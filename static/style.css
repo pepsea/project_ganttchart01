@@ -114,10 +114,10 @@ button.primary:hover { filter: brightness(1.08); }
 }
 .g-left .del:hover { color: var(--today); }
 
-select.prio { font-weight: 600; }
-select.prio[data-v="高"] { color: var(--prio-high); }
-select.prio[data-v="中"] { color: #b37400; }
-select.prio[data-v="低"] { color: var(--prio-low); }
+.prio { font-weight: 600; }
+.prio[data-v="高"] { color: var(--prio-high); }
+.prio[data-v="中"] { color: #b37400; }
+.prio[data-v="低"] { color: var(--prio-low); }
 
 .area-chip { display: flex; align-items: center; height: 100%; border-right: 1px solid var(--line); }
 .area-chip::before {
@@ -477,3 +477,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 /* PJ名 ⇔ 案件番号 の相互リンク */
 .pj-link { display: inline-flex; align-items: center; white-space: nowrap; font-size: 12px; color: var(--accent); }
 .select-add .pj-link { height: 34px; }
+
+/* ガントチャート: タスクごとの区切り線（表・タイムラインとも薄い線で区切る） */
+.g-row:not(.g-head) { border-bottom: 1px solid #d3d8e0; }
+.g-row:not(.g-head):nth-child(even) .g-track { background: rgba(120, 130, 150, .035); }

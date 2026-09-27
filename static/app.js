@@ -352,12 +352,12 @@ function renderRow(task, trackW) {
   assignee.addEventListener("click", () => openTaskDialog(task));
   syncReadonlyCells(row, task, areaText, projText, assignee);
 
-  const prio = document.createElement("select");
-  prio.className = "prio";
+  // 優先度も表示のみ（修正はクリックしてタスク詳細で）
+  const prio = el("button", "ro-cell prio");
+  prio.type = "button";
   prio.dataset.field = "priority";
-  prio.dataset.v = task.priority;
-  for (const p of PRIORITIES) prio.append(new Option(p, p, false, p === task.priority));
-  prio.addEventListener("change", () => { prio.dataset.v = prio.value; saveField(task, row, "priority", prio.value); });
+  prio.addEventListener("click", () => openTaskDialog(task));
+  syncPrioCell(prio, task);
 
   const start = dateCell(task, row, "start_date");
   const end = dateCell(task, row, "end_date");
@@ -434,6 +434,12 @@ function syncReadonlyCells(row, task, areaCell, projCell, assigneeCell) {
 
 // 実施中 = 今日が開始日〜終了日の間（期限超過・3 日以内の色を優先）
 const isActive = (task) => parseDate(task.start_date) <= todayMs() && todayMs() <= parseDate(task.end_date);
+
+function syncPrioCell(cell, task) {
+  cell.textContent = task.priority;
+  cell.dataset.v = task.priority;
+  cell.title = `優先度: ${task.priority}（修正はクリックしてタスク詳細で）`;
+}
 
 function syncTaskCell(cell, task) {
   cell.innerHTML = "";
@@ -525,12 +531,12 @@ function refreshRow(task, row) {
   const newAssignee = !!task.assignee && ![...$("#filter-assignees").options].some((o) => o.value === task.assignee);
   if (!inRange(task) || !list.includes(task) || orderChanged || newAssignee) return rerenderKeepScroll();
   row.style.setProperty("--area-color", areaColor(task.area));
-  for (const name of ["priority", "start_date", "end_date"]) {
+  for (const name of ["start_date", "end_date"]) {
     field(row, name).value = task[name];
   }
   syncReadonlyCells(row, task, field(row, "area"), field(row, "project"), field(row, "assignee"));
   syncTaskCell(field(row, "task"), task);
-  field(row, "priority").dataset.v = task.priority;
+  syncPrioCell(field(row, "priority"), task);
   for (const name of ["start_date", "end_date"]) syncDateCell($(`[data-cell="${name}"]`, row), task, name);
   const bar = $(".bar", row);
   placeBar(bar, task.start_date, task.end_date);
