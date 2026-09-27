@@ -3,7 +3,7 @@
 // グループ目標: 左にグループ一覧、右に選んだグループ（グループ名・PL・メンバー・全体目標・目標）
 const DAY_MS = 86400000;
 const $ = (sel, root = document) => root.querySelector(sel);
-const state = { groups: [], goals: [], statuses: [], current: null, services: [], platforms: [] };
+const state = { groups: [], goals: [], kpis: [], statuses: [], current: null, services: [], platforms: [] };
 const serviceName = (no) => state.services.find((s) => s.service_no === no)?.name || "";
 const platformName = (no) => state.platforms.find((p) => p.name === no)?.title || "";
 
@@ -87,7 +87,7 @@ function renderList() {
     const bar = el("i");
     bar.style.width = g.goal_total ? `${(g.goal_done / g.goal_total) * 100}%` : "0";
     meter.append(bar);
-    li.append(meter, el("div", "meta", `目標 ${g.goal_done}/${g.goal_total}`));
+    li.append(meter, el("div", "meta", `目標 ${g.goal_done}/${g.goal_total}` + (g.kpi_count ? `　指標 平均 ${g.kpi_avg}%` : "")));
     const team = [g.pl && `PL ${g.pl}`, g.members && `メンバー ${people(g).join("・")}`].filter(Boolean).join(" ／ ");
     if (team) li.append(el("div", "team", team));
     li.addEventListener("click", () => select(g.id));
@@ -98,7 +98,7 @@ function renderList() {
 async function select(id) {
   state.current = id;
   history.replaceState(null, "", `/groups?id=${id}`);
-  state.goals = await api(`/api/groups/${id}/goals`);
+  [state.goals, state.kpis] = await Promise.all([api(`/api/groups/${id}/goals`), api(`/api/groups/${id}/kpis`)]);
   renderList();
   renderDetail();
 }
@@ -117,7 +117,7 @@ function renderDetail() {
   const box = el("div");
   box.append(el("h2", "", g.name), teamLine(g));
   const edit = el("button", "", "✎ 編集");
-  edit.title = "グループ名・PL・メンバー・大目標・達成指標・関連サービス / 基盤技術を編集";
+  edit.title = "グループ名・PL・メンバー・大目標・関連サービス / 基盤技術を編集";
   edit.addEventListener("click", () => openGroupDialog(g));
   const editRow = el("div");
   editRow.style.marginTop = "8px";
@@ -152,7 +152,7 @@ function renderDetail() {
     sec.append(h, el("div", `vision-text${text ? "" : " hint"}`, text || "未記入（「✎ 編集」から入力）"));
     return sec;
   };
-  two.append(textSection("大目標", "中長期的に目指すこと", g.vision), textSection("今年度の達成指標", "今年度に達成を測る指標", g.kpi));
+  two.append(textSection("大目標", "中長期的に目指すこと", g.vision), renderKpis(g));
   root.append(two);
 
   // 関連サービス・関連基盤技術（クリックでそれぞれの画面へ）
@@ -167,6 +167,8 @@ function renderDetail() {
     for (const no of items) {
       const a = el("a", "rel-chip");
       a.href = href(no);
+      a.target = "_blank";
+      a.rel = "noopener";
       a.append(el("b", "", no), nameOf(no), el("span", "arrow", "↗"));
       chips.append(a);
     }
@@ -222,13 +224,91 @@ function renderDetail() {
   root.append(gs);
 }
 
+// ---- 今年度の達成指標: 指標・担当者・進捗 %（クリックで編集）
+function renderKpis(g) {
+  const sec = el("section", "gp-section");
+  const h = el("h3", "", "今年度の達成指標");
+  if (state.kpis.length) {
+    const avg = Math.round(state.kpis.reduce((n, k) => n + k.progress, 0) / state.kpis.length);
+    h.append(el("span", "avg-badge", `平均 ${avg}%`));
+  }
+  const add = el("button", "primary right", "＋ 指標を追加");
+  add.addEventListener("click", () => openKpiDialog(g, null));
+  h.append(add);
+  sec.append(h);
+  if (!state.kpis.length) {
+    sec.append(el("p", "hint", "まだ指標がありません。「＋ 指標を追加」から登録してください。"));
+    return sec;
+  }
+  const ul = el("ul", "kpi-list");
+  for (const k of state.kpis) {
+    const li = el("li");
+    li.tabIndex = 0;
+    li.title = "クリックして編集";
+    const done = k.progress >= 100;
+    li.append(el("span", "k-title", k.title), el("span", k.owner ? "k-owner" : "k-owner none", k.owner ? `担当 ${k.owner}` : "担当未設定"));
+    const bar = el("div", done ? "pbar done" : "pbar");
+    const fill = el("i");
+    fill.style.width = `${Math.max(0, Math.min(100, k.progress))}%`;
+    bar.append(fill);
+    li.append(bar, el("span", done ? "k-pct done" : "k-pct", `${k.progress}%`));
+    const openIt = () => openKpiDialog(g, k);
+    li.addEventListener("click", openIt);
+    li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openIt(); } });
+    ul.append(li);
+  }
+  sec.append(ul);
+  return sec;
+}
+
+let kpiEditing = null; // { group, kpi }
+const kpiForm = $("#form-kpi");
+kpiForm.progress_range.addEventListener("input", () => { kpiForm.progress.value = kpiForm.progress_range.value; });
+kpiForm.progress.addEventListener("input", () => { kpiForm.progress_range.value = kpiForm.progress.value || 0; });
+function openKpiDialog(g, k) {
+  kpiEditing = { group: g, kpi: k };
+  kpiForm.reset();
+  kpiForm.title.value = k?.title || "";
+  kpiForm.owner.value = k?.owner || "";
+  kpiForm.progress.value = kpiForm.progress_range.value = k ? k.progress : 0;
+  $("#kpi-title").textContent = k ? "指標の編集" : "指標の追加";
+  $("#kpi-meta").textContent = k ? `${g.name}　／　最終更新 ${k.updated_at.slice(0, 16)}` : g.name;
+  $("#kpi-submit").textContent = k ? "保存" : "追加";
+  $("#kpi-delete").hidden = !k;
+  $("#kpi-error").textContent = "";
+  $("#dlg-kpi").showModal();
+  (k ? kpiForm.progress : kpiForm.title).focus();
+}
+$("#dlg-kpi [data-close]").addEventListener("click", () => $("#dlg-kpi").close());
+kpiForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const { group, kpi } = kpiEditing;
+  const progress = Number(kpiForm.progress.value);
+  if (!Number.isInteger(progress) || progress < 0 || progress > 100) { $("#kpi-error").textContent = "進捗は 0〜100 の整数で入力してください"; return; }
+  const body = { title: kpiForm.title.value.trim(), owner: kpiForm.owner.value.trim(), progress };
+  try {
+    await api(kpi ? `/api/groups/${group.id}/kpis/${kpi.id}` : `/api/groups/${group.id}/kpis`,
+      { method: kpi ? "PUT" : "POST", body: JSON.stringify(body) });
+    $("#dlg-kpi").close();
+    await reload(group.id);
+    toast(kpi ? "指標を保存しました" : "指標を追加しました");
+  } catch (err) {
+    $("#kpi-error").textContent = err.message;
+  }
+});
+$("#kpi-delete").addEventListener("click", () => {
+  const { group, kpi } = kpiEditing;
+  $("#dlg-kpi").close();
+  openDelete("指標", `指標: ${kpi.title}`, `/api/groups/${group.id}/kpis/${kpi.id}`, () => reload(group.id));
+});
+
 // ------------------------------------------------------------ グループの追加・編集
 let groupEditing = null;
 function openGroupDialog(g = null) {
   groupEditing = g;
   const f = $("#form-group");
   f.reset();
-  for (const k of ["name", "pl", "members", "vision", "kpi"]) f[k].value = g?.[k] || "";
+  for (const k of ["name", "pl", "members", "vision"]) f[k].value = g?.[k] || "";
   // 関連サービス・関連基盤技術（複数選択）
   const chips = (sel, items, selected, name, labelOf) => {
     const box = $(sel);
@@ -263,7 +343,7 @@ $("#form-group").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
   const body = {
-    name: f.name.value.trim(), pl: f.pl.value.trim(), members: f.members.value, vision: f.vision.value, kpi: f.kpi.value,
+    name: f.name.value.trim(), pl: f.pl.value.trim(), members: f.members.value, vision: f.vision.value,
     services: [...f.querySelectorAll('input[name="services"]:checked')].map((i) => i.value),
     platforms: [...f.querySelectorAll('input[name="platforms"]:checked')].map((i) => i.value),
   };

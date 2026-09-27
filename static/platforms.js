@@ -288,6 +288,8 @@ function renderDetail() {
     for (const s of related) {
       const a = el("a", "svc-chip", `${s.service_no} ${s.name} ↗`);
       a.href = `/services#svc-${enc(s.service_no)}`;
+      a.target = "_blank";
+      a.rel = "noopener";
       rel.append(a);
     }
     titleBox.append(links, rel);
@@ -760,6 +762,8 @@ function renderTasks(p, tasks) {
   h.append(el("span", "hint", `${tasks.length} 件（表示のみ。追加・編集はガントチャートで）`));
   const link = el("a", "button right", "ガントチャートで編集 ↗");
   link.href = `/?pj=${enc(p.name)}`;
+  link.target = "_blank";
+  link.rel = "noopener";
   h.append(link);
   sec.append(h);
   if (!tasks.length) {

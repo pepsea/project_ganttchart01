@@ -67,8 +67,11 @@
 | `team_groups` | id, name (一意) | グループ名 |
 | | pl / members | PL / メンバー（半角スペース区切り） |
 | | vision | 大目標 |
-| | kpi | 今年度の達成指標 |
+| | kpi | （未使用。旧・今年度の達成指標の文章。起動時に `team_kpis` へ 1 行ずつ引き継ぐ） |
 | | services / platforms | 関連サービス（サービス番号の JSON 配列）/ 関連基盤技術（基盤番号の JSON 配列） |
+| | sort_order / created_at / updated_at | 表示順 / 作成・更新日時 |
+| `team_kpis` | id, group_id | 今年度の達成指標（`team_groups.id` を参照。グループの削除時に一緒に削除） |
+| | title / owner / progress | 指標 / 担当者 / 進捗（0〜100 %） |
 | | sort_order / created_at / updated_at | 表示順 / 作成・更新日時 |
 | `team_goals` | id, group_id | 目標（`team_groups.id` を参照。グループの削除時に一緒に削除） |
 | | title / due_date / status / note / url | 目標 / 期限 / 状態（未着手・取組中・達成・保留）/ メモ / リンク |

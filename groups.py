@@ -1,7 +1,7 @@
 """グループ目標管理 API
 
-グループ（グループ名・PL・メンバー・大目標・今年度の達成指標・関連サービス・関連基盤技術）と、
-グループごとの目標（状態・期限・メモ・リンク）を管理する。
+グループ（グループ名・PL・メンバー・大目標・関連サービス・関連基盤技術）と、
+今年度の達成指標（指標・担当者・進捗 %）、グループごとの目標（状態・期限・メモ・リンク）を管理する。
 """
 
 import asyncio
@@ -55,6 +55,26 @@ def init_db() -> None:
             # kpi = 今年度の達成指標 / services = 関連サービス（サービス番号）/ platforms = 関連基盤技術（基盤番号）
             if col not in cols:
                 db.execute(f"ALTER TABLE team_groups ADD COLUMN {col} TEXT NOT NULL DEFAULT {default}")
+        # 今年度の達成指標（指標ごとに担当者と進捗 %）
+        db.execute(
+            """CREATE TABLE IF NOT EXISTS team_kpis (
+                   id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                   group_id   INTEGER NOT NULL REFERENCES team_groups(id) ON DELETE CASCADE,
+                   title      TEXT NOT NULL,                -- 指標
+                   owner      TEXT NOT NULL DEFAULT '',     -- 担当者
+                   progress   INTEGER NOT NULL DEFAULT 0,   -- 進捗（0〜100 %）
+                   sort_order INTEGER NOT NULL DEFAULT 0,
+                   created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                   updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+               )"""
+        )
+        # 旧形式（kpi 列の文章）は 1 行ずつ指標として引き継ぐ（kpi 列は未使用として残す）
+        for r in db.execute("SELECT id, kpi FROM team_groups WHERE kpi <> ''"
+                            " AND id NOT IN (SELECT group_id FROM team_kpis)").fetchall():
+            lines = [x.strip() for x in r["kpi"].splitlines() if x.strip()]
+            for i, line in enumerate(lines, start=1):
+                db.execute("INSERT INTO team_kpis(group_id, title, sort_order) VALUES (?,?,?)", (r["id"], line, i))
+            db.execute("UPDATE team_groups SET kpi = '' WHERE id = ?", (r["id"],))
 
 
 # ---------------------------------------------------------------- Models
@@ -104,6 +124,17 @@ class GoalIn(BaseModel):
         return _url(v)
 
 
+class KpiIn(BaseModel):
+    title: str = Field(min_length=1)
+    owner: str = ""
+    progress: int = Field(default=0, ge=0, le=100)
+
+    @field_validator("title", "owner", mode="before")
+    @classmethod
+    def strip(cls, v):
+        return v.strip() if isinstance(v, str) else v
+
+
 class PasswordIn(BaseModel):
     password: str = ""
 
@@ -119,7 +150,9 @@ GROUP_SELECT = """
            (SELECT COUNT(*) FROM team_goals t WHERE t.group_id = g.id) AS goal_total,
            (SELECT COUNT(*) FROM team_goals t WHERE t.group_id = g.id AND t.status = '達成') AS goal_done,
            (SELECT MIN(due_date) FROM team_goals t
-             WHERE t.group_id = g.id AND t.status NOT IN ('達成', '保留') AND t.due_date IS NOT NULL) AS next_due
+             WHERE t.group_id = g.id AND t.status NOT IN ('達成', '保留') AND t.due_date IS NOT NULL) AS next_due,
+           (SELECT COUNT(*) FROM team_kpis k WHERE k.group_id = g.id) AS kpi_count,
+           (SELECT ROUND(AVG(progress)) FROM team_kpis k WHERE k.group_id = g.id) AS kpi_avg
     FROM team_groups g
 """
 GOAL_ORDER = "ORDER BY CASE status WHEN '達成' THEN 1 WHEN '保留' THEN 2 ELSE 0 END, COALESCE(due_date, '9999'), id"
@@ -253,4 +286,43 @@ async def delete_goal(gid: int, tid: int, body: PasswordIn) -> Response:
     with get_db() as db:
         if db.execute("DELETE FROM team_goals WHERE id=? AND group_id=?", (tid, gid)).rowcount == 0:
             raise HTTPException(404, "目標が見つかりません")
+    return Response(status_code=204)
+
+
+# ---------------------------------------------------------------- 今年度の達成指標（担当者・進捗 %）
+
+@router.get("/{gid}/kpis")
+def list_kpis(gid: int) -> list[dict]:
+    with get_db() as db:
+        _fetch(db, gid)
+        return [dict(r) for r in db.execute("SELECT * FROM team_kpis WHERE group_id = ? ORDER BY sort_order, id", (gid,))]
+
+
+@router.post("/{gid}/kpis", status_code=201)
+def add_kpi(gid: int, k: KpiIn) -> dict:
+    with get_db() as db:
+        _fetch(db, gid)
+        order = db.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM team_kpis WHERE group_id = ?", (gid,)).fetchone()[0]
+        cur = db.execute("INSERT INTO team_kpis(group_id, title, owner, progress, sort_order) VALUES (?,?,?,?,?)",
+                         (gid, k.title, k.owner, k.progress, order))
+        return dict(db.execute("SELECT * FROM team_kpis WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+
+@router.put("/{gid}/kpis/{kid}")
+def update_kpi(gid: int, kid: int, k: KpiIn) -> dict:
+    with get_db() as db:
+        cur = db.execute("UPDATE team_kpis SET title=?, owner=?, progress=?, updated_at=datetime('now','localtime')"
+                         " WHERE id=? AND group_id=?", (k.title, k.owner, k.progress, kid, gid))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "指標が見つかりません")
+        return dict(db.execute("SELECT * FROM team_kpis WHERE id = ?", (kid,)).fetchone())
+
+
+@router.delete("/{gid}/kpis/{kid}", status_code=204)
+async def delete_kpi(gid: int, kid: int, body: PasswordIn) -> Response:
+    """指標の削除（パスワード必須）"""
+    await _require_password(body)
+    with get_db() as db:
+        if db.execute("DELETE FROM team_kpis WHERE id=? AND group_id=?", (kid, gid)).rowcount == 0:
+            raise HTTPException(404, "指標が見つかりません")
     return Response(status_code=204)

@@ -50,7 +50,6 @@
         <label><span>メンバー（複数はスペース区切り）</span><input name="members" placeholder="例: 佐藤 鈴木"></label>
       </div>
       <label><span>大目標</span><textarea name="vision" rows="3" placeholder="このグループで中長期的に目指すこと"></textarea></label>
-      <label><span>今年度の達成指標</span><textarea name="kpi" rows="3" placeholder="例: 受託件数 30 件 / 平均納期 3 週間以内"></textarea></label>
       <div class="field">
         <span class="field-label">関連サービス（複数選択可）</span>
         <div id="group-services" class="chips-select"></div>
@@ -65,6 +64,30 @@
         <span class="spacer"></span>
         <button type="button" data-close>キャンセル</button>
         <button type="submit" class="primary" id="group-submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 今年度の達成指標の追加・編集 -->
+  <dialog id="dlg-kpi">
+    <form id="form-kpi" method="dialog" autocomplete="off">
+      <h2 id="kpi-title">指標の追加</h2>
+      <p id="kpi-meta" class="hint"></p>
+      <label><span>指標 <span class="req">*</span></span><input name="title" required placeholder="例: 受託件数 30 件"></label>
+      <label><span>担当者</span><input name="owner" placeholder="例: 田中"></label>
+      <label><span>進捗（％）</span>
+        <span class="progress-input">
+          <input type="range" name="progress_range" min="0" max="100" step="5">
+          <input type="number" name="progress" min="0" max="100" step="1" required>
+          <b>%</b>
+        </span>
+      </label>
+      <p class="error" id="kpi-error"></p>
+      <div class="actions gp-actions">
+        <button type="button" id="kpi-delete" class="danger-outline">削除…</button>
+        <span class="spacer"></span>
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="primary" id="kpi-submit">保存</button>
       </div>
     </form>
   </dialog>

@@ -47,6 +47,7 @@ TABLE_LABELS = {
     "ref_links": "参考リンク",
     "team_groups": "グループ",
     "team_goals": "グループの目標",
+    "team_kpis": "グループの今年度の達成指標",
     "areas": "領域",
     "case_nos": "案件番号",
     "customers": "顧客",

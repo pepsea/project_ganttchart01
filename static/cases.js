@@ -119,6 +119,8 @@ function caseNoTag(c) {
   tag.title = `案件番号（PJ名）: ${c.case_no}`;
   const link = el("a", "mini-link", "ガント ↗");
   link.href = ganttUrl(c.case_no);
+  link.target = "_blank";
+  link.rel = "noopener";
   link.title = `ガントチャートでこの案件のタスクを表示（${c.task_count ?? 0} 件）`;
   link.addEventListener("click", (e) => e.stopPropagation());
   tag.append(c.case_no, link);

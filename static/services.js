@@ -202,6 +202,8 @@ function renderRow(s) {
       for (const no of s.platforms) {
         const a = el("a", "pf-chip");
         a.href = `/platforms?id=${enc(no)}`;
+        a.target = "_blank";
+        a.rel = "noopener";
         a.title = "基盤技術で開く";
         a.append(el("b", "", no), platformTitle(no) || "", el("span", "arrow", "↗"));
         pfBox.append(a);
@@ -239,6 +241,8 @@ function renderTasks(s) {
       const pjTd = el("td", "nowrap");
       const pj = el("a", "pj-link", t.project);
       pj.href = `/?pj=${enc(t.project)}`;
+      pj.target = "_blank";
+      pj.rel = "noopener";
       pj.title = `ガントチャートで ${t.project} のタスクを表示・編集`;
       pjTd.append(pj);
       tr.append(pjTd);
