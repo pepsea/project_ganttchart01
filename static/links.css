@@ -68,5 +68,9 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 /* ---- 左: 自社技術リンク / 右: WEB リンク（自社サービス・その他参考を縦に） */
 .links-main { grid-template-columns: 1fr 1fr; }
 .web-links { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.web-links .col-title { margin: 0 0 -4px 2px; font-size: 13px; color: var(--muted); }
 .link-section.tech { border-top: 3px solid #2fa36b; }
+
+/* 左右の上端をそろえ、長い URL などで列が広がらないようにする */
+.links-main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.link-list li { grid-template-columns: minmax(0, 1fr) auto; }
+@media (max-width: 860px) { .links-main { grid-template-columns: minmax(0, 1fr); } }
