@@ -89,3 +89,19 @@
   .case-list li { grid-template-columns: 50px minmax(0, 1fr) auto; }
   .case-list .c-cust, .case-list .c-end { display: none; }
 }
+
+/* タスクは左から詰めて並べる（状態・タスク名・期間・PJ名・領域・優先度） */
+.task-list li { display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: center; gap: 4px 12px; }
+.task-list .st-badge { flex: 0 0 84px; }
+.task-list .t-name { flex: 0 1 auto; max-width: 32em; }
+.task-list .t-date { order: 2; }
+.task-list .t-pj { order: 3; flex: 0 1 auto; max-width: 26em; }
+.task-list .t-area { order: 4; }
+.task-list .t-prio { order: 5; }
+@media (max-width: 900px) { .task-list .t-pj, .task-list .t-area, .task-list .t-prio { display: inline-block; } }
+
+/* 領域の色 */
+.area-pill, .task-list .t-area { font-size: 12px; padding: 1px 10px; border-radius: 999px; white-space: nowrap;
+  background: color-mix(in srgb, var(--c) 14%, white); color: color-mix(in srgb, var(--c) 75%, black);
+  border: 1px solid color-mix(in srgb, var(--c) 40%, white); font-weight: 600; }
+.task-list .t-area { font-size: 11px; }

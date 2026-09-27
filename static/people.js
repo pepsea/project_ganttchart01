@@ -2,7 +2,7 @@
 
 // 個人: 左に人の一覧、右に選んだ人のタスク（状態を色で表示）と担当（領域・グループ・基盤技術・案件・サービス）。表示のみ
 const $ = (sel, root = document) => root.querySelector(sel);
-const state = { people: [], current: null, q: "" };
+const state = { people: [], current: null, q: "", areas: [] };
 // タスクの状態（ガントチャートと同じ色）: 期限超過 = 赤、期限 3 日以内 = オレンジ、実施中 = 青、開始前 = 灰
 const TASK_STATES = [["overdue", "期限超過"], ["soon", "期限3日以内"], ["active", "実施中"], ["waiting", "開始前"]];
 const stateLabel = (k) => TASK_STATES.find(([x]) => x === k)?.[1] || "";
@@ -16,6 +16,17 @@ function el(tag, cls = "", text) {
 }
 const slashDate = (s) => (s ? s.replaceAll("-", "/") : "");
 const enc = encodeURIComponent;
+// 領域の色（ガントチャートなどと同じ）
+function areaColor(area) {
+  let i = state.areas.indexOf(area);
+  if (i < 0) i = state.areas.length;
+  return `hsl(${(210 + i * 67) % 360} 62% 50%)`;
+}
+function areaPill(a, cls = "area-pill") {
+  const s = el("span", cls, a);
+  s.style.setProperty("--c", areaColor(a));
+  return s;
+}
 
 async function api(path) {
   const res = await fetch(path);
@@ -142,7 +153,7 @@ function renderDetail(d) {
     li.append(t.project
       ? extLink(`${t.project}${t.project_name ? `｜${t.project_name}` : ""}`, `/?pj=${enc(t.project)}`, "t-pj")
       : el("span", "t-pj none", "PJ名なし"));
-    li.append(el("span", "t-area", t.area), el("span", `t-prio p-${t.priority}`, t.priority),
+    li.append(areaPill(t.area, "t-area"), el("span", `t-prio p-${t.priority}`, `優先度 ${t.priority}`),
       el("span", "t-date", `${slashDate(t.start_date)} 〜 ${slashDate(t.end_date)}`));
     li.title = `${t.task}\n${stateLabel(t.state)} / 優先度 ${t.priority}\n${t.start_date} 〜 ${t.end_date}`;
     ul.append(li);
@@ -164,7 +175,7 @@ function renderDetail(d) {
     return sec;
   };
   grid.append(
-    box("担当領域", d.areas.map((a) => el("span", "area-pill", a))),
+    box("担当領域", d.areas.map((a) => areaPill(a))),
     box("担当グループ", d.groups.map((g) => extLink([roleTag(g.role), g.name, el("span", "arrow", "↗")], `/groups?id=${g.id}&year=all`))),
     box("担当基盤技術", d.platforms.map((p) => extLink([roleTag(p.role), el("b", "", p.name), p.title, el("span", "arrow", "↗")],
       `/platforms?id=${enc(p.name)}`))),
@@ -199,7 +210,7 @@ $("#pp-q").addEventListener("input", (e) => {
 
 (async () => {
   try {
-    state.people = await api("/api/people");
+    [state.people, state.areas] = await Promise.all([api("/api/people"), api("/api/masters/areas")]);
     const want = new URLSearchParams(location.search).get("name");
     const target = state.people.find((p) => p.name === want) || state.people[0];
     renderList();
