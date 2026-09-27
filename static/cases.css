@@ -476,3 +476,7 @@ a.link-ic:hover { filter: brightness(1.12); color: #fff; }
 .due-label.overdue { background: #ffd4d4; border-color: #e5484d; color: #a3161b; }
 .due-label.overdue small { color: #a3161b; }
 .card-top .due-label { margin-left: auto; }
+/* 終了予定日: カードの一番下。未設定も赤 */
+.card-due { margin-top: 4px; }
+.due-label.missing { background: #ffd4d4; border-color: #e5484d; color: #a3161b; font-weight: 600; }
+.due-label.missing small { color: #a3161b; }
