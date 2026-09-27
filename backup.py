@@ -2,7 +2,8 @@
 
 - バックアップは JSON（全テーブルの全行）。テーブル・列はデータベースから自動で読み取るので、今後項目が増えても対象になる
 - 復元は全データの置き換え。パスワードが必要で、直前の状態を自動でサーバーに保存してから実行する
-- サーバーには月 1 回自動でバックアップを保存し、直近 AUTO_KEEP か月分を残す
+- サーバーには毎週日曜日に自動でバックアップを保存し、直近 AUTO_KEEP 週分を残す（日曜に止まっていたときは、次に動いたときに保存）
+- バックアップファイルはダウンロードでき、手元のファイルをサーバーにアップロード（保存のみ。復元は別操作）もできる
 - アプリの起動のたび（アップデートでテーブルを更新する前）にもバックアップを保存し、直近 STARTUP_KEEP 回分を残す
 - 復元のあとには MIGRATIONS（テーブルの作成・列の追加）を実行し、古い形式のバックアップも新しいアプリで使えるようにする
 """
@@ -11,7 +12,7 @@ import asyncio
 import json
 import re
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
@@ -25,9 +26,9 @@ router = APIRouter(prefix="/api/admin", tags=["バックアップ"])
 BACKUP_DIR = DATA_DIR / "backups"
 FORMAT = "gantt-pm-backup"
 VERSION = 1
-AUTO_KEEP = 12  # 自動バックアップ（月 1 回）を残す数 = 12 か月分
+AUTO_KEEP = 26  # 自動バックアップ（毎週日曜日）を残す数 = 26 週（約半年）分
 STARTUP_KEEP = 10
-NAME_RE = re.compile(r"^(auto|manual|pre-restore|startup)-\d{8}-\d{6}\.json$")
+NAME_RE = re.compile(r"^(auto|manual|pre-restore|startup|upload)-\d{8}-\d{6}\.json$")
 MIGRATIONS: list = []  # main.py が登録する（テーブルの作成・列の追加）
 # 形を変えたテーブル: {新テーブル: (旧テーブル, 旧→新へ写す SQL)}。main.py が登録する。
 # 新テーブルを含まない古いバックアップを復元したときは、復元した旧テーブルから作り直す
@@ -176,13 +177,21 @@ def save_startup_backup() -> str | None:
         return None
 
 
-# ---------------------------------------------------------------- 自動バックアップ（月 1 回）
+# ---------------------------------------------------------------- 自動バックアップ（毎週日曜日）
 
-def ensure_monthly_backup() -> str | None:
-    """その月の自動バックアップがまだなければ保存する（1 時間ごとに確認）"""
+def last_sunday(now: datetime | None = None) -> datetime:
+    """直近の日曜日の 0 時（今日が日曜なら今日）"""
+    now = now or datetime.now()
+    d = now - timedelta(days=(now.weekday() + 1) % 7)
+    return d.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def ensure_weekly_backup(now: datetime | None = None) -> str | None:
+    """直近の日曜日以降の自動バックアップがまだなければ保存する（1 時間ごとに確認）。
+    日曜日にアプリが止まっていた場合も、次に動いたときに保存する"""
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    this_month = f"auto-{datetime.now():%Y%m}"
-    if any(f.name.startswith(this_month) for f in BACKUP_DIR.glob("auto-*.json")):
+    since = f"auto-{last_sunday(now):%Y%m%d}"
+    if any(f.name[:len(since)] >= since for f in BACKUP_DIR.glob("auto-*.json") if NAME_RE.match(f.name)):
         return None
     name = save_to_server("auto")
     _prune("auto", AUTO_KEEP)
@@ -192,7 +201,7 @@ def ensure_monthly_backup() -> str | None:
 async def auto_backup_loop() -> None:
     while True:
         try:
-            ensure_monthly_backup()
+            ensure_weekly_backup()
         except Exception as e:  # noqa: BLE001  バックアップの失敗でアプリを止めない
             print(f"[backup] 自動バックアップに失敗しました: {e}")
         await asyncio.sleep(3600)
@@ -223,6 +232,21 @@ def current_summary() -> dict:
 @router.post("/backups", status_code=201)
 def create_server_backup() -> dict:
     return {"name": save_to_server("manual"), "server_backups": list_server_backups()}
+
+
+@router.post("/backups/upload", status_code=201)
+async def upload_backup(file: UploadFile = File(...)) -> dict:
+    """手元のバックアップファイル（JSON）をサーバーに保存する（保存のみ。データは変わらない）"""
+    raw = await file.read()
+    try:
+        data = json.loads(raw.decode("utf-8-sig"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise HTTPException(422, "バックアップファイル（JSON）を読み込めません")
+    _validate(data)
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    name = f"upload-{datetime.now():%Y%m%d-%H%M%S}.json"
+    (BACKUP_DIR / name).write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    return {"name": name, "backup_created_at": data.get("created_at"), "server_backups": list_server_backups()}
 
 
 @router.get("/backups/{name}")

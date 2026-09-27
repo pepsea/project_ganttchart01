@@ -222,7 +222,7 @@ function startEdit(li, card, item, err) {
 }
 
 // ------------------------------------------------------------ バックアップ・復元
-const KIND_LABEL = { auto: "自動（毎月）", manual: "手動", "pre-restore": "復元前", startup: "起動時" };
+const KIND_LABEL = { auto: "自動（毎週日曜）", manual: "手動", "pre-restore": "復元前", startup: "起動時", upload: "アップロード" };
 const fmtSize = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
 const fmtTime = (s) => s.replace("T", " ").slice(0, 16);
 let restoreTarget = null; // { file } または { name }
@@ -236,7 +236,7 @@ async function loadBackups() {
     s.append(`${t.label} `, el("b", "", String(t.rows)));
     sum.append(s);
   }
-  $("#auto-keep").textContent = `（毎月の自動保存は直近 ${d.auto_keep} か月分、起動時の保存は直近 ${d.startup_keep} 回分を保持）`;
+  $("#auto-keep").textContent = `（毎週日曜日の自動保存は直近 ${d.auto_keep} 週分、起動時の保存は直近 ${d.startup_keep} 回分を保持）`;
   const ul = $("#server-backups");
   ul.innerHTML = "";
   if (!d.server_backups.length) ul.append(el("li", "empty", "まだありません"));
@@ -255,6 +255,27 @@ async function loadBackups() {
     ul.append(li);
   }
 }
+
+// 手元のバックアップファイルをサーバーにアップロード（保存のみ。復元は一覧の「復元」から）
+$("#btn-upload").addEventListener("click", () => {
+  $("#upload-file").value = "";
+  $("#upload-file").click();
+});
+$("#upload-file").addEventListener("change", async () => {
+  const file = $("#upload-file").files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append("file", file);
+  try {
+    const res = await fetch("/api/admin/backups/upload", { method: "POST", body: fd });
+    const d = await res.json();
+    if (!res.ok) throw new Error(typeof d.detail === "string" ? d.detail : `${res.status} ${res.statusText}`);
+    await loadBackups();
+    toast(`「${file.name}」をサーバーに保存しました（データは変わっていません。戻すときは一覧の「復元」から）`);
+  } catch (ex) {
+    toast(`アップロードできませんでした: ${ex.message}`, true);
+  }
+});
 
 $("#btn-server-save").addEventListener("click", async () => {
   try {
