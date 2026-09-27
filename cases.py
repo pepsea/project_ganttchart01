@@ -76,6 +76,18 @@ def init_db() -> None:
             );
             """
         )
+        # 進捗メモ（日付ごと。同じ日に複数可）。旧・週次進捗メモ（case_notes）は初回だけ引き継ぎ、以後は未使用として残す
+        has_progress = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='case_progress'").fetchone()
+        db.execute("""CREATE TABLE IF NOT EXISTS case_progress (
+                          id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                          case_id    INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+                          note_date  TEXT NOT NULL,   -- 日付（YYYY-MM-DD）
+                          body       TEXT NOT NULL,
+                          created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                          updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+                      )""")
+        if not has_progress:
+            db.execute(LEGACY_NOTES_COPY)
         cols = {r["name"] for r in db.execute("PRAGMA table_info(cases)")}
         for col in ("project", "detail"):
             if col not in cols:
@@ -91,6 +103,11 @@ def init_db() -> None:
                       WHERE project <> '' AND project NOT IN (SELECT name FROM case_nos)""")
 
 
+# 旧・週次進捗メモ（case_notes）→ 進捗メモ（case_progress）の引き継ぎ（backup.py の復元でも使う）
+LEGACY_NOTES_COPY = """INSERT INTO case_progress(case_id, note_date, body, created_at, updated_at)
+                       SELECT case_id, week, body, updated_at, updated_at FROM case_notes ORDER BY case_id, week"""
+
+
 def monday_of(d: date) -> date:
     return d - timedelta(days=d.weekday())
 
@@ -98,7 +115,7 @@ def monday_of(d: date) -> date:
 def seed_sample_cases(db: sqlite3.Connection) -> None:
     t = date.today()
     d = lambda n: (t + timedelta(days=n)).isoformat()  # noqa: E731
-    w = lambda n: (monday_of(t) + timedelta(weeks=n)).isoformat()  # noqa: E731
+    w = lambda n: (t + timedelta(weeks=n)).isoformat()  # noqa: E731
     samples = [
         ("C-2026-001", "A製薬", "血漿プロテオーム解析", "実施中", "佐藤", "鈴木 高橋",
          ["プロテオミクス", "バイオマーカー分析"], d(-40), d(25),
@@ -130,8 +147,8 @@ def seed_sample_cases(db: sqlite3.Connection) -> None:
             db.execute("INSERT INTO case_monthly(case_id, month, body) VALUES (?,?,?)",
                        (cur.lastrowid, (t.replace(day=1) - timedelta(days=1)).strftime("%Y-%m"),
                         "サンプル受領・前処理条件の検討を実施。測定開始に向けた準備が完了。"))
-        for week, body in notes:
-            db.execute("INSERT INTO case_notes(case_id, week, body) VALUES (?,?,?)", (cur.lastrowid, week, body))
+        for day, body in notes:
+            db.execute("INSERT INTO case_progress(case_id, note_date, body) VALUES (?,?,?)", (cur.lastrowid, day, body))
     # 未使用の案件番号・顧客（選択肢のサンプル）
     for no in ("C-2026-001", "C-2026-002", "C-2026-003", "C-2026-004", "C-2026-005", "C-2026-006",
                "C-2026-007", "C-2026-008"):
@@ -210,17 +227,24 @@ class MonthlyIn(BaseModel):
 
 
 class NoteIn(BaseModel):
-    week: date
+    note_date: date = Field(default_factory=date.today)  # 省略時は今日
     body: str = Field(min_length=1)
+
+    @field_validator("body", mode="before")
+    @classmethod
+    def strip(cls, v):
+        return v.strip() if isinstance(v, str) else v
 
 
 # ---------------------------------------------------------------- helpers
 
 CASE_SELECT = """
     SELECT c.*,
-           (SELECT COUNT(*) FROM case_notes n WHERE n.case_id = c.id) AS note_count,
-           (SELECT week FROM case_notes n WHERE n.case_id = c.id ORDER BY week DESC LIMIT 1) AS last_week,
-           (SELECT body FROM case_notes n WHERE n.case_id = c.id ORDER BY week DESC LIMIT 1) AS last_note,
+           (SELECT COUNT(*) FROM case_progress n WHERE n.case_id = c.id) AS note_count,
+           (SELECT note_date FROM case_progress n WHERE n.case_id = c.id
+             ORDER BY note_date DESC, id DESC LIMIT 1) AS last_note_date,
+           (SELECT body FROM case_progress n WHERE n.case_id = c.id
+             ORDER BY note_date DESC, id DESC LIMIT 1) AS last_note,
            (SELECT month FROM case_monthly m WHERE m.case_id = c.id ORDER BY month DESC LIMIT 1) AS last_month,
            (SELECT COUNT(*) FROM tasks t WHERE t.project = c.case_no) AS task_count
     FROM cases c
@@ -261,20 +285,39 @@ def list_statuses() -> list[str]:
     return list(STATUSES)
 
 
-# エクスポートの基本列（月報・週次メモの列はこの後ろに日付ごとに並ぶ）
+# エクスポートの基本列（月報・進捗メモの列はこの後ろに日付ごとに並ぶ）
 EXPORT_HEADERS = ["案件番号", "状況", "顧客名", "案件名", "PL", "担当者", "領域", "開始日", "終了予定日",
                   "BOXリンク", "Teamsリンク", "案件概要書リンク", "試験計画書リンク", "案件詳細"]
-# 日付パターンの列名: 月報_YYYY-MM / 週次_YYYY-MM-DD（週の月曜日）
+# 日付パターンの列名: 月報_YYYY-MM / 進捗_YYYY-MM-DD（旧形式の 週次_YYYY-MM-DD も読み込める）
 MONTH_COL = re.compile(r"^月報_(\d{4})[-/](\d{1,2})$")
-WEEK_COL = re.compile(r"^週次_(\d{4}[-/]\d{1,2}[-/]\d{1,2})$")
+NOTE_COL = re.compile(r"^(?:進捗|週次)_(\d{4}[-/]\d{1,2}[-/]\d{1,2})$")
+NOTE_SEP = "\n\n"  # 同じ日の進捗メモが複数あるときは空行でつないで 1 セルにする
+
+
+def _notes_by_day(db: sqlite3.Connection, case_id: int | None = None) -> dict[tuple[int, str], str]:
+    sql = "SELECT case_id, note_date, body FROM case_progress"
+    rows = db.execute(sql + (" WHERE case_id = ?" if case_id else "") + " ORDER BY id", (case_id,) if case_id else ())
+    out: dict[tuple[int, str], list[str]] = {}
+    for r in rows:
+        out.setdefault((r["case_id"], r["note_date"]), []).append(r["body"])
+    return {k: NOTE_SEP.join(v) for k, v in out.items()}
+
+
+def _import_note(db: sqlite3.Connection, case_id: int, day: str, body: str) -> bool:
+    """その日の進捗メモを CSV の内容にそろえる（同じ内容なら何もしない）。変更したら True"""
+    if _notes_by_day(db, case_id).get((case_id, day)) == body:
+        return False
+    db.execute("DELETE FROM case_progress WHERE case_id = ? AND note_date = ?", (case_id, day))
+    db.execute("INSERT INTO case_progress(case_id, note_date, body) VALUES (?,?,?)", (case_id, day, body))
+    return True
 
 
 @router.get("/export.csv")
 def export_csv() -> Response:
-    """全案件を 1 案件 1 行で出力。月報・週次進捗メモはすべて日付ごとの列に展開する（新しい順）。"""
+    """全案件を 1 案件 1 行で出力。月報・進捗メモはすべて日付ごとの列に展開する（新しい順）。"""
     cases = list_cases()
     with get_db() as db:
-        notes = {(r["case_id"], r["week"]): r["body"] for r in db.execute("SELECT case_id, week, body FROM case_notes")}
+        notes = _notes_by_day(db)
         monthly = {(r["case_id"], r["month"]): r["body"]
                    for r in db.execute("SELECT case_id, month, body FROM case_monthly")}
     months = sorted({m for _, m in monthly}, reverse=True)
@@ -282,7 +325,7 @@ def export_csv() -> Response:
 
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow([*EXPORT_HEADERS, *(f"月報_{m}" for m in months), *(f"週次_{wk}" for wk in weeks)])
+    w.writerow([*EXPORT_HEADERS, *(f"月報_{m}" for m in months), *(f"進捗_{wk}" for wk in weeks)])
     for c in cases:
         w.writerow([c["case_no"], c["status"], c["customer"], c["name"], c["pl"], c["assignees"],
                     " ".join(c["areas"]), c["start_date"] or "", c["end_date"] or "",
@@ -317,7 +360,7 @@ IMPORT_ALIASES = {
     "案件概要書リンク": "overview_url", "案件概要書": "overview_url", "overview_url": "overview_url",
     "試験計画書リンク": "plan_url", "試験計画書": "plan_url", "plan_url": "plan_url",
     "案件詳細": "detail", "detail": "detail",
-    "最新進捗週": "note_week", "最新進捗メモ": "note_body",
+    "最新進捗週": "note_week", "最新進捗メモ": "note_body",  # 旧形式
 }
 
 
@@ -326,7 +369,8 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
     """案件 CSV を取り込む（案件番号が一致すれば更新、なければ追加）。
 
     - 既存案件の更新時、CSV に無い列・空欄のセルは既存の値を保持する（誤って消さないため）
-    - 「月報_YYYY-MM」「週次_YYYY-MM-DD」列の内容を月報・週次進捗メモとして登録（同じ月・週は上書き、空欄は変更なし）
+    - 「月報_YYYY-MM」「進捗_YYYY-MM-DD」列の内容を月報・進捗メモとして登録（同じ月・日は上書き、空欄は変更なし）
+    - 旧形式の「週次_YYYY-MM-DD」列は、その日付の進捗メモとして登録
     - 旧形式の「最新進捗週」「最新進捗メモ」列にも対応
     - 1 行でもエラーがあれば全体を取り込まない
     """
@@ -334,7 +378,7 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
     if not reader.fieldnames:
         raise HTTPException(422, "CSV にヘッダー行がありません")
     colmap = {h: IMPORT_ALIASES.get(h.strip()) for h in reader.fieldnames}
-    # 日付パターンの列（月報・週次）
+    # 日付パターンの列（月報・進捗）
     log_cols: dict[str, tuple[str, str]] = {}
     for h in reader.fieldnames:
         if m := MONTH_COL.match(h.strip()):
@@ -342,8 +386,8 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
             if not 1 <= mo <= 12:
                 raise HTTPException(422, f"列名「{h}」の月が正しくありません")
             log_cols[h] = ("month", f"{y:04d}-{mo:02d}")
-        elif m := WEEK_COL.match(h.strip()):
-            log_cols[h] = ("week", monday_of(parse_date(m.group(1), 1, f"列名「{h}」の日付")).isoformat())
+        elif m := NOTE_COL.match(h.strip()):
+            log_cols[h] = ("note", parse_date(m.group(1), 1, f"列名「{h}」の日付").isoformat())
     missing = {"case_no", "name"} - set(colmap.values())
     if missing:
         raise HTTPException(422, "必須列がありません: " + ", ".join({"case_no": "案件番号", "name": "案件名"}[m] for m in sorted(missing)))
@@ -399,12 +443,8 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                 added += 1
 
             if rec.get("note_week") and rec.get("note_body"):
-                week = monday_of(parse_date(rec["note_week"], line, "最新進捗週")).isoformat()
-                db.execute(
-                    """INSERT INTO case_notes(case_id, week, body) VALUES (?,?,?)
-                       ON CONFLICT(case_id, week) DO UPDATE
-                       SET body = excluded.body, updated_at = datetime('now', 'localtime')""",
-                    (case_id, week, rec["note_body"]))
+                day = parse_date(rec["note_week"], line, "最新進捗週").isoformat()
+                _import_note(db, case_id, day, rec["note_body"])
                 notes += 1
 
             for h, (kind, key) in log_cols.items():
@@ -420,12 +460,7 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                         (case_id, key, body))
                     reports += 1
                 else:
-                    db.execute(
-                        """INSERT INTO case_notes(case_id, week, body) VALUES (?,?,?)
-                           ON CONFLICT(case_id, week) DO UPDATE
-                           SET body = excluded.body, updated_at = datetime('now', 'localtime')
-                           WHERE body <> excluded.body""",
-                        (case_id, key, body))
+                    _import_note(db, case_id, key, body)
                     notes += 1
     return {"added": added, "updated": updated, "notes": notes, "monthly": reports}
 
@@ -476,35 +511,39 @@ def delete_case(case_id: int, confirm: str = "") -> Response:
     return Response(status_code=204)
 
 
-# ---------------------------------------------------------------- 週次進捗メモ
+# ---------------------------------------------------------------- 進捗メモ（日付ごと。同じ日に複数可）
 
 @router.get("/{case_id}/notes")
 def list_notes(case_id: int) -> list[dict]:
     with get_db() as db:
         fetch_case(db, case_id)
-        rows = db.execute("SELECT * FROM case_notes WHERE case_id = ? ORDER BY week DESC", (case_id,))
+        rows = db.execute("SELECT * FROM case_progress WHERE case_id = ? ORDER BY note_date DESC, id DESC", (case_id,))
         return [dict(r) for r in rows]
 
 
-@router.put("/{case_id}/notes")
-def upsert_note(case_id: int, n: NoteIn) -> dict:
-    """週（月曜日に丸める）ごとに 1 件。既にあれば上書き。"""
-    week = monday_of(n.week).isoformat()
+@router.post("/{case_id}/notes", status_code=201)
+def add_note(case_id: int, n: NoteIn) -> dict:
     with get_db() as db:
         fetch_case(db, case_id)
-        db.execute(
-            """INSERT INTO case_notes(case_id, week, body) VALUES (?,?,?)
-               ON CONFLICT(case_id, week) DO UPDATE
-               SET body = excluded.body, updated_at = datetime('now', 'localtime')""",
-            (case_id, week, n.body.strip()),
-        )
-        return dict(db.execute("SELECT * FROM case_notes WHERE case_id = ? AND week = ?", (case_id, week)).fetchone())
+        cur = db.execute("INSERT INTO case_progress(case_id, note_date, body) VALUES (?,?,?)",
+                         (case_id, n.note_date.isoformat(), n.body))
+        return dict(db.execute("SELECT * FROM case_progress WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+
+@router.put("/{case_id}/notes/{note_id}")
+def update_note(case_id: int, note_id: int, n: NoteIn) -> dict:
+    with get_db() as db:
+        cur = db.execute("UPDATE case_progress SET note_date = ?, body = ?, updated_at = datetime('now', 'localtime')"
+                         " WHERE id = ? AND case_id = ?", (n.note_date.isoformat(), n.body, note_id, case_id))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "進捗メモが見つかりません")
+        return dict(db.execute("SELECT * FROM case_progress WHERE id = ?", (note_id,)).fetchone())
 
 
 @router.delete("/{case_id}/notes/{note_id}", status_code=204)
 def delete_note(case_id: int, note_id: int) -> Response:
     with get_db() as db:
-        cur = db.execute("DELETE FROM case_notes WHERE id = ? AND case_id = ?", (note_id, case_id))
+        cur = db.execute("DELETE FROM case_progress WHERE id = ? AND case_id = ?", (note_id, case_id))
         if cur.rowcount == 0:
             raise HTTPException(404, "進捗メモが見つかりません")
     return Response(status_code=204)

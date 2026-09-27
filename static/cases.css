@@ -145,7 +145,8 @@
   background: var(--panel);
 }
 a.link-ic:hover { border-color: var(--accent); color: var(--accent); }
-span.link-ic { color: #c3c7cf; border-style: dashed; }
+/* リンクが無いものは赤背景 */
+span.link-ic { color: #a3161b; background: #ffd4d4; border-color: #f2b8b9; }
 
 /* ---- 一覧 */
 .table-wrap { padding: 12px 16px; }
@@ -460,3 +461,7 @@ a.link-ic:hover { filter: brightness(1.12); color: #fff; }
 .case-task-table td.prio[data-v="高"] { color: var(--prio-high); }
 .case-task-table td.prio[data-v="中"] { color: #b37400; }
 .case-task-table td.prio[data-v="低"] { color: var(--prio-low); }
+
+/* 詳細画面: リンクが入っていない入力欄は赤背景 */
+.link-field input.missing { background: #fde8e8; border-color: #f2b8b9; }
+.link-field input.missing:focus { background: #fff; }

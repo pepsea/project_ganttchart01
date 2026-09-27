@@ -114,19 +114,20 @@
 
       <div id="logs">
       <div class="log-tabs seg" role="tablist">
-        <button type="button" data-log="weekly" class="on">週次進捗メモ</button>
+        <button type="button" data-log="weekly" class="on">進捗メモ</button>
         <button type="button" data-log="monthly">月報</button>
       </div>
       <section id="notes-section" class="notes">
         <form id="note-form" class="note-form">
           <div class="note-week">
-            <label>週 <input type="date" name="week" required></label>
-            <span id="note-week-label" class="hint"></span>
+            <label>日付 <input type="date" name="note_date" required></label>
+            <span class="hint">初期値は今日。同じ日に何件でも記入できます</span>
           </div>
-          <textarea name="body" rows="4" required placeholder="今週の進捗、課題、次週の予定など"></textarea>
+          <textarea name="body" rows="4" required placeholder="進捗、課題、次の予定など"></textarea>
           <div class="note-actions">
             <span id="note-state" class="hint"></span>
-            <button type="submit" class="primary">進捗を保存</button>
+            <button type="button" id="note-cancel" hidden>編集をやめる</button>
+            <button type="submit" class="primary" id="note-submit">進捗を追加</button>
           </div>
         </form>
         <ol id="note-list" class="note-list"></ol>
@@ -167,7 +168,7 @@
         <li>案件番号が一致する案件は<b>更新</b>、一致しない案件は<b>追加</b>されます</li>
         <li>更新時、空欄のセルや CSV に無い列は元の値のまま残ります</li>
         <li>領域は「、」やスペース区切りで複数指定できます。未登録の顧客・PJ名・領域・案件番号は自動登録されます</li>
-        <li>「月報_2026-09」「週次_2026-09-21」のような日付の列は、その月の月報・その週の週次進捗メモとして登録されます（同じ月・週は上書き、空欄は変更なし）</li>
+        <li>「月報_2026-09」「進捗_2026-09-21」のような日付の列は、その月の月報・その日の進捗メモとして登録されます（同じ月・日は上書き、空欄は変更なし。旧形式の「週次_」列も読み込めます）</li>
         <li>エラーのある行が 1 行でもあれば、何も取り込まれません</li>
       </ul>
       <p class="error" id="import-error"></p>
@@ -182,7 +183,7 @@
   <dialog id="dlg-delete">
     <form id="form-delete" method="dialog">
       <h2 class="danger">案件の削除</h2>
-      <p>案件と、その週次進捗メモをすべて削除します。<strong>この操作は元に戻せません。</strong></p>
+      <p>案件と、その進捗メモ・月報をすべて削除します。<strong>この操作は元に戻せません。</strong></p>
       <label><span>確認のため、案件番号 <strong id="delete-no"></strong> を入力してください</span>
         <input name="confirm" autocomplete="off">
       </label>

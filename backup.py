@@ -29,12 +29,16 @@ AUTO_KEEP = 12  # 自動バックアップ（月 1 回）を残す数 = 12 か�
 STARTUP_KEEP = 10
 NAME_RE = re.compile(r"^(auto|manual|pre-restore|startup)-\d{8}-\d{6}\.json$")
 MIGRATIONS: list = []  # main.py が登録する（テーブルの作成・列の追加）
+# 形を変えたテーブル: {新テーブル: (旧テーブル, 旧→新へ写す SQL)}。main.py が登録する。
+# 新テーブルを含まない古いバックアップを復元したときは、復元した旧テーブルから作り直す
+LEGACY_UPGRADES: dict[str, tuple[str, str]] = {}
 
 # テーブルの説明（管理画面の表示用）
 TABLE_LABELS = {
     "tasks": "ガントチャートのタスク",
     "cases": "案件",
-    "case_notes": "案件の週次進捗メモ",
+    "case_notes": "案件の週次進捗メモ（旧形式・未使用）",
+    "case_progress": "案件の進捗メモ",
     "case_monthly": "案件の月報",
     "platforms": "基盤（基盤番号・基本情報・全体目標）",
     "platform_goals": "基盤の目標",
@@ -116,6 +120,10 @@ def restore(data: dict) -> list[dict]:
                         continue
                     conn.execute(f"INSERT INTO {t} ({', '.join(keys)}) VALUES ({', '.join('?' * len(keys))})",
                                  [row[k] for k in keys])
+            for new, (old, copy_sql) in LEGACY_UPGRADES.items():
+                if new in existing and new not in data["tables"] and old in data["tables"]:
+                    conn.execute(f"DELETE FROM {new}")
+                    conn.execute(copy_sql)
     except sqlite3.Error as e:
         raise HTTPException(422, f"復元に失敗しました（データは変更されていません）: {e}")
     finally:

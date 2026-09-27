@@ -13,8 +13,6 @@ const STATUS_COLOR = {
   アフターフォロー: "#1f9fb4",
   キャンセル: "#a9adb6",
 };
-// 週次進捗の記入が必要な状況
-const NEEDS_WEEKLY = new Set(["契約中", "ブリーフィング前", "実施中", "QC", "アフターフォロー"]);
 // 期限（終了予定日）の色分け対象外
 const NO_DEADLINE = new Set(["アフターフォロー", "キャンセル"]);
 const LINKS = [
@@ -59,14 +57,13 @@ const todayMs = () => {
   return Date.UTC(n.getFullYear(), n.getMonth(), n.getDate());
 };
 const mondayOf = (ms) => ms - ((new Date(ms).getUTCDay() + 6) % 7) * DAY_MS;
-const thisMonday = () => fmtDate(mondayOf(todayMs()));
 function shortDate(str) {
   if (!str) return "";
   const d = new Date(parseDate(str));
   const md = `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
   return d.getUTCFullYear() === new Date().getFullYear() ? md : `${d.getUTCFullYear()}/${md}`;
 }
-const weekLabel = (week) => `${shortDate(week)}週`;
+const today = () => fmtDate(todayMs());
 const people = (c) => (c.assignees ? c.assignees.split(" ") : []);
 const safeUrl = (u) => (/^https?:\/\//i.test(u || "") ? u : "");
 
@@ -82,12 +79,6 @@ function deadlineStatus(c) {
   if (left < 0) return "overdue";
   if (left <= 3) return "soon";
   return "";
-}
-
-// 週次進捗: "missing" = 記入が必要なのに今週分がない / "ok" = 今週記入済み / "" = 対象外
-function weeklyStatus(c) {
-  if (c.last_week && c.last_week >= thisMonday()) return "ok";
-  return NEEDS_WEEKLY.has(c.status) ? "missing" : "";
 }
 
 async function api(path, options = {}) {
@@ -226,13 +217,6 @@ function dueLabel(c) {
   return span;
 }
 
-function weeklyBadge(c) {
-  const st = weeklyStatus(c);
-  if (st === "missing") return el("span", "badge warn", "今週未記入");
-  if (st === "ok") return el("span", "badge ok", "今週記入済");
-  return null;
-}
-
 // ---- カンバン
 function renderBoard() {
   const board = el("div", "board");
@@ -292,14 +276,12 @@ function renderCard(c) {
 
   if (c.last_note) {
     const memo = el("div", "memo");
-    memo.append(el("span", "wk", weekLabel(c.last_week)), c.last_note);
+    memo.append(el("span", "wk", shortDate(c.last_note_date)), c.last_note);
     memo.title = c.last_note;
     card.append(memo);
   }
   const foot = el("div", "card-foot");
   foot.append(linkIcons(c), el("span", "spacer"));
-  const badge = weeklyBadge(c);
-  if (badge) foot.append(badge);
   card.append(foot);
   return card;
 }
@@ -321,7 +303,7 @@ async function changeStatus(c, status) {
 const COLUMNS = [
   ["status", "状況"], ["case_no", "案件番号"], ["customer", "顧客名"], ["name", "案件名"], ["pl", "PL"],
   ["assignees", "担当者"], ["areas", "領域"], ["start_date", "開始日"], ["end_date", "終了予定日"],
-  ["links", "リンク"], ["last_week", "最新の進捗"],
+  ["links", "リンク"], ["last_note_date", "最新の進捗"],
 ];
 
 function renderList() {
@@ -372,9 +354,7 @@ function renderList() {
     if (ds) endTd.append(el("span", `due ${ds}`, ds === "overdue" ? " 超過" : " 間近"));
     cell(linkIcons(c), "nowrap");
     const memo = cell("", "memo-cell");
-    if (c.last_week) memo.append(el("span", "wk", `${weekLabel(c.last_week)}（全 ${c.note_count} 件）`), c.last_note);
-    const badge = weeklyBadge(c);
-    if (badge && badge.classList.contains("warn")) memo.append(" ", badge);
+    if (c.last_note_date) memo.append(el("span", "wk", `${shortDate(c.last_note_date)}（全 ${c.note_count} 件）`), c.last_note);
     tbody.append(tr);
   }
   table.append(thead, tbody);
@@ -529,6 +509,7 @@ function fillCustomerSelect(current = "") {
 function syncLinks() {
   document.querySelectorAll("#case-form .open-link").forEach((a) => {
     const url = safeUrl(form[a.dataset.for].value.trim());
+    form[a.dataset.for].classList.toggle("missing", !url); // リンクが無い欄は赤背景
     if (url) {
       a.href = url;
       a.setAttribute("aria-disabled", "false");
@@ -601,7 +582,7 @@ form.addEventListener("submit", async (e) => {
     await loadCases();
     const fresh = state.cases.find((x) => x.id === saved.id);
     render();
-    toast(c ? "保存しました" : "案件を追加しました。続けて週次進捗を記入できます");
+    toast(c ? "保存しました" : "案件を追加しました。続けて進捗メモを記入できます");
     openDrawer(fresh);
   } catch (err) {
     $("#case-error").textContent = err.message;
@@ -611,45 +592,55 @@ form.addEventListener("submit", async (e) => {
 drawer.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => drawer.close()));
 drawer.addEventListener("click", (e) => { if (e.target === drawer) drawer.close(); }); // 背景クリックで閉じる
 
-// ---- 週次進捗メモ
+// ---- 進捗メモ（日付ごと。同じ日に複数可。日付は今日が初期値）
 const noteForm = $("#note-form");
 let notes = [];
+let noteEditing = null; // 編集中の進捗メモ（null = 新規）
 
-function setNoteWeek(week) {
-  const w = fmtDate(mondayOf(parseDate(week)));
-  noteForm.week.value = w;
-  const existing = notes.find((n) => n.week === w);
-  noteForm.body.value = existing ? existing.body : "";
-  const end = fmtDate(parseDate(w) + 6 * DAY_MS);
-  $("#note-week-label").textContent = `${w.replaceAll("-", "/")}（月）〜 ${shortDate(end)}（日）${w === thisMonday() ? "・今週" : ""}`;
-  $("#note-state").textContent = existing ? "この週は記入済みです（上書き保存されます）" : "新規記入";
+function resetNoteForm() {
+  noteEditing = null;
+  noteForm.note_date.value = today();
+  noteForm.body.value = "";
+  $("#note-submit").textContent = "進捗を追加";
+  $("#note-cancel").hidden = true;
+  $("#note-state").textContent = "";
+}
+
+function editNote(n) {
+  noteEditing = n;
+  noteForm.note_date.value = n.note_date;
+  noteForm.body.value = n.body;
+  $("#note-submit").textContent = "保存";
+  $("#note-cancel").hidden = false;
+  $("#note-state").textContent = `${n.note_date.replaceAll("-", "/")} のメモを編集中`;
+  noteForm.body.focus();
 }
 
 async function loadNotes(c) {
   notes = await api(`/api/cases/${c.id}/notes`);
   renderNotes();
-  setNoteWeek(thisMonday());
+  resetNoteForm();
 }
 
 function renderNotes() {
   const ol = $("#note-list");
   ol.innerHTML = "";
   if (!notes.length) {
-    ol.append(el("li", "note-empty", "まだ進捗メモがありません。毎週の進捗を記入してください。"));
+    ol.append(el("li", "note-empty", "まだ進捗メモがありません。"));
     return;
   }
   for (const n of notes) {
     const li = el("li");
-    if (n.week === thisMonday()) li.classList.add("current");
+    if (n.note_date === today()) li.classList.add("current");
     const h = el("div", "nh");
-    h.append(el("b", "", `${n.week.replaceAll("-", "/")} 週`), el("span", "upd", `更新 ${n.updated_at.slice(0, 16)}`));
+    h.append(el("b", "", n.note_date.replaceAll("-", "/")), el("span", "upd", `更新 ${n.updated_at.slice(0, 16)}`));
     const edit = el("button", "", "編集");
     edit.type = "button";
-    edit.addEventListener("click", () => { setNoteWeek(n.week); noteForm.body.focus(); });
+    edit.addEventListener("click", () => editNote(n));
     const del = el("button", "", "削除");
     del.type = "button";
     del.addEventListener("click", async () => {
-      if (!confirm(`${n.week} 週の進捗メモを削除しますか？`)) return;
+      if (!confirm(`${n.note_date.replaceAll("-", "/")} の進捗メモを削除しますか？`)) return;
       try {
         await api(`/api/cases/${state.current.id}/notes/${n.id}`, { method: "DELETE" });
         await afterNoteChange();
@@ -664,28 +655,27 @@ function renderNotes() {
 
 async function afterNoteChange() {
   const id = state.current.id;
-  const week = noteForm.week.value;
   notes = await api(`/api/cases/${id}/notes`);
   renderNotes();
-  setNoteWeek(week || thisMonday());
+  resetNoteForm();
   await loadCases();
   state.current = state.cases.find((x) => x.id === id);
   render();
 }
 
-noteForm.week.addEventListener("change", () => { if (noteForm.week.value) setNoteWeek(noteForm.week.value); });
+$("#note-cancel").addEventListener("click", resetNoteForm);
 
 noteForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const body = noteForm.body.value.trim();
   if (!body) return;
+  const payload = JSON.stringify({ note_date: noteForm.note_date.value || today(), body });
   try {
-    await api(`/api/cases/${state.current.id}/notes`, {
-      method: "PUT",
-      body: JSON.stringify({ week: noteForm.week.value, body }),
-    });
+    if (noteEditing) await api(`/api/cases/${state.current.id}/notes/${noteEditing.id}`, { method: "PUT", body: payload });
+    else await api(`/api/cases/${state.current.id}/notes`, { method: "POST", body: payload });
+    const wasEdit = !!noteEditing;
     await afterNoteChange();
-    toast("進捗メモを保存しました");
+    toast(wasEdit ? "進捗メモを保存しました" : "進捗メモを追加しました");
   } catch (err) {
     toast(err.message, true);
   }
@@ -732,7 +722,7 @@ async function loadCaseTasks(c) {
   box.append(table);
 }
 
-// ---- 週次進捗 / 月報 のタブ切り替え
+// ---- 進捗メモ / 月報 のタブ切り替え
 function setLogTab(tab) {
   document.querySelectorAll(".log-tabs button").forEach((b) => b.classList.toggle("on", b.dataset.log === tab));
   $("#notes-section").hidden = tab !== "weekly";
@@ -843,7 +833,7 @@ $("#form-import").addEventListener("submit", async (e) => {
     $("#dlg-import").close();
     await Promise.all([loadCases(), loadMasters()]);
     render();
-    toast(`インポート完了: 追加 ${data.added} 件 / 更新 ${data.updated} 件 / 月報 ${data.monthly} 件 / 週次メモ ${data.notes} 件`);
+    toast(`インポート完了: 追加 ${data.added} 件 / 更新 ${data.updated} 件 / 月報 ${data.monthly} 件 / 進捗メモ ${data.notes} 件`);
   } catch (err) {
     $("#import-error").textContent = err.message;
   }
