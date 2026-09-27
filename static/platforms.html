@@ -57,23 +57,26 @@
   </header>
 
   <div class="pf-layout">
-    <!-- 基盤の一覧 -->
-    <aside class="pf-list">
+    <!-- 基盤一覧（表）。行をクリックすると詳細を表示 -->
+    <main class="pf-listview" id="list-view">
       <div class="pf-list-head">
-        <b>基盤一覧</b>
-        <a href="/admin" class="hint" target="_blank" rel="noopener">基盤番号の登録は管理サイト ↗</a>
-      </div>
-      <div class="pf-list-filter">
+        <h2>基盤一覧 <span id="pf-count" class="hint"></span></h2>
         <label class="filter">領域 <select id="f-area"><option value="">すべて</option></select></label>
         <label class="filter">メンバー <select id="f-person"><option value="">すべて</option></select></label>
+        <span class="spacer"></span>
+        <a href="/admin" class="hint" target="_blank" rel="noopener">基盤番号の登録は管理サイト ↗</a>
       </div>
-      <ul id="pf-items"></ul>
-    </aside>
+      <div id="pf-table" class="pf-table-wrap"></div>
+    </main>
 
     <!-- 選択した基盤の詳細 -->
-    <main class="pf-detail" id="detail">
-      <p class="hint pf-empty">左の一覧から基盤を選択してください。</p>
-    </main>
+    <section class="pf-detail-view" id="detail-view" hidden>
+      <div class="pf-backbar">
+        <button type="button" id="btn-back">← 基盤一覧</button>
+        <span id="back-name" class="hint"></span>
+      </div>
+      <main class="pf-detail" id="detail"></main>
+    </section>
   </div>
 
   <div id="toast" class="toast" role="status"></div>

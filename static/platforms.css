@@ -482,3 +482,35 @@ table.tasks td { border-bottom-color: var(--line); }
 .goal-list li, .goal-list li:last-child { border-bottom: 1px solid #d3d8e0; }
 .goal-list li:nth-child(even) { background: #fafbfd; }
 .goal-list li:nth-child(even):hover, .goal-list li:nth-child(even):focus { background: #f3f7ff; }
+
+/* ---- 基盤一覧（表）→ クリックで詳細 */
+.pf-listview { flex: 1; overflow: auto; padding: 16px 20px 40px; min-width: 0; }
+.pf-listview .pf-list-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 0 0 12px; }
+.pf-listview .pf-list-head h2 { margin: 0; font-size: 17px; }
+.pf-listview .pf-list-head h2 .hint { font-size: 12px; font-weight: 400; margin-left: 6px; }
+.pf-listview .pf-list-head .spacer { flex: 1; }
+.pf-table-wrap { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 10px; overflow: auto; }
+table.pf-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.pf-table th { position: sticky; top: 0; background: #f7f8fa; text-align: left; font-size: 12px; color: var(--muted); font-weight: 700;
+  padding: 8px 10px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+table.pf-table td { padding: 9px 10px; border-bottom: 1px solid #d3d8e0; vertical-align: middle; }
+table.pf-table tbody tr { cursor: pointer; }
+table.pf-table tbody tr:nth-child(even) { background: #fafbfd; }
+table.pf-table tbody tr:hover, table.pf-table tbody tr:focus { background: #eef3ff; outline: none; }
+table.pf-table tbody tr:last-child td { border-bottom: 0; }
+table.pf-table td.no { font-weight: 700; white-space: nowrap; border-left: 4px solid var(--c); font-variant-numeric: tabular-nums; }
+table.pf-table td.ttl { font-weight: 600; min-width: 12em; }
+table.pf-table td.ttl.untitled { color: var(--muted); font-weight: 400; }
+table.pf-table td.members { font-size: 12.5px; }
+table.pf-table td.none { color: #b0b4bc; }
+table.pf-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.pf-table td.nowrap, table.pf-table td.due { white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.pf-table td.due.overdue { color: var(--today); font-weight: 700; }
+table.pf-table td.due.soon { color: #b56d00; font-weight: 700; }
+table.pf-table .goal-cell { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+table.pf-table .goal-cell .meter { width: 70px; flex: 0 0 70px; }
+
+.pf-detail-view { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.pf-backbar { display: flex; align-items: center; gap: 12px; padding: 8px 20px; border-bottom: 1px solid var(--line-strong); background: #f7f9fc; }
+.pf-backbar button { padding: 3px 12px; font-weight: 600; }
+.pf-detail-view .pf-detail { flex: 1; }

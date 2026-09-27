@@ -131,65 +131,76 @@ function refreshPersonFilter() {
   sel.value = state.filterPerson;
 }
 
+// 基盤一覧（表）: 1 基盤 1 行。行をクリックすると詳細を表示
 function renderList() {
   refreshPersonFilter();
-  const ul = $("#pf-items");
-  ul.innerHTML = "";
+  const box = $("#pf-table");
+  box.innerHTML = "";
   if (!state.platforms.length) {
-    ul.append(el("li", "hint pf-empty", "基盤番号が登録されていません。管理サイトで登録してください。"));
+    box.append(el("p", "hint pf-empty", "基盤番号が登録されていません。管理サイトで登録してください。"));
+    $("#pf-count").textContent = "";
     return;
   }
-  // 各基盤は一覧に 1 回だけ表示する。
-  // 絞り込みなし: 1 つ目の領域のグループに表示し、2 つ目以降の領域はタグで表示
-  // 領域で絞り込み: その領域を含む基盤をまとめて表示
-  const primary = (p) => p.areas[0] || "";
-  const pool = state.platforms.filter(matchesPerson);
-  let groups;
-  if (state.filterArea) {
-    groups = [[state.filterArea, pool.filter((p) => p.areas.includes(state.filterArea))]];
-  } else {
-    const extra = [...new Set(pool.map(primary))].filter((a) => a && !state.areas.includes(a));
-    groups = [...state.areas, ...extra, ""].map((area) => [area, pool.filter((p) => primary(p) === area)]);
+  const list = state.platforms
+    .filter((p) => (!state.filterArea || p.areas.includes(state.filterArea)) && matchesPerson(p))
+    .sort((a, b) => a.name.localeCompare(b.name, "ja", { numeric: true }));
+  $("#pf-count").textContent = `${list.length} 件${list.length !== state.platforms.length ? `（全 ${state.platforms.length} 件）` : ""}`;
+  if (!list.length) {
+    box.append(el("p", "hint pf-empty", "条件に合う基盤はありません。"));
+    return;
   }
-  let shown = 0;
-  for (const [area, items] of groups) {
-    if (!items.length) continue;
-    const head = el("li", "pf-group");
-    head.style.setProperty("--c", areaColor(area));
-    head.append(el("span", "dot"), area || "領域未設定", el("span", "n", `${items.length}`));
-    ul.append(head);
-    for (const p of items) {
-      shown++;
-      const li = el("li", "pf-item");
-      li.style.setProperty("--c", areaColor(area || primary(p)));
-      li.classList.toggle("on", p.name === state.current);
-      li.append(el("span", "no", p.name));
-      li.append(el("span", `ttl${p.title ? "" : " untitled"}`, p.title || "（基盤名未設定）"));
-      const others = p.areas.filter((a) => a !== area);
-      if (others.length) {
-        const tags = el("div", "more-areas");
-        for (const a of others) {
-          const t = el("span", "area-tag", a);
-          t.style.setProperty("--c", areaColor(a));
-          tags.append(t);
-        }
-        li.append(tags);
-      }
-      const meter = el("div", "meter");
-      const bar = el("i");
-      bar.style.width = p.goal_total ? `${(p.goal_done / p.goal_total) * 100}%` : "0";
-      meter.append(bar);
-      meter.title = `目標 ${p.goal_done} / ${p.goal_total} 達成`;
-      li.append(meter);
-      const meta = el("div", "meta");
-      meta.append(el("span", "", `目標 ${p.goal_done}/${p.goal_total}`), el("span", "", `タスク ${p.task_count}`));
-      li.append(meta);
-      if (teamText(p)) li.append(el("div", "team", teamText(p)));
-      li.addEventListener("click", () => select(p.name));
-      ul.append(li);
-    }
+  const table = el("table", "pf-table");
+  const thead = el("thead");
+  const hr = el("tr");
+  for (const h of ["基盤番号", "基盤名", "領域", "PL", "メンバー", "タスク", "最新ディスカッション", "最新の月報"]) {
+    hr.append(el("th", "", h));
   }
-  if (!shown) ul.append(el("li", "hint pf-empty", "条件に合う基盤はありません。"));
+  thead.append(hr);
+  const tbody = el("tbody");
+  for (const p of list) {
+    const tr = el("tr");
+    tr.tabIndex = 0;
+    tr.title = "クリックして詳細を表示";
+    tr.style.setProperty("--c", areaColor(p.areas[0] || ""));
+    const td = (content, cls = "") => {
+      const c = el("td", cls);
+      if (content instanceof Node) c.append(content);
+      else c.textContent = content ?? "";
+      tr.append(c);
+      return c;
+    };
+    td(p.name, "no");
+    td(p.title || "（基盤名未設定）", `ttl${p.title ? "" : " untitled"}`);
+    td(areaTags(p.areas), "areas");
+    td(p.owner || "—", p.owner ? "" : "none");
+    td(people(p).join("・") || "—", p.members ? "members" : "none");
+    td(String(p.task_count), "num");
+    td(p.last_topic_date ? slashDate(p.last_topic_date) : "—", p.last_topic_date ? "nowrap" : "none");
+    td(p.last_month ? p.last_month.replace("-", "/") : "—", p.last_month ? "nowrap" : "none");
+    const open = () => select(p.name);
+    tr.addEventListener("click", open);
+    tr.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+    tbody.append(tr);
+  }
+  table.append(thead, tbody);
+  box.append(table);
+}
+
+// 一覧と詳細の切り替え
+function showView(detail) {
+  $("#list-view").hidden = detail;
+  $("#detail-view").hidden = !detail;
+}
+
+function backToList(push = true) {
+  if (state.editing && state.dirty && !confirm("編集中の変更が保存されていません。破棄して一覧に戻りますか？")) return false;
+  state.editing = false;
+  state.dirty = false;
+  state.current = null;
+  if (push) history.pushState(null, "", "/platforms");
+  renderList();
+  showView(false);
+  return true;
 }
 
 async function select(name) {
@@ -197,15 +208,30 @@ async function select(name) {
     if (state.dirty && !confirm("編集中の変更が保存されていません。破棄して切り替えますか？")) return;
     state.editing = false;
   }
+  const fromList = state.current !== name;
   state.current = name;
   state.dirty = false;
-  history.replaceState(null, "", `/platforms?id=${enc(name)}`);
+  const url = `/platforms?id=${enc(name)}`;
+  if (fromList && location.pathname + location.search !== url) history.pushState(null, "", url);
+  else history.replaceState(null, "", url);
   const base = `/api/platforms/${enc(name)}`;
   [state.goals, state.topics, state.monthly] = await Promise.all(
     [api(`${base}/goals`), api(`${base}/topics`), api(`${base}/monthly`)]);
   renderList();
   renderDetail();
+  const p = state.platforms.find((x) => x.name === name);
+  $("#back-name").textContent = p ? `${p.name}　${p.title || ""}` : name;
+  showView(true);
+  $("#detail").scrollTop = 0;
 }
+
+$("#btn-back").addEventListener("click", () => backToList());
+// ブラウザの「戻る」「進む」
+window.addEventListener("popstate", async () => {
+  const id = new URLSearchParams(location.search).get("id");
+  if (id && state.platforms.some((p) => p.name === id)) await select(id);
+  else if (!backToList(false)) history.pushState(null, "", `/platforms?id=${enc(state.current)}`);
+});
 
 // ---- 編集モード: 修正は「編集する」を押したときだけ可能
 function setEditing(on) {
@@ -922,9 +948,8 @@ window.addEventListener("beforeunload", (e) => {
     syncExportLinks();
     renderList();
     const want = new URLSearchParams(location.search).get("id");
-    const visible = platforms.filter((p) => (!state.filterArea || p.areas.includes(state.filterArea)) && matchesPerson(p));
-    const first = platforms.find((p) => p.name === want) || visible[0] || platforms[0];
-    if (first) await select(first.name);
+    if (want && platforms.some((p) => p.name === want)) await select(want);
+    else showView(false);
   } catch (err) {
     toast(`読み込みに失敗しました: ${err.message}`, true);
   }
