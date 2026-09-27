@@ -1,29 +1,10 @@
 /* 共有資料 */
 body { overflow: auto; }
 .doc-main { padding: 12px 18px 40px; }
-#doc-count { margin: 0 0 8px; }
-.doc-table-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 10px; }
-.doc-table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 13px; }
-.doc-table th {
-  text-align: left;
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 700;
-  padding: 8px 12px;
-  background: #f3f5f8;
-  border-bottom: 1px solid var(--line-strong);
-  white-space: nowrap;
-}
-.doc-table td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
-.doc-table tbody tr:last-child td { border-bottom: 0; }
-.doc-table tbody tr:hover { background: #fbfcff; }
 .c-title { width: 26%; }
-.c-purpose { width: 34%; }
 .c-date { width: 130px; }
 .c-links { width: 24%; }
-.c-edit { width: 60px; }
 .doc-name { font-weight: 700; line-height: 1.5; }
-.doc-purpose { white-space: pre-wrap; line-height: 1.6; color: #3b4252; }
 .doc-date { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
 .doc-links { display: flex; flex-wrap: wrap; gap: 6px; }
 .doc-link {
@@ -44,7 +25,6 @@ body { overflow: auto; }
 .doc-link:hover { filter: brightness(1.1); }
 .none { color: #b0b4bc; font-size: 12.5px; }
 .edit-btn { padding: 1px 8px; font-size: 12px; }
-.empty-row td { text-align: center; color: var(--muted); padding: 24px; }
 
 /* ダイアログ */
 #dlg-doc { width: min(620px, 94vw); }
@@ -60,9 +40,6 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 #dlg-doc-delete { width: min(440px, 92vw); }
 
 @media (max-width: 640px) { .link-grid { grid-template-columns: 1fr; } }
-
-/* 領域 */
-.c-purpose { width: 28%; }
 .c-areas { width: 16%; }
 .area-tags { display: flex; flex-wrap: wrap; gap: 3px; }
 .area-tag {
@@ -103,3 +80,24 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .link-row .no { font-size: 12px; font-weight: 700; color: var(--muted); text-align: center; }
 .link-row input { padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; min-width: 0; }
 @media (max-width: 640px) { .link-row { grid-template-columns: 20px 1fr; } .link-row input[type=url] { grid-column: 2; } }
+
+/* ---- 左右 2 分割: 左 = グループ資料、右 = その他参考資料 */
+.doc-main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.doc-section { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 10px; overflow: hidden; }
+.doc-section.group { border-top: 3px solid var(--accent); }
+.doc-section.other { border-top: 3px solid #8a90a3; }
+.sec-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line-strong); }
+.sec-head h2 { margin: 0; font-size: 15px; }
+.sec-head .count { font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 4px; }
+.sec-head button { padding: 3px 10px; font-size: 12px; }
+.doc-list { list-style: none; margin: 0; padding: 0; }
+.doc-list > li { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.doc-list > li:last-child { border-bottom: 0; }
+.doc-list > li:hover { background: #fbfcff; }
+.doc-list .d-top { display: flex; align-items: baseline; gap: 10px; }
+.doc-list .d-top .doc-name { flex: 1; min-width: 0; font-size: 14px; }
+.doc-list .d-purpose { margin-top: 3px; font-size: 12.5px; color: #3b4252; white-space: pre-wrap; line-height: 1.6; }
+.doc-list .d-bottom { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 6px; }
+.doc-list .d-bottom .area-tags { gap: 3px; }
+.doc-list .empty-li { color: var(--muted); font-size: 12.5px; text-align: center; padding: 18px; }
+@media (max-width: 900px) { .doc-main { grid-template-columns: 1fr; } }

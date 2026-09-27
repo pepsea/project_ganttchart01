@@ -10,6 +10,8 @@ import sqlite3
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Response
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 import auth
@@ -19,7 +21,8 @@ router = APIRouter(prefix="/api/documents", tags=["共有資料"])
 
 LINK_COUNT = 4  # 資料リンクの最大数
 COLS = ("title", "purpose", "created_date", "link1_label", "link1_url", "link2_label", "link2_url", "areas",
-        "link3_label", "link3_url", "link4_label", "link4_url")
+        "link3_label", "link3_url", "link4_label", "link4_url", "category")
+Category = Literal["group", "other"]  # group = グループ資料（左）/ other = その他参考資料（右）
 
 
 def init_db() -> None:
@@ -44,6 +47,8 @@ def init_db() -> None:
         for col in ("link3_label", "link3_url", "link4_label", "link4_url"):  # 資料リンク 3・4
             if col not in cols:
                 db.execute(f"ALTER TABLE documents ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
+        if "category" not in cols:  # 欄（既存の資料はグループ資料）
+            db.execute("ALTER TABLE documents ADD COLUMN category TEXT NOT NULL DEFAULT 'group'")
 
 
 def _url(v):
@@ -66,6 +71,7 @@ class DocumentIn(BaseModel):
     link4_label: str = ""
     link4_url: str = ""
     areas: list[str] = []   # 領域（複数可）
+    category: Category = "group"
 
     @field_validator("areas")
     @classmethod
@@ -99,7 +105,7 @@ class DocumentIn(BaseModel):
     def values(self) -> tuple:
         return (self.title, self.purpose.strip(), self.created_date, self.link1_label, self.link1_url,
                 self.link2_label, self.link2_url, json.dumps(self.areas, ensure_ascii=False),
-                self.link3_label, self.link3_url, self.link4_label, self.link4_url)
+                self.link3_label, self.link3_url, self.link4_label, self.link4_url, self.category)
 
 
 class PasswordIn(BaseModel):

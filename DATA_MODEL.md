@@ -86,6 +86,7 @@
 | テーブル | 列 | 内容 |
 |---|---|---|
 | `documents` | id | |
+| | category | 欄: `group` = グループ資料（左） / `other` = その他参考資料（右） |
 | | title / purpose | 資料名 / 目的 |
 | | created_date | 作成日時（`YYYY-MM-DD HH:MM`。未入力なら登録時刻） |
 | | link1_label / link1_url | 資料リンク 1 の表示名 / URL |

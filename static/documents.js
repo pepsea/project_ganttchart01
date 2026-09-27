@@ -51,54 +51,62 @@ function toast(msg, isErr = false) {
 }
 
 // ------------------------------------------------------------ 一覧
+const CATEGORIES = ["group", "other"]; // group = グループ資料（左）/ other = その他参考資料（右）
+
 function render() {
   const q = state.q.trim().toLowerCase();
-  const list = state.docs.filter((d) =>
-    (!state.area || d.areas.includes(state.area)) &&
-    (!q || [d.title, d.purpose, ...d.areas, ...LINKS.map((n) => d[`link${n}_label`])].some((v) => (v || "").toLowerCase().includes(q))));
-  $("#doc-count").textContent = `${list.length} 件${list.length !== state.docs.length ? `（全 ${state.docs.length} 件）` : ""}`;
-  const tbody = $("#doc-list");
-  tbody.innerHTML = "";
-  if (!list.length) {
-    const tr = el("tr", "empty-row");
-    const td = el("td", "", state.docs.length ? "条件に合う資料はありません。" : "まだ資料がありません。「＋ 資料を追加」から登録してください。");
-    td.colSpan = 6;
-    tr.append(td);
-    tbody.append(tr);
-    return;
+  for (const cat of CATEGORIES) {
+    const all = state.docs.filter((d) => (d.category || "group") === cat);
+    const list = all.filter((d) =>
+      (!state.area || d.areas.includes(state.area)) &&
+      (!q || [d.title, d.purpose, ...d.areas, ...LINKS.map((n) => d[`link${n}_label`])].some((v) => (v || "").toLowerCase().includes(q))));
+    $(`#count-${cat}`).textContent = `${list.length} 件${list.length !== all.length ? ` / ${all.length}` : ""}`;
+    const ul = $(`#list-${cat}`);
+    ul.innerHTML = "";
+    if (!list.length) {
+      ul.append(el("li", "empty-li", all.length ? "条件に合う資料はありません" : "まだ資料がありません。「＋ 追加」から登録してください。"));
+      continue;
+    }
+    for (const d of list) ul.append(renderDoc(d));
   }
-  for (const d of list) {
-    const tr = el("tr");
-    const td = (child) => { const x = el("td"); if (child) x.append(child); tr.append(x); return x; };
-    td(el("div", "doc-name", d.title));
-    td(d.purpose ? el("div", "doc-purpose", d.purpose) : el("span", "none", "—"));
-    const tags = el("div", "area-tags");
+}
+
+// 1 件: 資料名・作成日時・編集 / 目的 / 領域・リンク
+function renderDoc(d) {
+  const li = el("li");
+  const top = el("div", "d-top");
+  top.append(el("span", "doc-name", d.title), el("span", "doc-date", d.created_date.replaceAll("-", "/")));
+  const edit = el("button", "edit-btn", "✎");
+  edit.title = "編集";
+  edit.addEventListener("click", () => openDialog(d));
+  top.append(edit);
+  li.append(top);
+  if (d.purpose) li.append(el("div", "d-purpose", d.purpose));
+  const bottom = el("div", "d-bottom");
+  if (d.areas.length) {
+    const tags = el("span", "area-tags");
     for (const a of d.areas) {
       const t = el("span", "area-tag", a);
       t.style.setProperty("--c", areaColor(a));
       tags.append(t);
     }
-    td(d.areas.length ? tags : el("span", "none", "—"));
-    td(el("span", "doc-date", d.created_date.replaceAll("-", "/")));
-    const links = el("div", "doc-links");
-    for (const n of LINKS) {
-      const label = d[`link${n}_label`];
-      const u = safeUrl(d[`link${n}_url`]);
-      if (!u) continue;
-      const a = el("a", "doc-link", `${label || `リンク${n}`} ↗`);
-      a.href = u;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      a.title = u;
-      links.append(a);
-    }
-    if (!links.children.length) links.append(el("span", "none", "未登録"));
-    td(links);
-    const edit = el("button", "edit-btn", "✎ 編集");
-    edit.addEventListener("click", () => openDialog(d));
-    td(edit);
-    tbody.append(tr);
+    bottom.append(tags);
   }
+  const links = el("span", "doc-links");
+  for (const n of LINKS) {
+    const u = safeUrl(d[`link${n}_url`]);
+    if (!u) continue;
+    const a = el("a", "doc-link", `${d[`link${n}_label`] || `リンク${n}`} ↗`);
+    a.href = u;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.title = u;
+    links.append(a);
+  }
+  if (!links.children.length) links.append(el("span", "none", "リンク未登録"));
+  bottom.append(links);
+  li.append(bottom);
+  return li;
 }
 
 // ------------------------------------------------------------ 追加・編集
@@ -106,9 +114,10 @@ const form = $("#form-doc");
 const LINKS = [1, 2, 3, 4]; // 資料リンクは最大 4 つ
 const FIELDS = ["title", "purpose", ...LINKS.flatMap((n) => [`link${n}_label`, `link${n}_url`])];
 
-function openDialog(d = null) {
+function openDialog(d = null, category = "group") {
   state.editing = d;
   form.reset();
+  form.category.value = d?.category || category;
   for (const k of FIELDS) form[k].value = d?.[k] || "";
   // 領域（複数選択）
   const box = $("#doc-areas");
@@ -136,7 +145,7 @@ function openDialog(d = null) {
   form.title.focus();
 }
 
-$("#btn-add").addEventListener("click", () => openDialog());
+document.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => openDialog(null, b.dataset.add)));
 $("#dlg-doc [data-close]").addEventListener("click", () => $("#dlg-doc").close());
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -144,6 +153,7 @@ form.addEventListener("submit", async (e) => {
   for (const k of FIELDS) body[k] = form[k].value.trim();
   body.created_date = form.created_date.value.replace("T", " ");
   body.areas = [...form.querySelectorAll('input[name="areas"]:checked')].map((i) => i.value);
+  body.category = form.category.value;
   for (const k of LINKS.map((n) => `link${n}_url`)) {
     if (body[k] && !safeUrl(body[k])) { $("#doc-error").textContent = "リンクは http:// または https:// で始まる URL を入力してください"; return; }
   }

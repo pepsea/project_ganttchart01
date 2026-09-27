@@ -19,7 +19,6 @@
       <a href="/admin">管理</a>
     </nav>
     <div class="tools">
-      <button id="btn-add" class="primary">＋ 資料を追加</button>
       <input id="q" type="search" class="search" placeholder="資料名・目的・領域で検索">
       <label class="filter">領域 <select id="f-area"><option value="">すべて</option></select></label>
     </div>
@@ -27,22 +26,20 @@
   </header>
 
   <main class="doc-main">
-    <p id="doc-count" class="hint"></p>
-    <div class="doc-table-wrap">
-      <table class="doc-table">
-        <thead>
-          <tr>
-            <th class="c-title">資料名</th>
-            <th class="c-purpose">目的</th>
-            <th class="c-areas">領域</th>
-            <th class="c-date">作成日時</th>
-            <th class="c-links">資料リンク</th>
-            <th class="c-edit"></th>
-          </tr>
-        </thead>
-        <tbody id="doc-list"></tbody>
-      </table>
-    </div>
+    <section class="doc-section group">
+      <div class="sec-head">
+        <h2>グループ資料 <span class="count" id="count-group"></span></h2>
+        <button class="primary" data-add="group">＋ 追加</button>
+      </div>
+      <ul id="list-group" class="doc-list"></ul>
+    </section>
+    <section class="doc-section other">
+      <div class="sec-head">
+        <h2>その他参考資料 <span class="count" id="count-other"></span></h2>
+        <button class="primary" data-add="other">＋ 追加</button>
+      </div>
+      <ul id="list-other" class="doc-list"></ul>
+    </section>
   </main>
 
   <div id="toast" class="toast" role="status"></div>
@@ -51,6 +48,12 @@
   <dialog id="dlg-doc">
     <form id="form-doc" method="dialog" autocomplete="off">
       <h2 id="doc-title">資料を追加</h2>
+      <label><span>欄</span>
+        <select name="category">
+          <option value="group">グループ資料（左）</option>
+          <option value="other">その他参考資料（右）</option>
+        </select>
+      </label>
       <label><span>資料名 <span class="req">*</span></span><input name="title" required placeholder="例: 2026 年度 サービス紹介資料"></label>
       <label><span>目的</span><textarea name="purpose" rows="3" placeholder="例: 顧客への初回説明に使う"></textarea></label>
       <label class="date-field"><span>作成日時</span><input name="created_date" type="datetime-local"></label>
