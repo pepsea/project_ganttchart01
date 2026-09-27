@@ -101,3 +101,14 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .doc-list .d-bottom .area-tags { gap: 3px; }
 .doc-list .empty-li { color: var(--muted); font-size: 12.5px; text-align: center; padding: 18px; }
 @media (max-width: 900px) { .doc-main { grid-template-columns: 1fr; } }
+
+/* 資料リンクは 1 行で表示（折り返さず、長い表示名は省略） */
+.doc-list .doc-links {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 5px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.doc-list .doc-link { flex: 0 1 auto; min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; line-height: 20px; }
+.doc-list .doc-links .none { white-space: nowrap; }

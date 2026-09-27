@@ -104,8 +104,8 @@ function renderDoc(d) {
     links.append(a);
   }
   if (!links.children.length) links.append(el("span", "none", "リンク未登録"));
-  bottom.append(links);
-  li.append(bottom);
+  if (bottom.children.length) li.append(bottom);
+  li.append(links);
   return li;
 }
 
