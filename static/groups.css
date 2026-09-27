@@ -137,7 +137,7 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .g-facts .fv { color: #3b4252; white-space: pre-wrap; }
 .g-facts .fv.none { color: #b0b4bc; }
 
-/* 今年度達成したこと */
+/* 達成したこと */
 .ach-list { list-style: none; margin: 0; padding: 0; }
 .ach-list li { display: grid; grid-template-columns: 90px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 8px 6px; border-bottom: 1px solid var(--line); cursor: pointer; }
 .ach-list li:last-child { border-bottom: 0; }
@@ -154,3 +154,41 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .gp-item:hover { background: color-mix(in srgb, var(--gc) 7%, transparent); }
 .gp-item.on { background: color-mix(in srgb, var(--gc) 12%, #fff); border-color: color-mix(in srgb, var(--gc) 45%, #fff); border-left-color: var(--gc); border-radius: 0 6px 6px 0; }
 .gp-detail .gp-head h2 { border-left: 6px solid var(--gc, transparent); padding-left: 10px; }
+
+/* 年度 */
+.year-bar { flex-direction: row; align-items: center; gap: 8px; margin: 0; padding: 8px 14px; border-bottom: 1px solid var(--line-strong); background: #f7f9fc; }
+.year-bar span { font-size: 12px; font-weight: 700; color: var(--muted); }
+.year-bar select { flex: 1; font-weight: 700; }
+.fy-tag { font-size: 10.5px; font-weight: 700; color: #2f5bd0; background: #e3ecff; border-radius: 4px; padding: 0 6px; margin-right: 6px; vertical-align: 1px; }
+.year-bar { display: flex; }
+
+/* 達成したこと: 1 件 1 行（達成日・内容・メモ・担当者。はみ出すメモは「…」で省略） */
+.ach-list li { align-items: center; padding: 6px; }
+.ach-list .a-main { display: flex; align-items: center; gap: 10px; min-width: 0; white-space: nowrap; overflow: hidden; }
+.ach-list .a-title { flex: 0 1 auto; min-width: 4em; overflow: hidden; text-overflow: ellipsis; }
+.ach-list .a-note { flex: 1 1 0; min-width: 0; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.ach-list .fy-tag, .ach-list .g-link { flex: 0 0 auto; margin: 0; }
+
+/* 目標: 1 目標 1 行 */
+.goal-list li { align-items: center; padding: 6px 10px; }
+.goal-list .g-main { display: flex; align-items: center; gap: 10px; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 13px; }
+.goal-list .g-title { flex: 0 1 auto; min-width: 5em; max-width: 45%; overflow: hidden; text-overflow: ellipsis; }
+.goal-list .g-link, .goal-list .fy-tag { flex: 0 0 auto; margin: 0; }
+.goal-list .fact { display: inline-flex; align-items: center; gap: 5px; min-width: 0; font-size: 12.5px; }
+.goal-list .fact .fl { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--muted); border: 1px solid var(--line-strong); border-radius: 4px; padding: 0 5px; }
+.goal-list .fact .fv { overflow: hidden; text-overflow: ellipsis; color: #3b4252; }
+.goal-list .fact .fv.none { color: #b0b4bc; }
+.goal-list .f-criteria { flex: 1 1 0; }
+.goal-list .f-period { flex: 0 1 auto; max-width: 30%; }
+.goal-list .f-criteria { min-width: 9em; }
+.goal-list .g-title { flex-shrink: 3; }
+.goal-list .f-period { flex-shrink: 2; min-width: 5em; }
+
+/* 期限超過の目標は行全体を赤、14 日以内はオレンジ */
+.goal-list li.overdue { background: #fde8e8; border-left: 4px solid var(--today); border-radius: 4px; }
+.goal-list li.overdue .g-title { color: var(--today); }
+.goal-list li.soon { background: #fff3e0; border-left: 4px solid #e08a00; border-radius: 4px; }
+.goal-list li.overdue:hover, .goal-list li.overdue:focus { background: #fbd9d9; }
+.goal-list li.soon:hover, .goal-list li.soon:focus { background: #ffe9c7; }
+.goal-list li + li { margin-top: 2px; }
+.gp-item .over-badge { font-size: 10.5px; font-weight: 700; color: #fff; background: var(--today); border-radius: 4px; padding: 0 6px; }

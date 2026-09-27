@@ -76,8 +76,10 @@
 | `team_goals` | id, group_id | 目標（`team_groups.id` を参照。グループの削除時に一緒に削除） |
 | | title / due_date / status / note / url | 目標 / 期限 / 状態（未着手・取組中・達成・保留）/ メモ / リンク |
 | | criteria / period | 達成基準 / 時期（自由記述。例: 2026 年度下期） |
-| `team_achievements` | id, group_id | 今年度達成したこと（`team_groups.id` を参照。グループの削除時に一緒に削除） |
+| | fiscal_year | 年度（4 月始まり。例: 2026 = 2026/4〜2027/3）。未設定の行は起動時に期限（無ければ作成日）から設定 |
+| `team_achievements` | id, group_id | 年度ごとの達成したこと（`team_groups.id` を参照。グループの削除時に一緒に削除） |
 | | title / owner / achieved_on / note / url | 達成したこと / 担当者（半角スペース区切り）/ 達成日 / メモ / リンク |
+| | fiscal_year | 年度（4 月始まり）。未設定の行は起動時に達成日（無ければ作成日）から設定 |
 | | created_at / updated_at | 作成・更新日時 |
 | | created_at / updated_at | 作成・更新日時 |
 

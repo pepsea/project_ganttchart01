@@ -29,6 +29,7 @@
         <b>グループ一覧</b>
         <button id="btn-group-add" class="primary">＋ グループ追加</button>
       </div>
+      <label class="year-bar"><span>年度</span><select id="year-select" title="表示する年度（4 月始まり）"></select></label>
       <ul id="gp-items"></ul>
     </aside>
 
@@ -68,16 +69,17 @@
     </form>
   </dialog>
 
-  <!-- 今年度達成したことの追加・編集 -->
+  <!-- 達成したことの追加・編集 -->
   <dialog id="dlg-ach">
     <form id="form-ach" method="dialog" autocomplete="off">
-      <h2 id="ach-title">今年度達成したことを追記</h2>
+      <h2 id="ach-title">達成したことを追記</h2>
       <p id="ach-meta" class="hint"></p>
       <label><span>達成したこと <span class="req">*</span></span><input name="title" required placeholder="例: 新サービスをリリース"></label>
       <div class="two">
         <label><span>担当者（複数はスペース区切り）</span><input name="owner" placeholder="例: 高橋 鈴木"></label>
         <label><span>達成日</span><input type="date" name="achieved_on"></label>
       </div>
+      <label><span>年度 <span class="req">*</span></span><select name="fiscal_year" required></select></label>
       <label><span>メモ</span><textarea name="note" rows="3" placeholder="成果の詳細など"></textarea></label>
       <label><span>リンク（報告資料など）</span><input name="url" type="url" placeholder="https://"></label>
       <p class="error" id="ach-error"></p>
@@ -101,7 +103,10 @@
       </div>
       <label><span>目標 <span class="req">*</span></span><input name="title" required></label>
       <label><span>達成基準</span><textarea name="criteria" rows="2" placeholder="例: 全案件で英語版レポートを納品"></textarea></label>
-      <label><span>時期</span><input name="period" placeholder="例: 2026 年度下期"></label>
+      <div class="two">
+        <label><span>年度 <span class="req">*</span></span><select name="fiscal_year" required></select></label>
+        <label><span>時期</span><input name="period" placeholder="例: 下期、9 月末まで"></label>
+      </div>
       <label><span>メモ</span><textarea name="note" rows="3" placeholder="補足など"></textarea></label>
       <label><span>リンク</span><input name="url" type="url" placeholder="https://"></label>
       <p class="error" id="goal-error"></p>

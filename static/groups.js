@@ -3,7 +3,8 @@
 // グループ目標: 左にグループ一覧、右に選んだグループ（グループ名・PL・メンバー・全体目標・目標）
 const DAY_MS = 86400000;
 const $ = (sel, root = document) => root.querySelector(sel);
-const state = { groups: [], goals: [], achievements: [], statuses: [], current: null, services: [], platforms: [] };
+const state = { groups: [], goals: [], achievements: [], statuses: [], current: null, services: [], platforms: [],
+  year: null, currentYear: null, years: [] }; // year: 表示中の年度（"" = すべての年度）
 const serviceName = (no) => state.services.find((s) => s.service_no === no)?.name || "";
 const platformName = (no) => state.platforms.find((p) => p.name === no)?.title || "";
 
@@ -26,6 +27,21 @@ const daysLeft = (s) => Math.round((parseDate(s) - todayMs()) / DAY_MS);
 const slashDate = (s) => s.replaceAll("-", "/");
 const safeUrl = (u) => (/^https?:\/\//i.test(u || "") ? u : "");
 const people = (g) => (g.members ? g.members.split(" ") : []);
+// 年度（4 月始まり）
+const fiscalYearOf = (s) => {
+  if (!s) return null;
+  const [y, m] = s.split("-").map(Number);
+  return m >= 4 ? y : y - 1;
+};
+const yearLabel = (y) => (y ? `${y}年度` : "すべての年度");
+const yearQuery = () => (state.year ? `?year=${state.year}` : "");
+function yearOptions(select, value, withAll = false) {
+  select.innerHTML = "";
+  const ys = [...new Set([...state.years, value].filter(Boolean))].sort((a, b) => b - a);
+  for (const y of ys) select.append(new Option(`${y}年度${y === state.currentYear ? "（今年度）" : ""}`, y));
+  if (withAll) select.append(new Option("すべての年度", ""));
+  select.value = value ?? "";
+}
 
 async function api(path, options = {}) {
   const res = await fetch(path, { headers: options.body ? { "Content-Type": "application/json" } : {}, ...options });
@@ -91,7 +107,10 @@ function renderList() {
     const bar = el("i");
     bar.style.width = g.goal_total ? `${(g.goal_done / g.goal_total) * 100}%` : "0";
     meter.append(bar);
-    li.append(meter, el("div", "meta", `目標 ${g.goal_done}/${g.goal_total}`));
+    const meta = el("div", "meta", `目標 ${g.goal_done}/${g.goal_total}`);
+    // next_due = 未達成（達成・保留以外）の目標で一番早い期限
+    if (g.next_due && daysLeft(g.next_due) < 0) meta.append(el("span", "over-badge", "期限超過あり"));
+    li.append(meter, meta);
     const team = [g.pl && `PL ${g.pl}`, g.members && `メンバー ${people(g).join("・")}`].filter(Boolean).join(" ／ ");
     if (team) li.append(el("div", "team", team));
     li.addEventListener("click", () => select(g.id));
@@ -101,16 +120,16 @@ function renderList() {
 
 async function select(id) {
   state.current = id;
-  history.replaceState(null, "", `/groups?id=${id}`);
+  history.replaceState(null, "", `/groups?id=${id}&year=${state.year || "all"}`);
   [state.goals, state.achievements] = await Promise.all([
-    api(`/api/groups/${id}/goals`), api(`/api/groups/${id}/achievements`),
+    api(`/api/groups/${id}/goals${yearQuery()}`), api(`/api/groups/${id}/achievements${yearQuery()}`),
   ]);
   renderList();
   renderDetail();
 }
 
 // ------------------------------------------------------------ 詳細
-// 並び: 見出し → 大目標 → 目標（達成基準・時期）→ 今年度達成したこと → 関連サービス・関連基盤技術
+// 並び: 見出し → 大目標 → 目標（達成基準・時期）→ 年度ごとの達成したこと → 関連サービス・関連基盤技術
 function renderDetail() {
   const g = state.groups.find((x) => x.id === state.current);
   const root = $("#detail");
@@ -146,7 +165,7 @@ function renderDetail() {
   stats.append(
     stat("目標の達成", `${g.goal_done}<small> / ${g.goal_total}</small>`),
     stat("期限超過の目標", `${overdue}<small> 件</small>`, overdue ? "warn" : ""),
-    stat("今年度達成したこと", `${state.achievements.length}<small> 件</small>`),
+    stat(`${state.year ? `${state.year}年度に` : ""}達成したこと`, `${state.achievements.length}<small> 件</small>`),
   );
   head.append(stats);
   root.append(head);
@@ -164,13 +183,13 @@ function renderDetail() {
 // ---- 目標（達成基準・時期）: クリックで編集
 function renderGoals(g) {
   const gs = el("section", "gp-section");
-  const gh = el("h3", "", "目標");
+  const gh = el("h3", "", state.year ? `${state.year}年度の目標` : "目標（すべての年度）");
   gh.append(el("span", "count-badge", `${g.goal_done} / ${g.goal_total} 達成`), el("span", "hint", "目標をクリックすると編集できます"));
   const add = el("button", "primary right", "＋ 目標を追加");
   add.addEventListener("click", () => openGoalDialog(g, null));
   gh.append(add);
   gs.append(gh);
-  if (!state.goals.length) gs.append(el("p", "hint", "まだ目標がありません。「＋ 目標を追加」から登録してください。"));
+  if (!state.goals.length) gs.append(el("p", "hint", `${yearLabel(state.year)}の目標はまだありません。「＋ 目標を追加」から登録してください。`));
   const ul = el("ul", "goal-list");
   for (const t of state.goals) {
     const li = el("li");
@@ -178,28 +197,31 @@ function renderGoals(g) {
     li.title = "クリックして編集";
     const due = goalDue(t);
     li.classList.toggle("done", t.status === "達成");
+    if (due) li.classList.add(due); // 期限超過 = 赤、14 日以内 = オレンジ（行全体）
     const st = el("span", "status-badge", t.status);
     st.dataset.v = t.status;
-    const main = el("div");
-    const title = el("div", "g-title", t.title);
+    // 1 目標 1 行: [年度] 目標 [リンク] ｜ 達成基準 ｜ 時期（はみ出す分は「…」、全文はマウスを重ねて表示）
+    const main = el("div", "g-main");
+    if (!state.year) main.append(el("span", "fy-tag", `${t.fiscal_year}年度`));
+    const title = el("span", "g-title", t.title);
+    title.title = t.title;
+    main.append(title);
     if (safeUrl(t.url)) {
       const a = el("a", "g-link", "リンク ↗");
       a.href = t.url;
       a.target = "_blank";
       a.rel = "noopener noreferrer";
       a.addEventListener("click", (e) => e.stopPropagation());
-      title.append(a);
+      main.append(a);
     }
-    main.append(title);
-    const facts = el("div", "g-facts");
-    const fact = (label, text) => {
-      const f = el("span", "fact");
-      f.append(el("span", "fl", label), el("span", text ? "fv" : "fv none", text || "未記入"));
+    const fact = (label, text, cls) => {
+      const f = el("span", `fact ${cls}`);
+      f.append(el("span", "fl", label), el("span", text ? "fv" : "fv none", text ? text.replace(/\s*\n\s*/g, " ") : "未記入"));
+      if (text) f.title = `${label}: ${text}`;
       return f;
     };
-    facts.append(fact("達成基準", t.criteria), fact("時期", t.period));
-    main.append(facts);
-    if (t.note) main.append(el("div", "g-note", t.note));
+    main.append(fact("達成基準", t.criteria, "f-criteria"), fact("時期", t.period, "f-period"));
+    if (t.note) li.title = `メモ: ${t.note}\n（クリックして編集）`;
     const d = el("span", `g-due ${due}`, t.due_date ? `期限 ${slashDate(t.due_date)}` : "");
     if (due) d.title = due === "overdue" ? `期限超過（${-daysLeft(t.due_date)} 日経過）` : `期限まであと ${daysLeft(t.due_date)} 日`;
     li.append(st, main, d, el("span", "g-edit", "編集 ›"));
@@ -212,17 +234,17 @@ function renderGoals(g) {
   return gs;
 }
 
-// ---- 今年度達成したこと（内容・担当者・達成日）: クリックで編集
+// ---- 達成したこと（内容・担当者・達成日）: クリックで編集
 function renderAchievements(g) {
   const sec = el("section", "gp-section");
-  const h = el("h3", "", "今年度達成したこと");
+  const h = el("h3", "", state.year ? `${state.year}年度に達成したこと` : "達成したこと（すべての年度）");
   h.append(el("span", "hint", "達成したことと担当者を追記"));
   const add = el("button", "primary right", "＋ 追記");
   add.addEventListener("click", () => openAchievementDialog(g, null));
   h.append(add);
   sec.append(h);
   if (!state.achievements.length) {
-    sec.append(el("p", "hint", "まだ記録がありません。「＋ 追記」から登録してください。"));
+    sec.append(el("p", "hint", `${yearLabel(state.year)}の記録はまだありません。「＋ 追記」から登録してください。`));
     return sec;
   }
   const ul = el("ul", "ach-list");
@@ -230,18 +252,24 @@ function renderAchievements(g) {
     const li = el("li");
     li.tabIndex = 0;
     li.title = "クリックして編集";
-    const main = el("div");
-    const at = el("div", "a-title", a.title);
+    const main = el("div", "a-main");
+    const at = el("span", "a-title", a.title);
+    at.title = a.title;
+    if (!state.year) main.append(el("span", "fy-tag", `${a.fiscal_year}年度`));
+    main.append(at);
     if (safeUrl(a.url)) {
       const link = el("a", "g-link", "リンク ↗");
       link.href = a.url;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       link.addEventListener("click", (e) => e.stopPropagation());
-      at.append(link);
+      main.append(link);
     }
-    main.append(at);
-    if (a.note) main.append(el("div", "g-note", a.note));
+    if (a.note) {
+      const n = el("span", "a-note", a.note.replace(/\s*\n\s*/g, " "));
+      n.title = a.note; // 一行に収まらない分はマウスを重ねると全文を表示
+      main.append(n);
+    }
     li.append(el("span", "a-date", a.achieved_on ? slashDate(a.achieved_on) : "—"), main,
       el("span", a.owner ? "a-owner" : "a-owner none", a.owner ? `担当 ${a.owner.split(" ").join("・")}` : "担当未設定"));
     const openIt = () => openAchievementDialog(g, a);
@@ -282,7 +310,7 @@ function renderRelations(g) {
   return rel;
 }
 
-// ---- 今年度達成したことの追加・編集
+// ---- 達成したことの追加・編集
 let achEditing = null; // { group, item }
 const achForm = $("#form-ach");
 function openAchievementDialog(g, a) {
@@ -293,7 +321,8 @@ function openAchievementDialog(g, a) {
   achForm.achieved_on.value = a?.achieved_on || "";
   achForm.note.value = a?.note || "";
   achForm.url.value = a?.url || "";
-  $("#ach-title").textContent = a ? "今年度達成したことの編集" : "今年度達成したことを追記";
+  yearOptions(achForm.fiscal_year, a?.fiscal_year || state.year || state.currentYear);
+  $("#ach-title").textContent = a ? "達成したことの編集" : "達成したことを追記";
   $("#ach-meta").textContent = a ? `${g.name}　／　最終更新 ${a.updated_at.slice(0, 16)}` : g.name;
   $("#ach-submit").textContent = a ? "保存" : "追記";
   $("#ach-delete").hidden = !a;
@@ -301,11 +330,19 @@ function openAchievementDialog(g, a) {
   $("#dlg-ach").showModal();
   achForm.title.focus();
 }
+// 達成日を入れたら年度を合わせる
+achForm.achieved_on.addEventListener("change", () => {
+  const y = fiscalYearOf(achForm.achieved_on.value);
+  if (!y) return;
+  if (![...achForm.fiscal_year.options].some((o) => Number(o.value) === y)) yearOptions(achForm.fiscal_year, y);
+  achForm.fiscal_year.value = y;
+});
 $("#dlg-ach [data-close]").addEventListener("click", () => $("#dlg-ach").close());
 achForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const { group, item } = achEditing;
-  const body = { title: achForm.title.value.trim(), owner: achForm.owner.value.trim(), achieved_on: achForm.achieved_on.value || null, note: achForm.note.value, url: achForm.url.value.trim() };
+  const body = { title: achForm.title.value.trim(), owner: achForm.owner.value.trim(), achieved_on: achForm.achieved_on.value || null, note: achForm.note.value, url: achForm.url.value.trim(),
+    fiscal_year: Number(achForm.fiscal_year.value) };
   try {
     await api(item ? `/api/groups/${group.id}/achievements/${item.id}` : `/api/groups/${group.id}/achievements`,
       { method: item ? "PUT" : "POST", body: JSON.stringify(body) });
@@ -319,7 +356,7 @@ achForm.addEventListener("submit", async (e) => {
 $("#ach-delete").addEventListener("click", () => {
   const { group, item } = achEditing;
   $("#dlg-ach").close();
-  openDelete("記録", `今年度達成したこと: ${item.title}`, `/api/groups/${group.id}/achievements/${item.id}`, () => reload(group.id));
+  openDelete("記録", `達成したこと: ${item.title}`, `/api/groups/${group.id}/achievements/${item.id}`, () => reload(group.id));
 });
 
 // ------------------------------------------------------------ グループの追加・編集
@@ -401,6 +438,7 @@ function openGoalDialog(g, t) {
   f.due_date.value = t?.due_date || "";
   f.note.value = t?.note || "";
   f.url.value = t?.url || "";
+  yearOptions(f.fiscal_year, t?.fiscal_year || state.year || state.currentYear);
   $("#goal-title").textContent = t ? "目標の編集" : "目標の追加";
   $("#goal-meta").textContent = t ? `${g.name}　／　最終更新 ${t.updated_at.slice(0, 16)}` : g.name;
   $("#goal-submit").textContent = t ? "保存" : "追加";
@@ -417,6 +455,7 @@ $("#form-goal").addEventListener("submit", async (e) => {
   const body = {
     title: f.title.value.trim(), criteria: f.criteria.value, period: f.period.value.trim(),
     status: f.status.value, due_date: f.due_date.value || null, note: f.note.value, url: f.url.value.trim(),
+    fiscal_year: Number(f.fiscal_year.value),
   };
   if (body.url && !safeUrl(body.url)) { $("#goal-error").textContent = "リンクは http:// または https:// で始まる URL を入力してください"; return; }
   try {
@@ -463,9 +502,20 @@ $("#form-delete").addEventListener("submit", async (e) => {
   }
 });
 
+// ------------------------------------------------------------ 年度の切り替え
+$("#year-select").addEventListener("change", async (e) => {
+  state.year = e.target.value ? Number(e.target.value) : "";
+  await reload();
+});
+
 // ------------------------------------------------------------ 読み込み
 async function reload(selectId = state.current) {
-  state.groups = await api("/api/groups");
+  const info = await api("/api/groups/years");
+  state.currentYear = info.current;
+  state.years = info.years;
+  if (state.year === null) state.year = info.current;
+  yearOptions($("#year-select"), state.year || "", true);
+  state.groups = await api(`/api/groups${yearQuery()}`);
   const target = state.groups.find((g) => g.id === selectId) || state.groups[0];
   if (target) await select(target.id);
   else { state.current = null; renderList(); renderDetail(); }
@@ -476,7 +526,11 @@ async function reload(selectId = state.current) {
     [state.statuses, state.services, state.platforms] = await Promise.all([
       api("/api/groups/goal-statuses"), api("/api/services"), api("/api/platforms"),
     ]);
-    const want = Number(new URLSearchParams(location.search).get("id")) || null;
+    const params = new URLSearchParams(location.search);
+    const want = Number(params.get("id")) || null;
+    const y = params.get("year");
+    if (y === "all") state.year = "";
+    else if (Number(y)) state.year = Number(y);
     await reload(want);
   } catch (err) {
     toast(`読み込みに失敗しました: ${err.message}`, true);

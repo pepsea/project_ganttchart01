@@ -1,7 +1,8 @@
 """グループ目標管理 API
 
 グループ（グループ名・PL・メンバー・大目標・関連サービス・関連基盤技術）と、
-グループごとの目標（達成基準・時期・状態・期限・メモ・リンク）、今年度達成したこと（内容・担当者・達成日）を管理する。
+グループごとの目標（達成基準・時期・状態・期限・メモ・リンク）、年度ごとの達成したこと（内容・担当者・達成日・リンク）を管理する。
+目標と達成したことは年度（4 月始まり、fiscal_year）ごとに表示する。
 今年度の達成指標（team_kpis）は画面からは外したが、データと API は残している。
 """
 
@@ -89,6 +90,13 @@ def init_db() -> None:
         )
         if "url" not in {r["name"] for r in db.execute("PRAGMA table_info(team_achievements)")}:
             db.execute("ALTER TABLE team_achievements ADD COLUMN url TEXT NOT NULL DEFAULT ''")  # 関連リンク
+        # 年度（4 月始まり）。未設定の行は期限・達成日（無ければ作成日）から決める
+        for table, date_col in (("team_goals", "due_date"), ("team_achievements", "achieved_on")):
+            if "fiscal_year" not in {r["name"] for r in db.execute(f"PRAGMA table_info({table})")}:
+                db.execute(f"ALTER TABLE {table} ADD COLUMN fiscal_year INTEGER")
+            d = f"COALESCE({date_col}, created_at)"
+            db.execute(f"UPDATE {table} SET fiscal_year = CAST(strftime('%Y', {d}) AS INTEGER)"
+                       f" - (CAST(strftime('%m', {d}) AS INTEGER) < 4) WHERE fiscal_year IS NULL")
         # 旧形式（kpi 列の文章）は 1 行ずつ指標として引き継ぐ（kpi 列は未使用として残す）
         for r in db.execute("SELECT id, kpi FROM team_groups WHERE kpi <> ''"
                             " AND id NOT IN (SELECT group_id FROM team_kpis)").fetchall():
@@ -99,6 +107,15 @@ def init_db() -> None:
 
 
 # ---------------------------------------------------------------- Models
+
+def fiscal_year_of(d: date | None = None) -> int:
+    """年度（4 月始まり）: 2026/4/1〜2027/3/31 は 2026 年度"""
+    d = d or date.today()
+    return d.year if d.month >= 4 else d.year - 1
+
+
+FiscalYear = Field(default=None, ge=2000, le=2100)
+
 
 def _url(v):
     v = (v or "").strip()
@@ -133,6 +150,7 @@ class GroupIn(BaseModel):
 
 
 class GoalIn(BaseModel):
+    fiscal_year: int | None = FiscalYear  # 年度（省略時は期限、無ければ今日から決める）
     title: str = Field(min_length=1)
     criteria: str = ""       # 達成基準
     period: str = ""         # 時期（例: 2026 年度下期）
@@ -159,6 +177,7 @@ class KpiIn(BaseModel):
 
 
 class AchievementIn(BaseModel):
+    fiscal_year: int | None = FiscalYear  # 年度（省略時は達成日、無ければ今日から決める）
     title: str = Field(min_length=1)
     owner: str = ""
     achieved_on: date | None = None
@@ -186,12 +205,16 @@ async def _require_password(body: PasswordIn) -> None:
         raise HTTPException(403, "パスワードが正しくないため削除できません")
 
 
+# :y = 年度（NULL なら全年度）で目標の件数を数える
 GROUP_SELECT = """
     SELECT g.*,
-           (SELECT COUNT(*) FROM team_goals t WHERE t.group_id = g.id) AS goal_total,
-           (SELECT COUNT(*) FROM team_goals t WHERE t.group_id = g.id AND t.status = '達成') AS goal_done,
+           (SELECT COUNT(*) FROM team_goals t WHERE t.group_id = g.id
+             AND (:y IS NULL OR t.fiscal_year = :y)) AS goal_total,
+           (SELECT COUNT(*) FROM team_goals t WHERE t.group_id = g.id AND t.status = '達成'
+             AND (:y IS NULL OR t.fiscal_year = :y)) AS goal_done,
            (SELECT MIN(due_date) FROM team_goals t
-             WHERE t.group_id = g.id AND t.status NOT IN ('達成', '保留') AND t.due_date IS NOT NULL) AS next_due,
+             WHERE t.group_id = g.id AND t.status NOT IN ('達成', '保留') AND t.due_date IS NOT NULL
+             AND (:y IS NULL OR t.fiscal_year = :y)) AS next_due,
            (SELECT COUNT(*) FROM team_kpis k WHERE k.group_id = g.id) AS kpi_count,
            (SELECT ROUND(AVG(progress)) FROM team_kpis k WHERE k.group_id = g.id) AS kpi_avg
     FROM team_groups g
@@ -206,8 +229,8 @@ def _to_group(row: sqlite3.Row) -> dict:
     return d
 
 
-def _fetch(db: sqlite3.Connection, gid: int) -> dict:
-    row = db.execute(f"{GROUP_SELECT} WHERE g.id = ?", (gid,)).fetchone()
+def _fetch(db: sqlite3.Connection, gid: int, year: int | None = None) -> dict:
+    row = db.execute(f"{GROUP_SELECT} WHERE g.id = :gid", {"gid": gid, "y": year}).fetchone()
     if row is None:
         raise HTTPException(404, "グループが見つかりません")
     return _to_group(row)
@@ -248,9 +271,20 @@ def _write(db: sqlite3.Connection, sql: str, params: tuple, name: str):
 # ---------------------------------------------------------------- グループ
 
 @router.get("")
-def list_groups() -> list[dict]:
+def list_groups(year: int | None = None) -> list[dict]:
+    """year を指定すると、その年度の目標で件数を数える"""
     with get_db() as db:
-        return [_to_group(r) for r in db.execute(f"{GROUP_SELECT} ORDER BY g.sort_order, g.id")]
+        return [_to_group(r) for r in db.execute(f"{GROUP_SELECT} ORDER BY g.sort_order, g.id", {"y": year})]
+
+
+@router.get("/years")
+def list_years() -> dict:
+    """登録のある年度（今年度・来年度は常に含む）と今年度"""
+    now = fiscal_year_of()
+    with get_db() as db:
+        ys = {r[0] for r in db.execute("SELECT fiscal_year FROM team_goals UNION SELECT fiscal_year FROM team_achievements")
+              if r[0] is not None}
+    return {"current": now, "years": sorted(ys | {now, now + 1}, reverse=True)}
 
 
 @router.get("/goal-statuses")
@@ -292,29 +326,31 @@ async def delete_group(gid: int, body: PasswordIn) -> Response:
 
 def _goal_values(t: GoalIn) -> tuple:
     return (t.title.strip(), t.due_date.isoformat() if t.due_date else None, t.status, t.note.strip(), t.url,
-            t.criteria.strip(), t.period.strip())
+            t.criteria.strip(), t.period.strip(), t.fiscal_year or fiscal_year_of(t.due_date))
 
 
 @router.get("/{gid}/goals")
-def list_goals(gid: int) -> list[dict]:
+def list_goals(gid: int, year: int | None = None) -> list[dict]:
     with get_db() as db:
         _fetch(db, gid)
-        return [dict(r) for r in db.execute(f"SELECT * FROM team_goals WHERE group_id = ? {GOAL_ORDER}", (gid,))]
+        return [dict(r) for r in db.execute(
+            f"SELECT * FROM team_goals WHERE group_id = :gid AND (:y IS NULL OR fiscal_year = :y) {GOAL_ORDER}",
+            {"gid": gid, "y": year})]
 
 
 @router.post("/{gid}/goals", status_code=201)
 def add_goal(gid: int, t: GoalIn) -> dict:
     with get_db() as db:
         _fetch(db, gid)
-        cur = db.execute("INSERT INTO team_goals(group_id, title, due_date, status, note, url, criteria, period)"
-                         " VALUES (?,?,?,?,?,?,?,?)", (gid, *_goal_values(t)))
+        cur = db.execute("INSERT INTO team_goals(group_id, title, due_date, status, note, url, criteria, period, fiscal_year)"
+                         " VALUES (?,?,?,?,?,?,?,?,?)", (gid, *_goal_values(t)))
         return dict(db.execute("SELECT * FROM team_goals WHERE id = ?", (cur.lastrowid,)).fetchone())
 
 
 @router.put("/{gid}/goals/{tid}")
 def update_goal(gid: int, tid: int, t: GoalIn) -> dict:
     with get_db() as db:
-        cur = db.execute("UPDATE team_goals SET title=?, due_date=?, status=?, note=?, url=?, criteria=?, period=?,"
+        cur = db.execute("UPDATE team_goals SET title=?, due_date=?, status=?, note=?, url=?, criteria=?, period=?, fiscal_year=?,"
                          " updated_at=datetime('now','localtime') WHERE id=? AND group_id=?", (*_goal_values(t), tid, gid))
         if cur.rowcount == 0:
             raise HTTPException(404, "目標が見つかりません")
@@ -373,22 +409,24 @@ async def delete_kpi(gid: int, kid: int, body: PasswordIn) -> Response:
 # ---------------------------------------------------------------- 今年度達成したこと（内容・担当者・達成日）
 
 def _ach_values(a: AchievementIn) -> tuple:
-    return (a.title, a.owner, a.achieved_on.isoformat() if a.achieved_on else None, a.note.strip(), a.url)
+    return (a.title, a.owner, a.achieved_on.isoformat() if a.achieved_on else None, a.note.strip(), a.url,
+            a.fiscal_year or fiscal_year_of(a.achieved_on))
 
 
 @router.get("/{gid}/achievements")
-def list_achievements(gid: int) -> list[dict]:
+def list_achievements(gid: int, year: int | None = None) -> list[dict]:
     with get_db() as db:
         _fetch(db, gid)
         return [dict(r) for r in db.execute(
-            "SELECT * FROM team_achievements WHERE group_id = ? ORDER BY COALESCE(achieved_on, '0000') DESC, id DESC", (gid,))]
+            "SELECT * FROM team_achievements WHERE group_id = :gid AND (:y IS NULL OR fiscal_year = :y)"
+            " ORDER BY COALESCE(achieved_on, '0000') DESC, id DESC", {"gid": gid, "y": year})]
 
 
 @router.post("/{gid}/achievements", status_code=201)
 def add_achievement(gid: int, a: AchievementIn) -> dict:
     with get_db() as db:
         _fetch(db, gid)
-        cur = db.execute("INSERT INTO team_achievements(group_id, title, owner, achieved_on, note, url) VALUES (?,?,?,?,?,?)",
+        cur = db.execute("INSERT INTO team_achievements(group_id, title, owner, achieved_on, note, url, fiscal_year) VALUES (?,?,?,?,?,?,?)",
                          (gid, *_ach_values(a)))
         return dict(db.execute("SELECT * FROM team_achievements WHERE id = ?", (cur.lastrowid,)).fetchone())
 
@@ -396,7 +434,7 @@ def add_achievement(gid: int, a: AchievementIn) -> dict:
 @router.put("/{gid}/achievements/{aid}")
 def update_achievement(gid: int, aid: int, a: AchievementIn) -> dict:
     with get_db() as db:
-        cur = db.execute("UPDATE team_achievements SET title=?, owner=?, achieved_on=?, note=?, url=?,"
+        cur = db.execute("UPDATE team_achievements SET title=?, owner=?, achieved_on=?, note=?, url=?, fiscal_year=?,"
                          " updated_at=datetime('now','localtime') WHERE id=? AND group_id=?", (*_ach_values(a), aid, gid))
         if cur.rowcount == 0:
             raise HTTPException(404, "記録が見つかりません")
