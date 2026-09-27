@@ -9,10 +9,11 @@ import re
 import sqlite3
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Response
-from pydantic import BaseModel, Field, field_validator
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 import auth
+from csvutil import csv_response, read_csv, split_list
 from db import ensure_master, get_db
 
 router = APIRouter(prefix="/api/links", tags=["参考リンク"])
@@ -90,6 +91,66 @@ def _fetch(db: sqlite3.Connection, lid: int) -> dict:
 def list_links() -> list[dict]:
     with get_db() as db:
         return [_to_link(r) for r in db.execute("SELECT * FROM ref_links ORDER BY category, sort_order, id")]
+
+
+# ---------------------------------------------------------------- CSV（エクスポート・インポート）
+
+CATEGORY_LABELS = {"tech": "自社技術リンク", "own": "自社サービス", "other": "その他参考"}
+EXPORT_HEADERS = ["欄", "名前", "URL", "説明", "領域", "表示順"]
+
+
+@router.get("/export.csv")
+def export_csv() -> Response:
+    """全リンクを 1 リンク 1 行で出力（このファイルをインポートすれば元に戻せる）"""
+    rows = [EXPORT_HEADERS]
+    for l in list_links():
+        rows.append([CATEGORY_LABELS[l["category"]], l["title"], l["url"], l["note"], "、".join(l["areas"]), l["sort_order"]])
+    return csv_response(rows, "links")
+
+
+@router.post("/import")
+async def import_csv(file: UploadFile = File(...)) -> dict:
+    """リンク CSV を取り込む。欄と URL が同じリンクは更新（空欄のセルは今の値のまま）、無ければ欄の最後に追加。
+    1 行でもエラーがあれば何も取り込まない。"""
+    rows = read_csv(await file.read(), ["名前", "URL"])
+    cat_by_label = {v: k for k, v in CATEGORY_LABELS.items()} | {k: k for k in CATEGORY_LABELS} | {
+        "WEB リンク（自社サービス）": "own", "WEB リンク（その他参考）": "other"}
+    added = updated = 0
+    with get_db() as db:
+        for line, r in rows:
+            cat = cat_by_label.get(r.get("欄") or "その他参考")
+            if not cat:
+                raise HTTPException(422, f"{line} 行目: 欄は「自社技術リンク」「自社サービス」「その他参考」のいずれかにしてください")
+            row = db.execute("SELECT * FROM ref_links WHERE category = ? AND url = ? ORDER BY id LIMIT 1",
+                             (cat, r.get("URL", ""))).fetchone()
+            cur = _to_link(row) if row else {}
+            data = {"category": cat, "title": r.get("名前") or cur.get("title", ""), "url": r.get("URL", ""),
+                    "note": r.get("説明") or cur.get("note", ""),
+                    "areas": split_list(r["領域"]) if r.get("領域") else cur.get("areas", [])}
+            try:
+                l = LinkIn(**data)
+            except ValidationError as e:
+                msg = "; ".join(err["msg"].replace("Value error, ", "") for err in e.errors())
+                raise HTTPException(422, f"{line} 行目（{r.get('名前', '')}）: {msg}")
+            try:
+                order = int(r["表示順"]) if r.get("表示順") else None
+            except ValueError:
+                raise HTTPException(422, f"{line} 行目: 表示順は数字にしてください")
+            for a in l.areas:
+                ensure_master(db, "areas", a)
+            areas = json.dumps(l.areas, ensure_ascii=False)
+            if row:
+                db.execute("UPDATE ref_links SET title=?, note=?, areas=?, sort_order=COALESCE(?, sort_order),"
+                           " updated_at=datetime('now','localtime') WHERE id=?", (l.title, l.note.strip(), areas, order, row["id"]))
+                updated += 1
+            else:
+                if order is None:
+                    order = db.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM ref_links WHERE category = ?",
+                                       (cat,)).fetchone()[0]
+                db.execute("INSERT INTO ref_links(category, title, url, note, sort_order, areas) VALUES (?,?,?,?,?,?)",
+                           (cat, l.title, l.url, l.note.strip(), order, areas))
+                added += 1
+    return {"added": added, "updated": updated}
 
 
 @router.post("", status_code=201)

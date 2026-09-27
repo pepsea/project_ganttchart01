@@ -476,3 +476,9 @@ table.tasks td { border-bottom-color: var(--line); }
 .team-line .pf-links .role { margin-right: 2px; }
 .team-line .pf-link { font-size: 12px; padding: 1px 10px; }
 .team-line span.pf-link { background: #ffd4d4; color: #a3161b; border: 1px solid #f2b8b9; }
+
+/* 目標: 1 件ずつ細い線で区切る（最後の目標も含め、上下に線） */
+.goal-list { border-top: 1px solid #d3d8e0; }
+.goal-list li, .goal-list li:last-child { border-bottom: 1px solid #d3d8e0; }
+.goal-list li:nth-child(even) { background: #fafbfd; }
+.goal-list li:nth-child(even):hover, .goal-list li:nth-child(even):focus { background: #f3f7ff; }

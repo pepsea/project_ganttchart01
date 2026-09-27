@@ -84,3 +84,9 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .link-list .l-note { min-width: 8em; }
 .link-list .l-areas { flex-shrink: 5; min-width: 0; }
 .link-list .l-title { flex: 0 0 auto; max-width: 45%; }
+
+/* リンク（ウェブサイト）ごとに細い線で区切る（1 行おきに薄い背景） */
+.link-list li { border-bottom: 1px solid #d3d8e0; }
+.link-list li:last-child { border-bottom: 0; }
+.link-list li:nth-child(even):not(.empty-li) { background: #fafbfd; }
+.link-list li:hover { background: #f3f7ff; }

@@ -9,12 +9,13 @@ import re
 import sqlite3
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 import auth
+from csvutil import csv_response, read_csv, split_list
 from db import ensure_master, get_db
 
 router = APIRouter(prefix="/api/documents", tags=["共有資料"])
@@ -129,6 +130,64 @@ def _fetch(db: sqlite3.Connection, did: int) -> dict:
 def list_documents() -> list[dict]:
     with get_db() as db:
         return [_to_doc(r) for r in db.execute("SELECT * FROM documents ORDER BY created_date DESC, id DESC")]
+
+
+# ---------------------------------------------------------------- CSV（エクスポート・インポート）
+
+CATEGORY_LABELS = {"group": "グループ資料", "other": "その他参考資料"}
+EXPORT_HEADERS = ["欄", "資料名", "目的", "作成日時", "領域",
+                  *(h for i in range(1, LINK_COUNT + 1) for h in (f"リンク{i}の名前", f"リンク{i}"))]
+
+
+@router.get("/export.csv")
+def export_csv() -> Response:
+    """全資料を 1 資料 1 行で出力（このファイルをインポートすれば元に戻せる）"""
+    rows = [EXPORT_HEADERS]
+    for d in list_documents():
+        rows.append([CATEGORY_LABELS.get(d["category"], d["category"]), d["title"], d["purpose"], d["created_date"],
+                     "、".join(d["areas"]),
+                     *(d[f"link{i}_{k}"] for i in range(1, LINK_COUNT + 1) for k in ("label", "url"))])
+    return csv_response(rows, "documents")
+
+
+@router.post("/import")
+async def import_csv(file: UploadFile = File(...)) -> dict:
+    """資料 CSV を取り込む。欄と資料名が同じ資料は更新（空欄のセルは今の値のまま）、無ければ追加。
+    1 行でもエラーがあれば何も取り込まない。"""
+    rows = read_csv(await file.read(), ["資料名"])
+    cat_by_label = {v: k for k, v in CATEGORY_LABELS.items()} | {k: k for k in CATEGORY_LABELS}
+    added = updated = 0
+    with get_db() as db:
+        for line, r in rows:
+            cat = cat_by_label.get(r.get("欄") or "グループ資料")
+            if not cat:
+                raise HTTPException(422, f"{line} 行目: 欄は「グループ資料」か「その他参考資料」にしてください")
+            row = db.execute("SELECT * FROM documents WHERE title = ? AND category = ? ORDER BY id LIMIT 1",
+                             (r.get("資料名", ""), cat)).fetchone()
+            data = _to_doc(row) if row else {}
+            data = {k: data.get(k) for k in COLS if k in data} | {"category": cat}
+            for col, key in (("資料名", "title"), ("目的", "purpose"), ("作成日時", "created_date"),
+                             *((f"リンク{i}の名前", f"link{i}_label") for i in range(1, LINK_COUNT + 1)),
+                             *((f"リンク{i}", f"link{i}_url") for i in range(1, LINK_COUNT + 1))):
+                if r.get(col):
+                    data[key] = r[col]
+            if r.get("領域"):
+                data["areas"] = split_list(r["領域"])
+            try:
+                d = DocumentIn(**data)
+            except ValidationError as e:
+                msg = "; ".join(err["msg"].replace("Value error, ", "") for err in e.errors())
+                raise HTTPException(422, f"{line} 行目（{r.get('資料名', '')}）: {msg}")
+            for a in d.areas:
+                ensure_master(db, "areas", a)
+            if row:
+                db.execute(f"UPDATE documents SET {', '.join(c + '=?' for c in COLS)}, updated_at=datetime('now','localtime')"
+                           " WHERE id=?", (*d.values(), row["id"]))
+                updated += 1
+            else:
+                db.execute(f"INSERT INTO documents({', '.join(COLS)}) VALUES ({', '.join('?' * len(COLS))})", d.values())
+                added += 1
+    return {"added": added, "updated": updated}
 
 
 @router.post("", status_code=201)

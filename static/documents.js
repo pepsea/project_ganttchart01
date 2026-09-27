@@ -208,3 +208,11 @@ async function reload() {
 $("#f-area").addEventListener("change", (e) => { state.area = e.target.value; render(); });
 $("#q").addEventListener("input", (e) => { state.q = e.target.value; render(); });
 reload().catch((err) => toast(`読み込みに失敗しました: ${err.message}`, true));
+
+// ------------------------------------------------------------ CSV エクスポート・インポート
+setupCsvTools({
+  exportUrl: "/api/documents/export.csv", importUrl: "/api/documents/import",
+  note: "・欄と資料名が同じ資料は更新、無ければ追加します",
+  summary: (d) => `追加 ${d.added} 件 / 更新 ${d.updated} 件`,
+  after: reload, toast,
+});

@@ -491,3 +491,8 @@ a.link-ic:hover { filter: brightness(1.12); color: #fff; }
 /* カード・一覧: Teams へ直接移動 */
 a.link-ic.teams { background: #5b5fc7; border-color: #5b5fc7; color: #fff; padding: 0 7px; }
 a.link-ic.teams:hover { filter: brightness(1.12); color: #fff; }
+/* 設定済みのリンク（クリックで開く） */
+a.link-ic.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+a.link-ic.on:hover { filter: brightness(1.12); color: #fff; }
+a.link-ic.free { background: #2fa36b; border-color: #2fa36b; max-width: 9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; line-height: 18px; }
+.links { flex-wrap: wrap; }

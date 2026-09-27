@@ -199,26 +199,31 @@ function areaChips(c) {
   return box;
 }
 
-// 最初の画面（カード・一覧）: Teams が設定済みなら「Teams ↗」で直接開ける。ほかは未設定のリンクだけを赤で出す
-// （設定済みのリンクは詳細画面の一番下の「開く」から）
+// 最初の画面（カード・一覧）のリンク: 設定済みはクリックで直接開く（別タブ）。未設定は赤。自由リンクは設定済みのときだけ
 function linkIcons(c) {
   const box = el("span", "links");
-  const teams = safeUrl(c.teams_url);
-  if (teams) {
-    const a = el("a", "link-ic teams", "Teams ↗");
-    a.href = teams;
+  const add = (url, text, title, cls) => {
+    const a = el("a", `link-ic on ${cls}`, `${text} ↗`);
+    a.href = url;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
-    a.title = "Teams を開く";
-    a.addEventListener("click", (e) => e.stopPropagation()); // カードの詳細を開かない
+    a.title = `${title}を開く`;
     a.draggable = false;
+    a.addEventListener("click", (e) => e.stopPropagation()); // カードの詳細は開かない
     box.append(a);
-  }
+  };
   for (const [key, short, label] of LINKS) {
-    if (safeUrl(c[key])) continue;
-    const s = el("span", "link-ic", short);
-    s.title = `${label}: 未設定（案件を開いて登録）`;
-    box.append(s);
+    const url = safeUrl(c[key]);
+    if (url) add(url, short, label, key === "teams_url" ? "teams" : "");
+    else {
+      const s = el("span", "link-ic", short);
+      s.title = `${label}: 未設定（案件を開いて一番下のリンクで登録）`;
+      box.append(s);
+    }
+  }
+  for (const i of [1, 2]) {
+    const url = safeUrl(c[`link${i}_url`]);
+    if (url) add(url, c[`link${i}_label`] || `リンク${i}`, c[`link${i}_label`] || `自由リンク ${i}`, "free");
   }
   return box;
 }
@@ -318,7 +323,7 @@ async function changeStatus(c, status) {
 const COLUMNS = [
   ["status", "状況"], ["case_no", "案件番号"], ["customer", "顧客名"], ["name", "案件名"], ["pl", "PL"],
   ["assignees", "担当者"], ["areas", "領域"], ["start_date", "開始日"], ["end_date", "終了予定日"],
-  ["links", "未設定リンク"], ["last_note_date", "最新の進捗"],
+  ["links", "リンク"], ["last_note_date", "最新の進捗"],
 ];
 
 function renderList() {

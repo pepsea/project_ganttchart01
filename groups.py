@@ -13,10 +13,11 @@ import sqlite3
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Response
-from pydantic import BaseModel, Field, field_validator
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 import auth
+from csvutil import csv_response, parse_date, read_csv, split_list
 from db import get_db
 
 router = APIRouter(prefix="/api/groups", tags=["グループ目標"])
@@ -503,3 +504,155 @@ async def delete_achievement(gid: int, aid: int, body: PasswordIn) -> Response:
         if db.execute("DELETE FROM team_achievements WHERE id=? AND group_id=?", (aid, gid)).rowcount == 0:
             raise HTTPException(404, "記録が見つかりません")
     return Response(status_code=204)
+
+
+# ---------------------------------------------------------------- CSV（エクスポート・インポート）
+# 1 ファイルに「種別」列（グループ / 目標 / 達成したこと / 指標 / 年度）の行を並べる。
+# このファイルをインポートすれば、データが空の状態からでも元に戻せる。
+
+EXPORT_HEADERS = ["種別", "グループ名", "PL", "メンバー", "大目標", "関連サービス", "関連基盤技術",
+                  "年度", "状態", "目標", "達成基準", "時期", "期限",
+                  "達成したこと", "担当者", "達成日", "指標", "進捗", "メモ", "リンク"]
+
+
+def _err(line: int, e: Exception) -> HTTPException:
+    if isinstance(e, ValidationError):
+        msg = "; ".join(err["msg"].replace("Value error, ", "") for err in e.errors())
+    else:
+        msg = getattr(e, "detail", str(e))
+    return HTTPException(422, f"{line} 行目: {msg}")
+
+
+@router.get("/export.csv")
+def export_csv() -> Response:
+    rows = [EXPORT_HEADERS]
+    blank = dict.fromkeys(EXPORT_HEADERS, "")
+    add = lambda **kw: rows.append([{**blank, **kw}[h] for h in EXPORT_HEADERS])  # noqa: E731
+    with get_db() as db:
+        groups = [_to_group(r) for r in db.execute(f"{GROUP_SELECT} ORDER BY g.created_at, g.id", {"y": None})]
+        for g in groups:
+            add(種別="グループ", グループ名=g["name"], PL=g["pl"], メンバー=g["members"], 大目標=g["vision"],
+                関連サービス="、".join(g["services"]), 関連基盤技術="、".join(g["platforms"]))
+        for g in groups:
+            for t in db.execute(f"SELECT * FROM team_goals WHERE group_id = ? ORDER BY fiscal_year, id", (g["id"],)):
+                add(種別="目標", グループ名=g["name"], 年度=t["fiscal_year"] or "", 状態=t["status"], 目標=t["title"],
+                    達成基準=t["criteria"], 時期=t["period"], 期限=t["due_date"] or "", メモ=t["note"], リンク=t["url"])
+            for a in db.execute("SELECT * FROM team_achievements WHERE group_id = ? ORDER BY fiscal_year, achieved_on, id",
+                                (g["id"],)):
+                add(種別="達成したこと", グループ名=g["name"], 年度=a["fiscal_year"] or "", 達成したこと=a["title"],
+                    担当者=a["owner"], 達成日=a["achieved_on"] or "", メモ=a["note"], リンク=a["url"])
+            for k in db.execute("SELECT * FROM team_kpis WHERE group_id = ? ORDER BY sort_order, id", (g["id"],)):
+                add(種別="指標", グループ名=g["name"], 指標=k["title"], 担当者=k["owner"], 進捗=k["progress"])
+        for r in db.execute("SELECT year FROM team_years ORDER BY year"):
+            add(種別="年度", 年度=r["year"])
+    return csv_response(rows, "groups")
+
+
+@router.post("/import")
+async def import_csv(file: UploadFile = File(...)) -> dict:
+    """グループ目標 CSV を取り込む（1 行でもエラーがあれば何も取り込まない）。
+    - グループ: グループ名が同じなら更新（空欄のセルは今の値のまま）、無ければ追加
+    - 目標: 同じグループ・年度・目標なら更新、無ければ追加 / 達成したこと: 同じグループ・年度・内容なら更新、無ければ追加
+    - 指標（画面では非表示）: 同じグループ・指標なら更新 / 年度: 登録
+    """
+    rows = read_csv(await file.read(), ["種別", "グループ名"])
+    result = dict.fromkeys(("groups_added", "groups_updated", "goals", "achievements", "kpis", "years"), 0)
+    kinds = ("グループ", "目標", "達成したこと", "指標", "年度")
+    with get_db() as db:
+        # グループの行を先に取り込む（目標などが同じファイルの後ろのグループを参照してもよいように）
+        for line, r in sorted(rows, key=lambda x: x[1].get("種別") != "グループ"):
+            kind = r.get("種別") or "グループ"
+            if kind not in kinds:
+                raise HTTPException(422, f"{line} 行目: 種別は {' / '.join(kinds)} のいずれかにしてください")
+            if kind == "年度":
+                try:
+                    _register_year(db, YearIn(year=int(r.get("年度", ""))).year)
+                except (ValueError, ValidationError):
+                    raise HTTPException(422, f"{line} 行目: 年度「{r.get('年度', '')}」が正しくありません")
+                result["years"] += 1
+                continue
+            name = r.get("グループ名", "")
+            if not name:
+                raise HTTPException(422, f"{line} 行目: グループ名は必須です")
+            row = db.execute("SELECT * FROM team_groups WHERE name = ?", (name,)).fetchone()
+            if kind == "グループ":
+                cur = _to_group(row) if row else {}
+                data = {"name": name, "pl": r.get("PL") or cur.get("pl", ""), "members": r.get("メンバー") or cur.get("members", ""),
+                        "vision": r.get("大目標") or cur.get("vision", ""), "kpi": cur.get("kpi", ""),
+                        "services": split_list(r["関連サービス"]) if r.get("関連サービス") else cur.get("services", []),
+                        "platforms": split_list(r["関連基盤技術"]) if r.get("関連基盤技術") else cur.get("platforms", [])}
+                try:
+                    g = GroupIn(**data)
+                    _check_refs(db, g)
+                except (ValidationError, HTTPException) as e:
+                    raise _err(line, e)
+                if row:
+                    db.execute("UPDATE team_groups SET name=?, pl=?, members=?, vision=?, kpi=?, services=?, platforms=?,"
+                               " updated_at=datetime('now','localtime') WHERE id=?", (*_group_values(g), row["id"]))
+                    result["groups_updated"] += 1
+                else:
+                    order = db.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM team_groups").fetchone()[0]
+                    db.execute("INSERT INTO team_groups(name, pl, members, vision, kpi, services, platforms, sort_order)"
+                               " VALUES (?,?,?,?,?,?,?,?)", (*_group_values(g), order))
+                    result["groups_added"] += 1
+                continue
+            if row is None:
+                raise HTTPException(422, f"{line} 行目: グループ「{name}」が見つかりません（グループの行を先に登録してください）")
+            gid = row["id"]
+            try:
+                year = int(r["年度"]) if r.get("年度") else None
+            except ValueError:
+                raise HTTPException(422, f"{line} 行目: 年度「{r['年度']}」が正しくありません")
+            if kind == "目標":
+                try:
+                    due = parse_date(r["期限"], line, "期限") if r.get("期限") else None
+                    t = GoalIn(fiscal_year=year, title=r.get("目標", ""), criteria=r.get("達成基準", ""),
+                               period=r.get("時期", ""), due_date=due, status=r.get("状態") or "未着手",
+                               note=r.get("メモ", ""), url=r.get("リンク", ""))
+                except ValidationError as e:
+                    raise _err(line, e)
+                vals = _goal_values(t)
+                hit = db.execute("SELECT id FROM team_goals WHERE group_id = ? AND fiscal_year = ? AND title = ?",
+                                 (gid, vals[-1], vals[0])).fetchone()
+                if hit:
+                    db.execute("UPDATE team_goals SET title=?, due_date=?, status=?, note=?, url=?, criteria=?, period=?,"
+                               " fiscal_year=?, updated_at=datetime('now','localtime') WHERE id=?", (*vals, hit["id"]))
+                else:
+                    db.execute("INSERT INTO team_goals(group_id, title, due_date, status, note, url, criteria, period,"
+                               " fiscal_year) VALUES (?,?,?,?,?,?,?,?,?)", (gid, *vals))
+                _register_year(db, vals[-1])
+                result["goals"] += 1
+            elif kind == "達成したこと":
+                try:
+                    on = parse_date(r["達成日"], line, "達成日") if r.get("達成日") else None
+                    a = AchievementIn(fiscal_year=year, title=r.get("達成したこと", ""), owner=r.get("担当者", ""),
+                                      achieved_on=on, note=r.get("メモ", ""), url=r.get("リンク", ""))
+                except ValidationError as e:
+                    raise _err(line, e)
+                vals = _ach_values(a)
+                hit = db.execute("SELECT id FROM team_achievements WHERE group_id = ? AND fiscal_year = ? AND title = ?",
+                                 (gid, vals[-1], vals[0])).fetchone()
+                if hit:
+                    db.execute("UPDATE team_achievements SET title=?, owner=?, achieved_on=?, note=?, url=?, fiscal_year=?,"
+                               " updated_at=datetime('now','localtime') WHERE id=?", (*vals, hit["id"]))
+                else:
+                    db.execute("INSERT INTO team_achievements(group_id, title, owner, achieved_on, note, url, fiscal_year)"
+                               " VALUES (?,?,?,?,?,?,?)", (gid, *vals))
+                _register_year(db, vals[-1])
+                result["achievements"] += 1
+            else:  # 指標
+                try:
+                    k = KpiIn(title=r.get("指標", ""), owner=r.get("担当者", ""), progress=int(r.get("進捗") or 0))
+                except (ValueError, ValidationError) as e:
+                    raise _err(line, e)
+                hit = db.execute("SELECT id FROM team_kpis WHERE group_id = ? AND title = ?", (gid, k.title)).fetchone()
+                if hit:
+                    db.execute("UPDATE team_kpis SET owner=?, progress=?, updated_at=datetime('now','localtime') WHERE id=?",
+                               (k.owner, k.progress, hit["id"]))
+                else:
+                    order = db.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM team_kpis WHERE group_id = ?",
+                                       (gid,)).fetchone()[0]
+                    db.execute("INSERT INTO team_kpis(group_id, title, owner, progress, sort_order) VALUES (?,?,?,?,?)",
+                               (gid, k.title, k.owner, k.progress, order))
+                result["kpis"] += 1
+    return result

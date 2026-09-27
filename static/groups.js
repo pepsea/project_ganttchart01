@@ -594,3 +594,11 @@ async function reload(selectId = state.current) {
     toast(`読み込みに失敗しました: ${err.message}`, true);
   }
 })();
+
+// ------------------------------------------------------------ CSV エクスポート・インポート
+setupCsvTools({
+  exportUrl: "/api/groups/export.csv", importUrl: "/api/groups/import",
+  note: "・グループ名が同じグループは更新、無ければ追加します\n・目標と達成したことは、同じグループ・年度・内容なら更新、無ければ追加します",
+  summary: (d) => `グループ 追加 ${d.groups_added} / 更新 ${d.groups_updated}・目標 ${d.goals}・達成したこと ${d.achievements}・年度 ${d.years}`,
+  after: () => reload(), toast,
+});

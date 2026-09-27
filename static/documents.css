@@ -138,3 +138,8 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .doc-row .doc-name { flex: 1 1 140px; min-width: 120px; }
 .doc-row .area-tags { flex: 0 6 auto; }
 .doc-row .doc-link { max-width: 84px; }
+
+/* 資料ごとに細い線で区切る（1 行おきに薄い背景） */
+.doc-list > li { border-bottom: 1px solid #d3d8e0; }
+.doc-list > li:last-child { border-bottom: 0; }
+.doc-list > li:nth-child(even):not(.empty-li) { background: #fafbfd; }
