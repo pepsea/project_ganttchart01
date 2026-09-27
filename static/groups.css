@@ -129,29 +129,28 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 #dlg-group { width: min(640px, 94vw); }
 @media (max-width: 900px) { .gp-two { grid-template-columns: minmax(0, 1fr); } }
 
-/* 今年度の達成指標（担当者・進捗 %） */
-.kpi-list { list-style: none; margin: 0; padding: 0; }
-.kpi-list li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 150px 40px;
-  gap: 10px;
-  align-items: center;
-  padding: 8px 6px;
-  border-bottom: 1px solid var(--line);
-  cursor: pointer;
-}
-.kpi-list li:last-child { border-bottom: 0; }
-.kpi-list li:hover, .kpi-list li:focus { background: #f3f7ff; outline: none; border-radius: 4px; }
-.kpi-list .k-title { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
-.kpi-list .k-owner { font-size: 12px; color: #3b4252; white-space: nowrap; }
-.kpi-list .k-owner.none { color: #b0b4bc; }
-.pbar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
-.pbar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
-.pbar.done i { background: #2fa36b; }
-.kpi-list .k-pct { font-size: 13px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
-.kpi-list .k-pct.done { color: #1d6b43; }
-.avg-badge { font-size: 11.5px; font-weight: 700; color: #2f5bd0; background: #e3ecff; border-radius: 999px; padding: 1px 8px; }
-.progress-input { display: flex; align-items: center; gap: 10px; }
-.progress-input input[type=range] { flex: 1; }
-.progress-input input[type=number] { width: 80px; }
-#dlg-kpi { width: min(480px, 94vw); }
+
+/* 目標の達成基準・時期 */
+.g-facts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 3px; font-size: 12.5px; }
+.g-facts .fact { display: inline-flex; gap: 6px; align-items: baseline; }
+.g-facts .fl { font-size: 11px; font-weight: 700; color: var(--muted); border: 1px solid var(--line-strong); border-radius: 4px; padding: 0 5px; }
+.g-facts .fv { color: #3b4252; white-space: pre-wrap; }
+.g-facts .fv.none { color: #b0b4bc; }
+
+/* 今年度達成したこと */
+.ach-list { list-style: none; margin: 0; padding: 0; }
+.ach-list li { display: grid; grid-template-columns: 90px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 8px 6px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.ach-list li:last-child { border-bottom: 0; }
+.ach-list li:hover, .ach-list li:focus { background: #f3f7ff; outline: none; border-radius: 4px; }
+.ach-list .a-date { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ach-list .a-title { font-weight: 600; }
+.ach-list .a-owner { font-size: 12px; color: #3b4252; white-space: nowrap; }
+.ach-list .a-owner.none { color: #b0b4bc; }
+#dlg-ach { width: min(520px, 94vw); }
+
+/* グループの色分け（--gc は groups.js で id ごとに設定） */
+.gp-item { border-left: 5px solid var(--gc, var(--line-strong)); border-radius: 0 6px 6px 0; margin-bottom: 4px; }
+.gp-item .ttl::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--gc); margin-right: 7px; }
+.gp-item:hover { background: color-mix(in srgb, var(--gc) 7%, transparent); }
+.gp-item.on { background: color-mix(in srgb, var(--gc) 12%, #fff); border-color: color-mix(in srgb, var(--gc) 45%, #fff); border-left-color: var(--gc); border-radius: 0 6px 6px 0; }
+.gp-detail .gp-head h2 { border-left: 6px solid var(--gc, transparent); padding-left: 10px; }

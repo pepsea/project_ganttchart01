@@ -3,7 +3,7 @@
 // グループ目標: 左にグループ一覧、右に選んだグループ（グループ名・PL・メンバー・全体目標・目標）
 const DAY_MS = 86400000;
 const $ = (sel, root = document) => root.querySelector(sel);
-const state = { groups: [], goals: [], kpis: [], statuses: [], current: null, services: [], platforms: [] };
+const state = { groups: [], goals: [], achievements: [], statuses: [], current: null, services: [], platforms: [] };
 const serviceName = (no) => state.services.find((s) => s.service_no === no)?.name || "";
 const platformName = (no) => state.platforms.find((p) => p.name === no)?.title || "";
 
@@ -72,6 +72,9 @@ function teamLine(g) {
 }
 
 // ------------------------------------------------------------ 一覧
+// グループの色: id から決める（並べ替え・追加削除で他のグループの色が変わらない）
+const groupColor = (g) => `hsl(${(210 + g.id * 67) % 360} 62% 50%)`;
+
 function renderList() {
   const ul = $("#gp-items");
   ul.innerHTML = "";
@@ -81,13 +84,14 @@ function renderList() {
   }
   for (const g of state.groups) {
     const li = el("li", "gp-item");
+    li.style.setProperty("--gc", groupColor(g));
     li.classList.toggle("on", g.id === state.current);
     li.append(el("span", "ttl", g.name));
     const meter = el("div", "meter");
     const bar = el("i");
     bar.style.width = g.goal_total ? `${(g.goal_done / g.goal_total) * 100}%` : "0";
     meter.append(bar);
-    li.append(meter, el("div", "meta", `目標 ${g.goal_done}/${g.goal_total}` + (g.kpi_count ? `　指標 平均 ${g.kpi_avg}%` : "")));
+    li.append(meter, el("div", "meta", `目標 ${g.goal_done}/${g.goal_total}`));
     const team = [g.pl && `PL ${g.pl}`, g.members && `メンバー ${people(g).join("・")}`].filter(Boolean).join(" ／ ");
     if (team) li.append(el("div", "team", team));
     li.addEventListener("click", () => select(g.id));
@@ -98,12 +102,15 @@ function renderList() {
 async function select(id) {
   state.current = id;
   history.replaceState(null, "", `/groups?id=${id}`);
-  [state.goals, state.kpis] = await Promise.all([api(`/api/groups/${id}/goals`), api(`/api/groups/${id}/kpis`)]);
+  [state.goals, state.achievements] = await Promise.all([
+    api(`/api/groups/${id}/goals`), api(`/api/groups/${id}/achievements`),
+  ]);
   renderList();
   renderDetail();
 }
 
 // ------------------------------------------------------------ 詳細
+// 並び: 見出し → 大目標 → 目標（達成基準・時期）→ 今年度達成したこと → 関連サービス・関連基盤技術
 function renderDetail() {
   const g = state.groups.find((x) => x.id === state.current);
   const root = $("#detail");
@@ -113,6 +120,7 @@ function renderDetail() {
     return;
   }
   // 見出し: グループ名・PL・メンバー・サマリー
+  root.style.setProperty("--gc", groupColor(g));
   const head = el("div", "gp-head");
   const box = el("div");
   box.append(el("h2", "", g.name), teamLine(g));
@@ -138,51 +146,23 @@ function renderDetail() {
   stats.append(
     stat("目標の達成", `${g.goal_done}<small> / ${g.goal_total}</small>`),
     stat("期限超過の目標", `${overdue}<small> 件</small>`, overdue ? "warn" : ""),
-    stat("次の期限", g.next_due ? `${g.next_due.slice(5).replace("-", "/")}<small> （あと ${daysLeft(g.next_due)} 日）</small>` : "—"),
+    stat("今年度達成したこと", `${state.achievements.length}<small> 件</small>`),
   );
   head.append(stats);
   root.append(head);
 
-  // 大目標・今年度の達成指標（左右に並べる）
-  const two = el("div", "gp-two");
-  const textSection = (title, hint, text) => {
-    const sec = el("section", "gp-section");
-    const h = el("h3", "", title);
-    h.append(el("span", "hint", hint));
-    sec.append(h, el("div", `vision-text${text ? "" : " hint"}`, text || "未記入（「✎ 編集」から入力）"));
-    return sec;
-  };
-  two.append(textSection("大目標", "中長期的に目指すこと", g.vision), renderKpis(g));
-  root.append(two);
+  // 大目標
+  const vs = el("section", "gp-section");
+  const vh = el("h3", "", "大目標");
+  vh.append(el("span", "hint", "中長期的に目指すこと（「✎ 編集」から変更）"));
+  vs.append(vh, el("div", `vision-text${g.vision ? "" : " hint"}`, g.vision || "未記入（「✎ 編集」から入力）"));
+  root.append(vs);
 
-  // 関連サービス・関連基盤技術（クリックでそれぞれの画面へ）
-  const rel = el("section", "gp-section");
-  const rh = el("h3", "", "関連サービス・関連基盤技術");
-  rh.append(el("span", "hint", "クリックでそれぞれの画面を開く"));
-  rel.append(rh);
-  const relRow = (label, items, href, nameOf) => {
-    const row = el("div", "rel-row");
-    row.append(el("span", "lbl", label));
-    const chips = el("div", "rel-chips");
-    for (const no of items) {
-      const a = el("a", "rel-chip");
-      a.href = href(no);
-      a.target = "_blank";
-      a.rel = "noopener";
-      a.append(el("b", "", no), nameOf(no), el("span", "arrow", "↗"));
-      chips.append(a);
-    }
-    if (!items.length) chips.append(el("span", "hint", "なし"));
-    row.append(chips);
-    return row;
-  };
-  rel.append(
-    relRow("関連サービス", g.services, (no) => `/services#svc-${encodeURIComponent(no)}`, serviceName),
-    relRow("関連基盤技術", g.platforms, (no) => `/platforms?id=${encodeURIComponent(no)}`, platformName),
-  );
-  root.append(rel);
+  root.append(renderGoals(g), renderAchievements(g), renderRelations(g));
+}
 
-  // 目標
+// ---- 目標（達成基準・時期）: クリックで編集
+function renderGoals(g) {
   const gs = el("section", "gp-section");
   const gh = el("h3", "", "目標");
   gh.append(el("span", "count-badge", `${g.goal_done} / ${g.goal_total} 達成`), el("span", "hint", "目標をクリックすると編集できます"));
@@ -211,8 +191,16 @@ function renderDetail() {
       title.append(a);
     }
     main.append(title);
+    const facts = el("div", "g-facts");
+    const fact = (label, text) => {
+      const f = el("span", "fact");
+      f.append(el("span", "fl", label), el("span", text ? "fv" : "fv none", text || "未記入"));
+      return f;
+    };
+    facts.append(fact("達成基準", t.criteria), fact("時期", t.period));
+    main.append(facts);
     if (t.note) main.append(el("div", "g-note", t.note));
-    const d = el("span", `g-due ${due}`, t.due_date ? slashDate(t.due_date) : "期限なし");
+    const d = el("span", `g-due ${due}`, t.due_date ? `期限 ${slashDate(t.due_date)}` : "");
     if (due) d.title = due === "overdue" ? `期限超過（${-daysLeft(t.due_date)} 日経過）` : `期限まであと ${daysLeft(t.due_date)} 日`;
     li.append(st, main, d, el("span", "g-edit", "編集 ›"));
     const openIt = () => openGoalDialog(g, t);
@@ -221,38 +209,42 @@ function renderDetail() {
     ul.append(li);
   }
   gs.append(ul);
-  root.append(gs);
+  return gs;
 }
 
-// ---- 今年度の達成指標: 指標・担当者・進捗 %（クリックで編集）
-function renderKpis(g) {
+// ---- 今年度達成したこと（内容・担当者・達成日）: クリックで編集
+function renderAchievements(g) {
   const sec = el("section", "gp-section");
-  const h = el("h3", "", "今年度の達成指標");
-  if (state.kpis.length) {
-    const avg = Math.round(state.kpis.reduce((n, k) => n + k.progress, 0) / state.kpis.length);
-    h.append(el("span", "avg-badge", `平均 ${avg}%`));
-  }
-  const add = el("button", "primary right", "＋ 指標を追加");
-  add.addEventListener("click", () => openKpiDialog(g, null));
+  const h = el("h3", "", "今年度達成したこと");
+  h.append(el("span", "hint", "達成したことと担当者を追記"));
+  const add = el("button", "primary right", "＋ 追記");
+  add.addEventListener("click", () => openAchievementDialog(g, null));
   h.append(add);
   sec.append(h);
-  if (!state.kpis.length) {
-    sec.append(el("p", "hint", "まだ指標がありません。「＋ 指標を追加」から登録してください。"));
+  if (!state.achievements.length) {
+    sec.append(el("p", "hint", "まだ記録がありません。「＋ 追記」から登録してください。"));
     return sec;
   }
-  const ul = el("ul", "kpi-list");
-  for (const k of state.kpis) {
+  const ul = el("ul", "ach-list");
+  for (const a of state.achievements) {
     const li = el("li");
     li.tabIndex = 0;
     li.title = "クリックして編集";
-    const done = k.progress >= 100;
-    li.append(el("span", "k-title", k.title), el("span", k.owner ? "k-owner" : "k-owner none", k.owner ? `担当 ${k.owner}` : "担当未設定"));
-    const bar = el("div", done ? "pbar done" : "pbar");
-    const fill = el("i");
-    fill.style.width = `${Math.max(0, Math.min(100, k.progress))}%`;
-    bar.append(fill);
-    li.append(bar, el("span", done ? "k-pct done" : "k-pct", `${k.progress}%`));
-    const openIt = () => openKpiDialog(g, k);
+    const main = el("div");
+    const at = el("div", "a-title", a.title);
+    if (safeUrl(a.url)) {
+      const link = el("a", "g-link", "リンク ↗");
+      link.href = a.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.addEventListener("click", (e) => e.stopPropagation());
+      at.append(link);
+    }
+    main.append(at);
+    if (a.note) main.append(el("div", "g-note", a.note));
+    li.append(el("span", "a-date", a.achieved_on ? slashDate(a.achieved_on) : "—"), main,
+      el("span", a.owner ? "a-owner" : "a-owner none", a.owner ? `担当 ${a.owner.split(" ").join("・")}` : "担当未設定"));
+    const openIt = () => openAchievementDialog(g, a);
     li.addEventListener("click", openIt);
     li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openIt(); } });
     ul.append(li);
@@ -261,45 +253,73 @@ function renderKpis(g) {
   return sec;
 }
 
-let kpiEditing = null; // { group, kpi }
-const kpiForm = $("#form-kpi");
-kpiForm.progress_range.addEventListener("input", () => { kpiForm.progress.value = kpiForm.progress_range.value; });
-kpiForm.progress.addEventListener("input", () => { kpiForm.progress_range.value = kpiForm.progress.value || 0; });
-function openKpiDialog(g, k) {
-  kpiEditing = { group: g, kpi: k };
-  kpiForm.reset();
-  kpiForm.title.value = k?.title || "";
-  kpiForm.owner.value = k?.owner || "";
-  kpiForm.progress.value = kpiForm.progress_range.value = k ? k.progress : 0;
-  $("#kpi-title").textContent = k ? "指標の編集" : "指標の追加";
-  $("#kpi-meta").textContent = k ? `${g.name}　／　最終更新 ${k.updated_at.slice(0, 16)}` : g.name;
-  $("#kpi-submit").textContent = k ? "保存" : "追加";
-  $("#kpi-delete").hidden = !k;
-  $("#kpi-error").textContent = "";
-  $("#dlg-kpi").showModal();
-  (k ? kpiForm.progress : kpiForm.title).focus();
+// ---- 関連サービス・関連基盤技術（一番下。クリックでそれぞれの画面を別タブで開く）
+function renderRelations(g) {
+  const rel = el("section", "gp-section");
+  const rh = el("h3", "", "関連サービス・関連基盤技術");
+  rh.append(el("span", "hint", "クリックでそれぞれの画面を開く（「✎ 編集」から変更）"));
+  rel.append(rh);
+  const relRow = (label, items, href, nameOf) => {
+    const row = el("div", "rel-row");
+    row.append(el("span", "lbl", label));
+    const chips = el("div", "rel-chips");
+    for (const no of items) {
+      const a = el("a", "rel-chip");
+      a.href = href(no);
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.append(el("b", "", no), nameOf(no), el("span", "arrow", "↗"));
+      chips.append(a);
+    }
+    if (!items.length) chips.append(el("span", "hint", "なし"));
+    row.append(chips);
+    return row;
+  };
+  rel.append(
+    relRow("関連サービス", g.services, (no) => `/services#svc-${encodeURIComponent(no)}`, serviceName),
+    relRow("関連基盤技術", g.platforms, (no) => `/platforms?id=${encodeURIComponent(no)}`, platformName),
+  );
+  return rel;
 }
-$("#dlg-kpi [data-close]").addEventListener("click", () => $("#dlg-kpi").close());
-kpiForm.addEventListener("submit", async (e) => {
+
+// ---- 今年度達成したことの追加・編集
+let achEditing = null; // { group, item }
+const achForm = $("#form-ach");
+function openAchievementDialog(g, a) {
+  achEditing = { group: g, item: a };
+  achForm.reset();
+  achForm.title.value = a?.title || "";
+  achForm.owner.value = a?.owner || "";
+  achForm.achieved_on.value = a?.achieved_on || "";
+  achForm.note.value = a?.note || "";
+  achForm.url.value = a?.url || "";
+  $("#ach-title").textContent = a ? "今年度達成したことの編集" : "今年度達成したことを追記";
+  $("#ach-meta").textContent = a ? `${g.name}　／　最終更新 ${a.updated_at.slice(0, 16)}` : g.name;
+  $("#ach-submit").textContent = a ? "保存" : "追記";
+  $("#ach-delete").hidden = !a;
+  $("#ach-error").textContent = "";
+  $("#dlg-ach").showModal();
+  achForm.title.focus();
+}
+$("#dlg-ach [data-close]").addEventListener("click", () => $("#dlg-ach").close());
+achForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const { group, kpi } = kpiEditing;
-  const progress = Number(kpiForm.progress.value);
-  if (!Number.isInteger(progress) || progress < 0 || progress > 100) { $("#kpi-error").textContent = "進捗は 0〜100 の整数で入力してください"; return; }
-  const body = { title: kpiForm.title.value.trim(), owner: kpiForm.owner.value.trim(), progress };
+  const { group, item } = achEditing;
+  const body = { title: achForm.title.value.trim(), owner: achForm.owner.value.trim(), achieved_on: achForm.achieved_on.value || null, note: achForm.note.value, url: achForm.url.value.trim() };
   try {
-    await api(kpi ? `/api/groups/${group.id}/kpis/${kpi.id}` : `/api/groups/${group.id}/kpis`,
-      { method: kpi ? "PUT" : "POST", body: JSON.stringify(body) });
-    $("#dlg-kpi").close();
+    await api(item ? `/api/groups/${group.id}/achievements/${item.id}` : `/api/groups/${group.id}/achievements`,
+      { method: item ? "PUT" : "POST", body: JSON.stringify(body) });
+    $("#dlg-ach").close();
     await reload(group.id);
-    toast(kpi ? "指標を保存しました" : "指標を追加しました");
+    toast(item ? "保存しました" : "追記しました");
   } catch (err) {
-    $("#kpi-error").textContent = err.message;
+    $("#ach-error").textContent = err.message;
   }
 });
-$("#kpi-delete").addEventListener("click", () => {
-  const { group, kpi } = kpiEditing;
-  $("#dlg-kpi").close();
-  openDelete("指標", `指標: ${kpi.title}`, `/api/groups/${group.id}/kpis/${kpi.id}`, () => reload(group.id));
+$("#ach-delete").addEventListener("click", () => {
+  const { group, item } = achEditing;
+  $("#dlg-ach").close();
+  openDelete("記録", `今年度達成したこと: ${item.title}`, `/api/groups/${group.id}/achievements/${item.id}`, () => reload(group.id));
 });
 
 // ------------------------------------------------------------ グループの追加・編集
@@ -376,6 +396,8 @@ function openGoalDialog(g, t) {
   for (const s of state.statuses) f.status.append(new Option(s, s));
   f.status.value = t ? t.status : "未着手";
   f.title.value = t?.title || "";
+  f.criteria.value = t?.criteria || "";
+  f.period.value = t?.period || "";
   f.due_date.value = t?.due_date || "";
   f.note.value = t?.note || "";
   f.url.value = t?.url || "";
@@ -392,7 +414,10 @@ $("#form-goal").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
   const { group, goal } = goalEditing;
-  const body = { title: f.title.value.trim(), status: f.status.value, due_date: f.due_date.value || null, note: f.note.value, url: f.url.value.trim() };
+  const body = {
+    title: f.title.value.trim(), criteria: f.criteria.value, period: f.period.value.trim(),
+    status: f.status.value, due_date: f.due_date.value || null, note: f.note.value, url: f.url.value.trim(),
+  };
   if (body.url && !safeUrl(body.url)) { $("#goal-error").textContent = "リンクは http:// または https:// で始まる URL を入力してください"; return; }
   try {
     await api(goal ? `/api/groups/${group.id}/goals/${goal.id}` : `/api/groups/${group.id}/goals`,

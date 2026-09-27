@@ -68,26 +68,24 @@
     </form>
   </dialog>
 
-  <!-- 今年度の達成指標の追加・編集 -->
-  <dialog id="dlg-kpi">
-    <form id="form-kpi" method="dialog" autocomplete="off">
-      <h2 id="kpi-title">指標の追加</h2>
-      <p id="kpi-meta" class="hint"></p>
-      <label><span>指標 <span class="req">*</span></span><input name="title" required placeholder="例: 受託件数 30 件"></label>
-      <label><span>担当者</span><input name="owner" placeholder="例: 田中"></label>
-      <label><span>進捗（％）</span>
-        <span class="progress-input">
-          <input type="range" name="progress_range" min="0" max="100" step="5">
-          <input type="number" name="progress" min="0" max="100" step="1" required>
-          <b>%</b>
-        </span>
-      </label>
-      <p class="error" id="kpi-error"></p>
+  <!-- 今年度達成したことの追加・編集 -->
+  <dialog id="dlg-ach">
+    <form id="form-ach" method="dialog" autocomplete="off">
+      <h2 id="ach-title">今年度達成したことを追記</h2>
+      <p id="ach-meta" class="hint"></p>
+      <label><span>達成したこと <span class="req">*</span></span><input name="title" required placeholder="例: 新サービスをリリース"></label>
+      <div class="two">
+        <label><span>担当者（複数はスペース区切り）</span><input name="owner" placeholder="例: 高橋 鈴木"></label>
+        <label><span>達成日</span><input type="date" name="achieved_on"></label>
+      </div>
+      <label><span>メモ</span><textarea name="note" rows="3" placeholder="成果の詳細など"></textarea></label>
+      <label><span>リンク（報告資料など）</span><input name="url" type="url" placeholder="https://"></label>
+      <p class="error" id="ach-error"></p>
       <div class="actions gp-actions">
-        <button type="button" id="kpi-delete" class="danger-outline">削除…</button>
+        <button type="button" id="ach-delete" class="danger-outline">削除…</button>
         <span class="spacer"></span>
         <button type="button" data-close>キャンセル</button>
-        <button type="submit" class="primary" id="kpi-submit">保存</button>
+        <button type="submit" class="primary" id="ach-submit">追記</button>
       </div>
     </form>
   </dialog>
@@ -102,7 +100,9 @@
         <label><span>期限</span><input type="date" name="due_date"></label>
       </div>
       <label><span>目標 <span class="req">*</span></span><input name="title" required></label>
-      <label><span>メモ</span><textarea name="note" rows="4" placeholder="補足、達成条件など"></textarea></label>
+      <label><span>達成基準</span><textarea name="criteria" rows="2" placeholder="例: 全案件で英語版レポートを納品"></textarea></label>
+      <label><span>時期</span><input name="period" placeholder="例: 2026 年度下期"></label>
+      <label><span>メモ</span><textarea name="note" rows="3" placeholder="補足など"></textarea></label>
       <label><span>リンク</span><input name="url" type="url" placeholder="https://"></label>
       <p class="error" id="goal-error"></p>
       <div class="actions gp-actions">
