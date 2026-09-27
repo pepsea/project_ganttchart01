@@ -73,3 +73,14 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .links-main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .link-list li { grid-template-columns: minmax(0, 1fr) auto; }
 @media (max-width: 860px) { .links-main { grid-template-columns: minmax(0, 1fr); } }
+
+/* 1 リンク 1 行: 名前・説明・領域を横に並べ、はみ出す説明は「…」で省略 */
+.link-list li { align-items: center; padding: 7px 14px; }
+.link-list .l-main { display: flex; align-items: center; gap: 10px; white-space: nowrap; overflow: hidden; }
+.link-list .l-title { flex: 0 1 auto; min-width: 60px; overflow: hidden; text-overflow: ellipsis; }
+.link-list .l-note { flex: 1 1 0; min-width: 0; margin-top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.link-list .l-areas { flex: 0 1 auto; flex-wrap: nowrap; margin-top: 0; margin-left: auto; overflow: hidden; }
+.link-list .l-ops { align-items: center; }
+.link-list .l-note { min-width: 8em; }
+.link-list .l-areas { flex-shrink: 5; min-width: 0; }
+.link-list .l-title { flex: 0 0 auto; max-width: 45%; }

@@ -71,7 +71,11 @@ function render() {
         a.title = u; // URL は画面に出さず、マウスを重ねたときだけ表示
       }
       main.append(a);
-      if (l.note) main.append(el("div", "l-note", l.note));
+      if (l.note) {
+        const n = el("span", "l-note", l.note.replace(/\s*\n\s*/g, " "));
+        n.title = l.note; // 一行に収まらない分はマウスを重ねると全文を表示
+        main.append(n);
+      }
       if (l.areas.length) {
         const tags = el("div", "l-areas");
         for (const a of l.areas) {
