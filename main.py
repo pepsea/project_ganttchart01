@@ -19,6 +19,7 @@ import auth
 import backup
 import cases
 import documents
+import groups
 import links
 import platforms
 import services
@@ -48,6 +49,7 @@ MASTERS = {
         ("SELECT COUNT(*) FROM platform_topics WHERE platform = ?", "基盤のディスカッション"),
         ("SELECT COUNT(*) FROM platform_monthly WHERE platform = ?", "基盤の月報"),
         ("SELECT COUNT(*) FROM services WHERE EXISTS (SELECT 1 FROM json_each(services.platforms) WHERE value = ?)", "サービス"),
+        ("SELECT COUNT(*) FROM team_groups WHERE EXISTS (SELECT 1 FROM json_each(team_groups.platforms) WHERE value = ?)", "グループ目標"),
     ]),
     "customers": ("customers", "顧客", [("SELECT COUNT(*) FROM cases WHERE customer = ?", "案件")]),
     "case_nos": ("case_nos", "案件番号", [
@@ -190,7 +192,8 @@ if not dbmod.FRESH_DB:
     backup.save_startup_backup()
 
 # テーブルの作成・更新（列の追加など。既存データは消さない）
-MIGRATIONS = [init_db, cases.init_db, platforms.init_db, services.init_db, documents.init_db, links.init_db]
+MIGRATIONS = [init_db, cases.init_db, platforms.init_db, services.init_db, documents.init_db, links.init_db,
+              groups.init_db]
 for migrate in MIGRATIONS:
     migrate()
 dbmod.finish_startup()
@@ -212,6 +215,7 @@ app.include_router(platforms.router)
 app.include_router(services.router)
 app.include_router(documents.router)
 app.include_router(links.router)
+app.include_router(groups.router)
 app.include_router(auth.router)
 app.include_router(backup.router)
 # ログイン必須（/login と /static 以外。API は 401、画面はログイン画面へ転送）
@@ -255,6 +259,11 @@ def documents_page():
 @app.get("/links", include_in_schema=False)
 def links_page():
     return FileResponse(STATIC_DIR / "links.html")
+
+
+@app.get("/groups", include_in_schema=False)
+def groups_page():
+    return FileResponse(STATIC_DIR / "groups.html")
 
 
 @app.get("/admin", include_in_schema=False)
@@ -309,7 +318,7 @@ RENAME_TARGETS = {
     "case_nos": [("cases", "case_no", False), ("tasks", "project", False)],
     "platforms": [("tasks", "project", False), ("platform_goals", "platform", False),
                   ("platform_topics", "platform", False), ("platform_monthly", "platform", False),
-                  ("services", "platforms", True)],
+                  ("services", "platforms", True), ("team_groups", "platforms", True)],
     "customers": [("cases", "customer", False)],
 }
 

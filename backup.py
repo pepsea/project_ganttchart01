@@ -45,6 +45,8 @@ TABLE_LABELS = {
     "app_settings": "画面の設定（親リンクなど）",
     "documents": "共有資料",
     "ref_links": "参考リンク",
+    "team_groups": "グループ",
+    "team_goals": "グループの目標",
     "areas": "領域",
     "case_nos": "案件番号",
     "customers": "顧客",

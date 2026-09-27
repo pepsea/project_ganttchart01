@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>グループ目標</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/groups.css">
+</head>
+<body>
+  <header class="toolbar">
+    <nav class="nav">
+      <a href="/">ガントチャート</a>
+      <a href="/cases">案件管理</a>
+      <a href="/platforms">基盤技術</a>
+      <a href="/groups" class="active">グループ目標</a>
+      <a href="/services">サービス</a>
+      <a href="/documents">共有資料</a>
+      <a href="/links">参考リンク</a>
+      <a href="/admin">管理</a>
+    </nav>
+    <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
+  </header>
+
+  <div class="gp-layout">
+    <!-- 左: グループの一覧 -->
+    <aside class="gp-list">
+      <div class="gp-list-head">
+        <b>グループ一覧</b>
+        <button id="btn-group-add" class="primary">＋ グループ追加</button>
+      </div>
+      <ul id="gp-items"></ul>
+    </aside>
+
+    <!-- 右: 選んだグループの詳細 -->
+    <main class="gp-detail" id="detail">
+      <p class="hint gp-empty">左の一覧からグループを選択してください。</p>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <!-- グループの追加・編集 -->
+  <dialog id="dlg-group">
+    <form id="form-group" method="dialog" autocomplete="off">
+      <h2 id="group-title">グループ追加</h2>
+      <label><span>グループ名 <span class="req">*</span></span><input name="name" required placeholder="例: オミクス解析グループ"></label>
+      <div class="two">
+        <label><span>PL</span><input name="pl" placeholder="例: 田中"></label>
+        <label><span>メンバー（複数はスペース区切り）</span><input name="members" placeholder="例: 佐藤 鈴木"></label>
+      </div>
+      <label><span>大目標</span><textarea name="vision" rows="3" placeholder="このグループで中長期的に目指すこと"></textarea></label>
+      <label><span>今年度の達成指標</span><textarea name="kpi" rows="3" placeholder="例: 受託件数 30 件 / 平均納期 3 週間以内"></textarea></label>
+      <div class="field">
+        <span class="field-label">関連サービス（複数選択可）</span>
+        <div id="group-services" class="chips-select"></div>
+      </div>
+      <div class="field">
+        <span class="field-label">関連基盤技術（複数選択可）</span>
+        <div id="group-platforms" class="chips-select"></div>
+      </div>
+      <p class="error" id="group-error"></p>
+      <div class="actions gp-actions">
+        <button type="button" id="group-delete" class="danger-outline">削除…</button>
+        <span class="spacer"></span>
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="primary" id="group-submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 目標の追加・編集 -->
+  <dialog id="dlg-goal">
+    <form id="form-goal" method="dialog" autocomplete="off">
+      <h2 id="goal-title">目標の追加</h2>
+      <p id="goal-meta" class="hint"></p>
+      <div class="two">
+        <label><span>状態</span><select name="status"></select></label>
+        <label><span>期限</span><input type="date" name="due_date"></label>
+      </div>
+      <label><span>目標 <span class="req">*</span></span><input name="title" required></label>
+      <label><span>メモ</span><textarea name="note" rows="4" placeholder="補足、達成条件など"></textarea></label>
+      <label><span>リンク</span><input name="url" type="url" placeholder="https://"></label>
+      <p class="error" id="goal-error"></p>
+      <div class="actions gp-actions">
+        <button type="button" id="goal-delete" class="danger-outline">削除…</button>
+        <span class="spacer"></span>
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="primary" id="goal-submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 削除（パスワードで確認） -->
+  <dialog id="dlg-delete">
+    <form id="form-delete" method="dialog">
+      <h2 class="danger" id="delete-title">削除</h2>
+      <p><span id="delete-lead"></span><strong>この操作は元に戻せません。</strong></p>
+      <p id="delete-target" class="summary"></p>
+      <label><span>確認のため、パスワードを入力してください</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <p class="error" id="delete-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="danger-btn">削除する</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/groups.js"></script>
+</body>
+</html>

@@ -16,6 +16,7 @@ from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 import auth
+import groups
 from csvutil import decode_csv
 from db import ensure_master, get_db
 
@@ -400,6 +401,7 @@ def update_service(sid: int, s: ServiceIn) -> dict:
                   " WHERE id=?", (*s.values(), sid), s.service_no)
         if old_no != s.service_no:  # パッケージの関連サービスも新しい番号に
             _replace_in_packages(db, old_no, s.service_no)
+            groups.replace_service_no(db, old_no, s.service_no)  # グループ目標の関連サービスも
         return fetch(db, sid)
 
 
@@ -413,4 +415,5 @@ async def delete_service(sid: int, body: PasswordIn) -> Response:
         no = fetch(db, sid)["service_no"]
         db.execute("DELETE FROM services WHERE id = ?", (sid,))
         _replace_in_packages(db, no, None)  # パッケージの関連サービスからも外す
+        groups.replace_service_no(db, no, None)  # グループ目標の関連サービスからも外す
     return Response(status_code=204)
