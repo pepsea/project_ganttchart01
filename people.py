@@ -1,7 +1,8 @@
 """個人ごとの担当（表示のみ）
 
-グループ目標の画面の下の方で、メンバーごとに担当領域・担当基盤技術・担当案件・担当グループ・担当サービス・
+個人の画面（/people）で、人ごとに担当領域・担当基盤技術・担当案件・担当グループ・担当サービス・
 ガントチャートのタスクを表示するための集計 API。データは各画面のテーブルから読むだけで、新しいテーブルは持たない。
+人の一覧は、タスクの担当者・案件の PL / 担当者・基盤の PL / メンバー・サービスの PL / 担当者・グループの PL / メンバーから集める。
 """
 
 import json
@@ -41,6 +42,24 @@ def task_state(start: str, end: str, today: date | None = None) -> str:
     if s <= today:
         return "active"
     return "waiting"
+
+
+@router.get("")
+def list_people() -> list[dict]:
+    """登録されている人の一覧（名前順）と、担当の件数・タスクの状態ごとの件数"""
+    names: set[str] = set()
+    with get_db() as db:
+        for sql in ("SELECT assignee FROM tasks", "SELECT pl || ' ' || assignees FROM cases",
+                    "SELECT owner || ' ' || members FROM platforms", "SELECT pl || ' ' || members FROM services",
+                    "SELECT pl || ' ' || members FROM team_groups"):
+            for r in db.execute(sql):
+                names.update(_names(r[0]))
+    out = []
+    for n in sorted(names):
+        d = person(n)
+        out.append({"name": n, "task_counts": d["task_counts"], "tasks": len(d["tasks"]), "cases": len(d["cases"]),
+                    "platforms": len(d["platforms"]), "services": len(d["services"]), "groups": len(d["groups"])})
+    return out
 
 
 @router.get("/{name}")

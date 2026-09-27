@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>個人</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/people.css">
+</head>
+<body>
+  <header class="toolbar">
+    <nav class="nav">
+      <a href="/">ガントチャート</a>
+      <a href="/cases">案件管理</a>
+      <a href="/platforms">基盤技術</a>
+      <a href="/groups">グループ目標</a>
+      <a href="/people" class="active">個人</a>
+      <a href="/services">サービス</a>
+      <a href="/documents">共有資料</a>
+      <a href="/links">参考リンク</a>
+      <a href="/admin">管理</a>
+    </nav>
+    <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
+  </header>
+
+  <div class="pp-layout">
+    <!-- 左: 人の一覧 -->
+    <aside class="pp-list">
+      <div class="pp-list-head">
+        <b>個人一覧</b>
+        <input id="pp-q" type="search" placeholder="名前で検索">
+      </div>
+      <ul id="pp-items"></ul>
+    </aside>
+
+    <!-- 右: 選んだ人の担当とタスク -->
+    <main class="pp-detail" id="detail">
+      <p class="hint pp-empty">左の一覧から人を選択してください。</p>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script src="/static/people.js"></script>
+</body>
+</html>

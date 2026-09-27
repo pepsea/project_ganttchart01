@@ -1,0 +1,91 @@
+/* 個人 */
+.pp-layout { flex: 1; display: flex; min-height: 0; }
+.pp-list { width: 260px; flex: 0 0 260px; background: var(--panel); border-right: 1px solid var(--line-strong); display: flex; flex-direction: column; min-height: 0; }
+.pp-list-head { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 10px; border-bottom: 1px solid var(--line-strong); }
+.pp-list-head input { width: 100%; }
+.pp-list ul { list-style: none; margin: 0; padding: 4px 8px 12px; overflow-y: auto; }
+.pp-item { padding: 9px 10px; border-bottom: 1px solid var(--line); cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.pp-item:hover { background: var(--bg); }
+.pp-item.on { background: #eef3ff; border: 1px solid #c9d7fb; border-radius: 6px; }
+.pp-top { display: flex; align-items: center; gap: 8px; }
+.pp-item .ttl { font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-item .meta { font-size: 11.5px; color: var(--muted); }
+.pp-empty { padding: 30px; text-align: center; }
+
+/* タスクの状態の色（ガントチャートと同じ）: 期限超過 = 赤、3 日以内 = オレンジ、実施中 = 青、開始前 = 灰 */
+.st-overdue { --bg: #ffd4d4; --bd: #e5484d; --fg: #a3161b; }
+.st-soon { --bg: #ffe2b3; --bd: #f5a524; --fg: #8a5100; }
+.st-active { --bg: #dbe8ff; --bd: #3b6fe0; --fg: #1f4fbf; }
+.st-waiting { --bg: #f1f2f5; --bd: #b8bdc7; --fg: #5b6270; }
+.st-counts { display: inline-flex; gap: 3px; }
+.st-count { min-width: 20px; text-align: center; font-size: 11px; font-weight: 700; border-radius: 4px; padding: 0 4px;
+  background: var(--bg); border: 1px solid var(--bd); color: var(--fg); font-variant-numeric: tabular-nums; }
+
+.pp-detail { flex: 1; overflow-y: auto; padding: 18px 24px 40px; min-width: 0; }
+.pp-head { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; padding-bottom: 14px; border-bottom: 1px solid var(--line-strong); }
+.pp-head h2 { margin: 0 0 4px; font-size: 22px; }
+.pp-head .spacer { flex: 1; }
+.stats { display: flex; gap: 8px; flex-wrap: wrap; }
+.stat { border-radius: 8px; padding: 7px 12px; min-width: 96px; background: var(--bg); border: 1px solid var(--bd); }
+.stat .k { font-size: 11px; font-weight: 700; color: var(--fg); }
+.stat .v { font-size: 20px; font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; }
+.stat .v small { font-size: 12px; font-weight: 500; }
+
+.pp-section { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 10px; padding: 14px 16px; margin-top: 14px; min-width: 0; }
+.pp-section > h3 { margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); font-size: 14px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.pp-section > h3 .count { font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.pp-section > h3 .hint { font-weight: 400; font-size: 12px; }
+.pp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+
+.legend { display: inline-flex; flex-wrap: wrap; gap: 10px; font-size: 12px; font-weight: 400; color: #3b4252; }
+.legend span { display: inline-flex; align-items: center; gap: 4px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; background: var(--bg); border: 1px solid var(--bd); }
+.open-btn { margin-left: auto; font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 6px; background: var(--accent); color: #fff; text-decoration: none; }
+.open-btn:hover { filter: brightness(1.1); }
+
+/* タスク: 1 タスク 1 行、状態の色で背景 */
+.task-list { list-style: none; margin: 0; padding: 0; }
+.task-list li { display: grid; grid-template-columns: 92px minmax(0, 1.3fr) minmax(0, 1fr) auto 28px auto; gap: 10px; align-items: center;
+  padding: 6px 10px; margin-bottom: 4px; border-radius: 6px; background: var(--bg); border-left: 5px solid var(--bd); font-size: 13px; }
+.task-list .st-badge { font-size: 11px; font-weight: 700; text-align: center; border-radius: 999px; padding: 1px 6px; background: rgba(255, 255, 255, .75); color: var(--fg); }
+.task-list .t-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-list .t-pj { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); text-decoration: none; }
+.task-list a.t-pj:hover { text-decoration: underline; }
+.task-list .t-pj.none { color: var(--muted); }
+.task-list .t-area { font-size: 11.5px; color: #5b6270; white-space: nowrap; }
+.task-list .t-prio { font-size: 11.5px; font-weight: 700; text-align: center; }
+.t-prio.p-高 { color: var(--prio-high); }
+.t-prio.p-中 { color: #b37400; }
+.t-prio.p-低 { color: var(--prio-low); }
+.task-list .t-date { font-size: 12px; color: #3b4252; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* 担当（チップ） */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 10px; border: 1px solid var(--line-strong); border-radius: 6px;
+  font-size: 12.5px; color: var(--text); text-decoration: none; background: #fbfcfe; }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip .arrow { color: var(--accent); font-size: 11px; }
+.area-pill { font-size: 12px; padding: 2px 10px; border-radius: 999px; background: #eef0f4; border: 1px solid var(--line-strong); }
+.role-tag { font-size: 10px; font-weight: 700; padding: 0 5px; border-radius: 3px; background: #eef0f4; color: var(--muted); }
+.role-tag.pl { background: #e3ecff; color: #2f5bd0; }
+
+/* 担当案件: 1 案件 1 行 */
+.case-list { list-style: none; margin: 0; padding: 0; }
+.case-list li { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto auto auto; gap: 10px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.case-list li:last-child { border-bottom: 0; }
+.case-list .role-tag { justify-self: start; }
+.case-list .c-link { color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.case-list .c-link:hover { color: var(--accent); }
+.case-list .c-cust, .case-list .c-end { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.case-list .c-status { font-size: 11px; font-weight: 700; padding: 0 8px; border-radius: 999px; background: #eef0f4; white-space: nowrap; }
+
+@media (max-width: 900px) {
+  .pp-layout { flex-direction: column; }
+  .pp-list { width: auto; flex: 0 0 auto; max-height: 35vh; border-right: 0; border-bottom: 1px solid var(--line-strong); }
+  .pp-detail { padding: 14px 16px 32px; }
+  .pp-grid { grid-template-columns: minmax(0, 1fr); }
+  .task-list li { grid-template-columns: 84px minmax(0, 1fr) auto; }
+  .task-list .t-pj, .task-list .t-area, .task-list .t-prio { display: none; }
+  .case-list li { grid-template-columns: 50px minmax(0, 1fr) auto; }
+  .case-list .c-cust, .case-list .c-end { display: none; }
+}

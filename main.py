@@ -269,6 +269,11 @@ def groups_page():
     return FileResponse(STATIC_DIR / "groups.html")
 
 
+@app.get("/people", include_in_schema=False)
+def people_page():
+    return FileResponse(STATIC_DIR / "people.html")
+
+
 @app.get("/admin", include_in_schema=False)
 def admin_page():
     return FileResponse(STATIC_DIR / "admin.html")
