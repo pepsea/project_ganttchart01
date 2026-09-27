@@ -68,8 +68,9 @@ function render() {
         a.href = u;
         a.target = "_blank";
         a.rel = "noopener noreferrer";
+        a.title = u; // URL は画面に出さず、マウスを重ねたときだけ表示
       }
-      main.append(a, el("span", "l-url", l.url));
+      main.append(a);
       if (l.note) main.append(el("div", "l-note", l.note));
       if (l.areas.length) {
         const tags = el("div", "l-areas");
