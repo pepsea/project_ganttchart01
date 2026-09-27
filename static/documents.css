@@ -112,3 +112,29 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 }
 .doc-list .doc-link { flex: 0 1 auto; min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; line-height: 20px; }
 .doc-list .doc-links .none { white-space: nowrap; }
+
+/* ---- 共有資料は 1 件 1 行 */
+.doc-list > li.doc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.doc-row .doc-name { flex: 1 1 auto; min-width: 60px; font-size: 13.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.doc-row .area-tags { flex: 0 1 auto; display: flex; flex-wrap: nowrap; gap: 3px; overflow: hidden; min-width: 0; }
+.doc-row .area-tag { font-size: 10.5px; padding: 0 6px; }
+.doc-row .doc-links { flex: 0 1 auto; display: flex; flex-wrap: nowrap; gap: 4px; margin: 0; overflow: hidden; min-width: 0; }
+.doc-row .doc-link { max-width: 110px; font-size: 11.5px; padding: 0 8px; line-height: 20px; }
+.doc-row .doc-date { flex: 0 0 auto; font-size: 11.5px; }
+.doc-row .edit-btn { flex: 0 0 auto; padding: 0 7px; }
+/* 1 行に収めるときの優先順位: リンク・日付・編集は縮めず、資料名 → 領域の順に省略 */
+.doc-row .doc-name { flex: 1 1 60px; min-width: 40px; }
+.doc-row .area-tags { flex: 0 3 auto; min-width: 0; }
+.doc-row .doc-links { flex: 0 0 auto; overflow: visible; }
+.doc-row .doc-link { flex: 0 0 auto; max-width: 96px; }
+/* 資料名は最低 8 文字程度を確保。領域は必要なら先頭のタグだけに縮む */
+.doc-row .doc-name { flex: 1 1 140px; min-width: 120px; }
+.doc-row .area-tags { flex: 0 6 auto; }
+.doc-row .doc-link { max-width: 84px; }

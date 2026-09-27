@@ -71,27 +71,19 @@ function render() {
   }
 }
 
-// 1 件: 資料名・作成日時・編集 / 目的 / 領域・リンク
+// 1 件 = 1 行: 資料名・領域・資料リンク・作成日時・編集（目的は資料名にマウスを置くと表示）
 function renderDoc(d) {
-  const li = el("li");
-  const top = el("div", "d-top");
-  top.append(el("span", "doc-name", d.title), el("span", "doc-date", d.created_date.replaceAll("-", "/")));
-  const edit = el("button", "edit-btn", "✎");
-  edit.title = "編集";
-  edit.addEventListener("click", () => openDialog(d));
-  top.append(edit);
-  li.append(top);
-  if (d.purpose) li.append(el("div", "d-purpose", d.purpose));
-  const bottom = el("div", "d-bottom");
-  if (d.areas.length) {
-    const tags = el("span", "area-tags");
-    for (const a of d.areas) {
-      const t = el("span", "area-tag", a);
-      t.style.setProperty("--c", areaColor(a));
-      tags.append(t);
-    }
-    bottom.append(tags);
+  const li = el("li", "doc-row");
+  const name = el("span", "doc-name", d.title);
+  name.title = d.purpose ? `${d.title}\n目的: ${d.purpose}` : d.title;
+  li.append(name);
+  const tags = el("span", "area-tags");
+  for (const a of d.areas) {
+    const t = el("span", "area-tag", a);
+    t.style.setProperty("--c", areaColor(a));
+    tags.append(t);
   }
+  li.append(tags);
   const links = el("span", "doc-links");
   for (const n of LINKS) {
     const u = safeUrl(d[`link${n}_url`]);
@@ -100,12 +92,17 @@ function renderDoc(d) {
     a.href = u;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
-    a.title = u;
+    a.title = `${d[`link${n}_label`] || `リンク${n}`}: ${u}`;
     links.append(a);
   }
-  if (!links.children.length) links.append(el("span", "none", "リンク未登録"));
-  if (bottom.children.length) li.append(bottom);
+  if (!links.children.length) links.append(el("span", "none", "リンクなし"));
   li.append(links);
+  li.append(el("span", "doc-date", d.created_date.slice(0, 10).replaceAll("-", "/")));
+  li.lastChild.title = `作成日時: ${d.created_date.replaceAll("-", "/")}`;
+  const edit = el("button", "edit-btn", "✎");
+  edit.title = "編集";
+  edit.addEventListener("click", () => openDialog(d));
+  li.append(edit);
   return li;
 }
 
