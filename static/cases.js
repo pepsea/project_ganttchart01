@@ -199,9 +199,21 @@ function areaChips(c) {
   return box;
 }
 
-// 最初の画面（カード・一覧）には未設定のリンクだけを赤で出す（設定済みのリンクは詳細画面の「開く」から）
+// 最初の画面（カード・一覧）: Teams が設定済みなら「Teams ↗」で直接開ける。ほかは未設定のリンクだけを赤で出す
+// （設定済みのリンクは詳細画面の一番下の「開く」から）
 function linkIcons(c) {
   const box = el("span", "links");
+  const teams = safeUrl(c.teams_url);
+  if (teams) {
+    const a = el("a", "link-ic teams", "Teams ↗");
+    a.href = teams;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.title = "Teams を開く";
+    a.addEventListener("click", (e) => e.stopPropagation()); // カードの詳細を開かない
+    a.draggable = false;
+    box.append(a);
+  }
   for (const [key, short, label] of LINKS) {
     if (safeUrl(c[key])) continue;
     const s = el("span", "link-ic", short);
@@ -513,7 +525,7 @@ function fillCustomerSelect(current = "") {
 
 // リンク: 有効な URL が入力されたら「開く」をアクティブにする
 function syncLinks() {
-  document.querySelectorAll("#case-form .open-link").forEach((a) => {
+  document.querySelectorAll("#links-section .open-link").forEach((a) => {
     const url = safeUrl(form[a.dataset.for].value.trim());
     form[a.dataset.for].classList.toggle("missing", !url && !("free" in a.dataset)); // リンクが無い欄は赤背景（自由リンクは除く）
     if (url) {

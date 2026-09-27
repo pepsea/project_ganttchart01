@@ -485,3 +485,9 @@ a.link-ic:hover { filter: brightness(1.12); color: #fff; }
 .free-links { margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--line-strong); display: grid; gap: 4px; }
 .link-field.free .free-name { flex: 0 0 34%; }
 .link-field.free .open-link { max-width: 12em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 詳細画面: リンク類は一番下 */
+.case-links { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 14px !important; border-bottom: 0 !important; }
+/* カード・一覧: Teams へ直接移動 */
+a.link-ic.teams { background: #5b5fc7; border-color: #5b5fc7; color: #fff; padding: 0 7px; }
+a.link-ic.teams:hover { filter: brightness(1.12); color: #fff; }

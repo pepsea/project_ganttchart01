@@ -83,40 +83,6 @@
           <textarea name="detail" rows="6" class="detail-text"
             placeholder="目的、検体・サンプル、手法、納品物、スケジュール、特記事項など"></textarea>
         </section>
-        <section>
-          <h3>リンク</h3>
-          <div class="links-edit">
-            <div class="link-field">
-              <label>BOX<input name="box_url" type="url" placeholder="https://"></label>
-              <a class="open-link" data-for="box_url" target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
-            </div>
-            <div class="link-field">
-              <label>Teams<input name="teams_url" type="url" placeholder="https://"></label>
-              <a class="open-link" data-for="teams_url" target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
-            </div>
-            <div class="link-field">
-              <label>案件概要書<input name="overview_url" type="url" placeholder="https://"></label>
-              <a class="open-link" data-for="overview_url" target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
-            </div>
-            <div class="link-field">
-              <label>試験計画書<input name="plan_url" type="url" placeholder="https://"></label>
-              <a class="open-link" data-for="plan_url" target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
-            </div>
-          </div>
-          <!-- 自由リンク（名前を付けて 2 つまで。未入力でも赤くしない） -->
-          <div class="free-links">
-            <div class="link-field free">
-              <label class="free-name">自由リンク 1 の名前<input name="link1_label" placeholder="例: 見積書"></label>
-              <label>URL<input name="link1_url" type="url" placeholder="https://"></label>
-              <a class="open-link" data-for="link1_url" data-free target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
-            </div>
-            <div class="link-field free">
-              <label class="free-name">自由リンク 2 の名前<input name="link2_label" placeholder="例: 納品データ"></label>
-              <label>URL<input name="link2_url" type="url" placeholder="https://"></label>
-              <a class="open-link" data-for="link2_url" data-free target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
-            </div>
-          </div>
-        </section>
         <p class="error" id="case-error"></p>
         <div class="form-actions">
           <button type="button" id="btn-delete" class="danger-outline">案件を削除</button>
@@ -125,6 +91,13 @@
           <button type="submit" class="primary" id="btn-save">保存</button>
         </div>
       </form>
+
+      <!-- ガントチャートのタスク（PJ名 = この案件番号） -->
+      <section id="tasks-section" class="case-tasks">
+        <h3>ガントチャートのタスク <span id="case-task-count" class="hint"></span>
+          <a id="case-task-link" class="jump-link" target="_blank" rel="noopener">ガントチャートで表示 ↗</a></h3>
+        <div id="case-task-list"></div>
+      </section>
 
       <div id="logs">
       <div class="log-tabs seg" role="tablist">
@@ -163,11 +136,45 @@
       </section>
       </div>
 
-      <!-- ガントチャートのタスク（PJ名 = この案件番号） -->
-      <section id="tasks-section" class="case-tasks">
-        <h3>ガントチャートのタスク <span id="case-task-count" class="hint"></span>
-          <a id="case-task-link" class="jump-link" target="_blank" rel="noopener">ガントチャートで表示 ↗</a></h3>
-        <div id="case-task-list"></div>
+
+      <!-- リンク類（一番下）。入力欄は case-form に属する（保存は上の「保存」でもここの「リンクを保存」でも同じ） -->
+      <section id="links-section" class="case-links">
+          <h3>リンク</h3>
+          <div class="links-edit">
+            <div class="link-field">
+              <label>BOX<input form="case-form" name="box_url" type="url" placeholder="https://"></label>
+              <a class="open-link" data-for="box_url" target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
+            </div>
+            <div class="link-field">
+              <label>Teams<input form="case-form" name="teams_url" type="url" placeholder="https://"></label>
+              <a class="open-link" data-for="teams_url" target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
+            </div>
+            <div class="link-field">
+              <label>案件概要書<input form="case-form" name="overview_url" type="url" placeholder="https://"></label>
+              <a class="open-link" data-for="overview_url" target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
+            </div>
+            <div class="link-field">
+              <label>試験計画書<input form="case-form" name="plan_url" type="url" placeholder="https://"></label>
+              <a class="open-link" data-for="plan_url" target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
+            </div>
+          </div>
+          <!-- 自由リンク（名前を付けて 2 つまで。未入力でも赤くしない） -->
+          <div class="free-links">
+            <div class="link-field free">
+              <label class="free-name">自由リンク 1 の名前<input form="case-form" name="link1_label" placeholder="例: 見積書"></label>
+              <label>URL<input form="case-form" name="link1_url" type="url" placeholder="https://"></label>
+              <a class="open-link" data-for="link1_url" data-free target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
+            </div>
+            <div class="link-field free">
+              <label class="free-name">自由リンク 2 の名前<input form="case-form" name="link2_label" placeholder="例: 納品データ"></label>
+              <label>URL<input form="case-form" name="link2_url" type="url" placeholder="https://"></label>
+              <a class="open-link" data-for="link2_url" data-free target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
+            </div>
+          </div>
+          <div class="form-actions">
+            <span class="spacer"></span>
+            <button type="submit" form="case-form" class="primary">リンクを保存</button>
+          </div>
       </section>
     </div>
   </dialog>
