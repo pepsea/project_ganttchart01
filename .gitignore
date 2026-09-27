@@ -1,8 +1,13 @@
-__pycache__/
-*.pyc
-*.db
-.venv/
+# データ・バックアップ・秘密情報は git で管理しない（サーバーで git pull しても変更されないように）
 .env
 data/
 backups/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+# Python / OS
+__pycache__/
+*.pyc
+.venv/
 .DS_Store

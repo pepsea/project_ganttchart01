@@ -10,6 +10,7 @@ Docker（port 5005）で稼働し、Linux サーバーへの移植を前提に�
 - 変更したら DATA_MODEL.md も更新する。
 
 ## 実データを壊さない
+- データ・バックアップ・`.env` は git に入れない（`.gitignore`）。サーバーは `./update.sh`（`git pull --ff-only`）で更新するので、これらを追跡対象にすると pull で書き換わる。
 - 稼働中のコンテナはユーザーの実データを持つ。`docker compose down -v` やデータの初期化はしない。
 - 動作確認は `DATA_DIR=<一時フォルダ>` で TestClient を使うか、別プロジェクト名・別ポートのコンテナで行う。
 - 更新の反映は `docker compose up -d --build`（起動時に自動バックアップされる）。

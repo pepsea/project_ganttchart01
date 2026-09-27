@@ -22,6 +22,7 @@
 
 ## ドキュメント
 - **Linux サーバーへの導入・データ移行・アップデート手順**: [DEPLOY_LINUX.md](DEPLOY_LINUX.md)
+  - サーバーの更新は `./update.sh`（更新前にバックアップ → `git pull --ff-only` → 作り直して起動）。データ・バックアップ・`.env` は git で管理しておらず、pull で変更されない。データは git のフォルダの外（`DATA_PATH=/srv/gantt-pm/data` など）に置くのを推奨
 - **データ構造と変更のルール**（アップデートでデータを失わないために）: [DATA_MODEL.md](DATA_MODEL.md)
 
 ## 起動方法
