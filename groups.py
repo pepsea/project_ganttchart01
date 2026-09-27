@@ -282,9 +282,9 @@ def _write(db: sqlite3.Connection, sql: str, params: tuple, name: str):
 
 @router.get("")
 def list_groups(year: int | None = None) -> list[dict]:
-    """year を指定すると、その年度の目標で件数を数える"""
+    """登録の新しい順。year を指定すると、その年度の目標で件数を数える"""
     with get_db() as db:
-        return [_to_group(r) for r in db.execute(f"{GROUP_SELECT} ORDER BY g.sort_order, g.id", {"y": year})]
+        return [_to_group(r) for r in db.execute(f"{GROUP_SELECT} ORDER BY g.created_at DESC, g.id DESC", {"y": year})]
 
 
 YEAR_USAGE = """

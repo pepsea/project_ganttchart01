@@ -37,9 +37,9 @@ const yearLabel = (y) => (y ? `${y}年度` : "すべての年度");
 const yearQuery = () => (state.year ? `?year=${state.year}` : "");
 function yearOptions(select, value, withAll = false) {
   select.innerHTML = "";
+  if (withAll) select.append(new Option("すべての年度", ""));
   const ys = [...new Set([...state.years, value].filter(Boolean))].sort((a, b) => b - a);
   for (const y of ys) select.append(new Option(`${y}年度${y === state.currentYear ? "（今年度）" : ""}`, y));
-  if (withAll) select.append(new Option("すべての年度", ""));
   select.value = value ?? "";
 }
 
@@ -529,7 +529,7 @@ async function loadYearList() {
       if (!confirm(`${y.year}年度を年度の選択肢から削除しますか？`)) return;
       try {
         await api(`/api/groups/years/${y.year}`, { method: "DELETE" });
-        if (state.year === y.year) state.year = info.current;
+        if (state.year === y.year) state.year = "";
         await loadYearList();
         await reload();
         toast(`${y.year}年度を削除しました`);
@@ -571,7 +571,7 @@ async function reload(selectId = state.current) {
   const info = await api("/api/groups/years");
   state.currentYear = info.current;
   state.years = info.years;
-  if (state.year === null) state.year = info.current;
+  if (state.year === null) state.year = ""; // 初期表示はすべての年度
   yearOptions($("#year-select"), state.year || "", true);
   state.groups = await api(`/api/groups${yearQuery()}`);
   const target = state.groups.find((g) => g.id === selectId) || state.groups[0];
