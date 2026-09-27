@@ -20,7 +20,6 @@
       <a href="/admin">管理</a>
     </nav>
     <div class="tools">
-      <button id="btn-add" class="primary">＋ サービス追加</button>
       <input id="q" type="search" class="search" placeholder="サービス名・番号・基盤番号で検索">
       <label class="filter">領域 <select id="f-area"><option value="">すべて</option></select></label>
       <label class="filter">メンバー <select id="f-person"><option value="">すべて</option></select></label>
@@ -51,7 +50,10 @@
 
     <!-- 右 2/3: サービス一覧 -->
     <main class="svc-main">
-      <p id="svc-count" class="hint"></p>
+      <div class="pkg-head svc-head">
+        <h2>サービス一覧 <span id="svc-count" class="hint"></span></h2>
+        <button id="btn-add" class="primary">＋ サービス追加</button>
+      </div>
       <div id="svc-list" class="svc-list"></div>
     </main>
   </div>

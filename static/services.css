@@ -262,3 +262,6 @@ body { overflow: hidden; }
 .parent-bar .unset { color: #9aa1ad; }
 .parent-bar .edit-btn { padding: 0 8px; font-size: 12px; }
 #dlg-parent { width: min(480px, 92vw); }
+
+/* サービス一覧の見出し（パッケージの見出しとそろえ、追加ボタンは右端） */
+.svc-head h2 .hint { font-size: 12px; font-weight: 400; margin-left: 6px; }
