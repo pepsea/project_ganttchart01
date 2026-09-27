@@ -97,6 +97,16 @@ def init_db() -> None:
             d = f"COALESCE({date_col}, created_at)"
             db.execute(f"UPDATE {table} SET fiscal_year = CAST(strftime('%Y', {d}) AS INTEGER)"
                        f" - (CAST(strftime('%m', {d}) AS INTEGER) < 4) WHERE fiscal_year IS NULL")
+        # 登録した年度（選択肢）。初回だけ、今年度と登録済みデータの年度を入れる
+        exists = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='team_years'").fetchone()
+        db.execute("""CREATE TABLE IF NOT EXISTS team_years (
+                          year       INTEGER PRIMARY KEY,   -- 年度（4 月始まり）
+                          created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+                      )""")
+        if not exists:
+            db.execute("INSERT OR IGNORE INTO team_years(year) VALUES (?)", (fiscal_year_of(),))
+            db.execute("INSERT OR IGNORE INTO team_years(year) SELECT fiscal_year FROM team_goals"
+                       " WHERE fiscal_year IS NOT NULL UNION SELECT fiscal_year FROM team_achievements WHERE fiscal_year IS NOT NULL")
         # 旧形式（kpi 列の文章）は 1 行ずつ指標として引き継ぐ（kpi 列は未使用として残す）
         for r in db.execute("SELECT id, kpi FROM team_groups WHERE kpi <> ''"
                             " AND id NOT IN (SELECT group_id FROM team_kpis)").fetchall():
@@ -277,14 +287,54 @@ def list_groups(year: int | None = None) -> list[dict]:
         return [_to_group(r) for r in db.execute(f"{GROUP_SELECT} ORDER BY g.sort_order, g.id", {"y": year})]
 
 
+YEAR_USAGE = """
+    SELECT y.year,
+           (SELECT COUNT(*) FROM team_goals t WHERE t.fiscal_year = y.year) AS goals,
+           (SELECT COUNT(*) FROM team_achievements a WHERE a.fiscal_year = y.year) AS achievements
+    FROM team_years y ORDER BY y.year DESC
+"""
+
+
+class YearIn(BaseModel):
+    year: int = Field(ge=2000, le=2100)
+
+
+def _register_year(db: sqlite3.Connection, year: int) -> None:
+    db.execute("INSERT OR IGNORE INTO team_years(year) VALUES (?)", (year,))
+
+
 @router.get("/years")
 def list_years() -> dict:
-    """登録のある年度（今年度・来年度は常に含む）と今年度"""
+    """登録した年度（使用件数つき）と今年度。years = 選択肢（登録済み ∪ データのある年度 ∪ 今年度）"""
     now = fiscal_year_of()
     with get_db() as db:
-        ys = {r[0] for r in db.execute("SELECT fiscal_year FROM team_goals UNION SELECT fiscal_year FROM team_achievements")
-              if r[0] is not None}
-    return {"current": now, "years": sorted(ys | {now, now + 1}, reverse=True)}
+        registered = [dict(r) for r in db.execute(YEAR_USAGE)]
+        used = {r[0] for r in db.execute("SELECT fiscal_year FROM team_goals UNION SELECT fiscal_year FROM team_achievements")
+                if r[0] is not None}
+    ys = {r["year"] for r in registered} | used | {now}
+    return {"current": now, "years": sorted(ys, reverse=True), "registered": registered}
+
+
+@router.post("/years", status_code=201)
+def add_year(y: YearIn) -> dict:
+    with get_db() as db:
+        if db.execute("SELECT 1 FROM team_years WHERE year = ?", (y.year,)).fetchone():
+            raise HTTPException(409, f"{y.year}年度は既に登録されています")
+        _register_year(db, y.year)
+    return {"year": y.year}
+
+
+@router.delete("/years/{year}", status_code=204)
+def delete_year(year: int) -> Response:
+    """年度の登録を外す（その年度の目標・達成したことが残っている間は外せない）"""
+    with get_db() as db:
+        n = db.execute("SELECT (SELECT COUNT(*) FROM team_goals WHERE fiscal_year = :y)"
+                       " + (SELECT COUNT(*) FROM team_achievements WHERE fiscal_year = :y)", {"y": year}).fetchone()[0]
+        if n:
+            raise HTTPException(409, f"{year}年度には目標・達成したことが {n} 件あるため削除できません")
+        if db.execute("DELETE FROM team_years WHERE year = ?", (year,)).rowcount == 0:
+            raise HTTPException(404, f"{year}年度は登録されていません")
+    return Response(status_code=204)
 
 
 @router.get("/goal-statuses")
@@ -344,6 +394,7 @@ def add_goal(gid: int, t: GoalIn) -> dict:
         _fetch(db, gid)
         cur = db.execute("INSERT INTO team_goals(group_id, title, due_date, status, note, url, criteria, period, fiscal_year)"
                          " VALUES (?,?,?,?,?,?,?,?,?)", (gid, *_goal_values(t)))
+        _register_year(db, _goal_values(t)[-1])
         return dict(db.execute("SELECT * FROM team_goals WHERE id = ?", (cur.lastrowid,)).fetchone())
 
 
@@ -354,6 +405,7 @@ def update_goal(gid: int, tid: int, t: GoalIn) -> dict:
                          " updated_at=datetime('now','localtime') WHERE id=? AND group_id=?", (*_goal_values(t), tid, gid))
         if cur.rowcount == 0:
             raise HTTPException(404, "目標が見つかりません")
+        _register_year(db, _goal_values(t)[-1])
         return dict(db.execute("SELECT * FROM team_goals WHERE id = ?", (tid,)).fetchone())
 
 
@@ -428,6 +480,7 @@ def add_achievement(gid: int, a: AchievementIn) -> dict:
         _fetch(db, gid)
         cur = db.execute("INSERT INTO team_achievements(group_id, title, owner, achieved_on, note, url, fiscal_year) VALUES (?,?,?,?,?,?,?)",
                          (gid, *_ach_values(a)))
+        _register_year(db, _ach_values(a)[-1])
         return dict(db.execute("SELECT * FROM team_achievements WHERE id = ?", (cur.lastrowid,)).fetchone())
 
 
@@ -438,6 +491,7 @@ def update_achievement(gid: int, aid: int, a: AchievementIn) -> dict:
                          " updated_at=datetime('now','localtime') WHERE id=? AND group_id=?", (*_ach_values(a), aid, gid))
         if cur.rowcount == 0:
             raise HTTPException(404, "記録が見つかりません")
+        _register_year(db, _ach_values(a)[-1])
         return dict(db.execute("SELECT * FROM team_achievements WHERE id = ?", (aid,)).fetchone())
 
 

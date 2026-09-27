@@ -29,7 +29,11 @@
         <b>グループ一覧</b>
         <button id="btn-group-add" class="primary">＋ グループ追加</button>
       </div>
-      <label class="year-bar"><span>年度</span><select id="year-select" title="表示する年度（4 月始まり）"></select></label>
+      <div class="year-bar">
+        <label for="year-select">年度</label>
+        <select id="year-select" title="表示する年度（4 月始まり）"></select>
+        <button type="button" id="btn-years" title="年度の追加・削除">年度の登録</button>
+      </div>
       <ul id="gp-items"></ul>
     </aside>
 
@@ -115,6 +119,24 @@
         <span class="spacer"></span>
         <button type="button" data-close>キャンセル</button>
         <button type="submit" class="primary" id="goal-submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 年度の登録 -->
+  <dialog id="dlg-years">
+    <form id="form-year" method="dialog" autocomplete="off">
+      <h2>年度の登録</h2>
+      <p class="hint">年度は 4 月始まり（例: 2026年度 = 2026/4〜2027/3）。登録した年度が表示の切り替えと入力画面の選択肢に出ます。</p>
+      <div class="year-add">
+        <input type="number" name="year" min="2000" max="2100" step="1" required placeholder="例: 2027">
+        <span>年度</span>
+        <button type="submit" class="primary">＋ 登録</button>
+      </div>
+      <p class="error" id="year-error"></p>
+      <ul id="year-list" class="year-list"></ul>
+      <div class="actions">
+        <button type="button" data-close>閉じる</button>
       </div>
     </form>
   </dialog>

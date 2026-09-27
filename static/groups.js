@@ -508,6 +508,64 @@ $("#year-select").addEventListener("change", async (e) => {
   await reload();
 });
 
+// ------------------------------------------------------------ 年度の登録（追加・削除）
+let yearRegistered = [];
+async function loadYearList() {
+  const info = await api("/api/groups/years");
+  yearRegistered = info.registered;
+  const ul = $("#year-list");
+  ul.innerHTML = "";
+  for (const y of yearRegistered) {
+    const li = el("li");
+    const used = y.goals + y.achievements;
+    li.append(el("b", "", `${y.year}年度`));
+    if (y.year === info.current) li.append(el("span", "cur", "今年度"));
+    li.append(el("span", "use", used ? `目標 ${y.goals} 件・達成したこと ${y.achievements} 件` : "未使用"), el("span", "spacer"));
+    const del = el("button", "danger-outline", "削除");
+    del.type = "button";
+    del.disabled = used > 0;
+    del.title = used ? "目標・達成したことが登録されている年度は削除できません" : "この年度を選択肢から外す";
+    del.addEventListener("click", async () => {
+      if (!confirm(`${y.year}年度を年度の選択肢から削除しますか？`)) return;
+      try {
+        await api(`/api/groups/years/${y.year}`, { method: "DELETE" });
+        if (state.year === y.year) state.year = info.current;
+        await loadYearList();
+        await reload();
+        toast(`${y.year}年度を削除しました`);
+      } catch (err) {
+        $("#year-error").textContent = err.message;
+      }
+    });
+    li.append(del);
+    ul.append(li);
+  }
+  if (!yearRegistered.length) ul.append(el("li", "hint", "登録された年度はありません"));
+}
+$("#btn-years").addEventListener("click", async () => {
+  $("#form-year").reset();
+  $("#year-error").textContent = "";
+  await loadYearList();
+  $("#dlg-years").showModal();
+  $("#form-year").year.focus();
+});
+$("#dlg-years [data-close]").addEventListener("click", () => $("#dlg-years").close());
+$("#form-year").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const year = Number(f.year.value);
+  try {
+    await api("/api/groups/years", { method: "POST", body: JSON.stringify({ year }) });
+    f.reset();
+    $("#year-error").textContent = "";
+    await loadYearList();
+    await reload();
+    toast(`${year}年度を登録しました`);
+  } catch (err) {
+    $("#year-error").textContent = err.message;
+  }
+});
+
 // ------------------------------------------------------------ 読み込み
 async function reload(selectId = state.current) {
   const info = await api("/api/groups/years");
