@@ -48,7 +48,7 @@ function toast(msg, isErr = false) {
 // ------------------------------------------------------------ 一覧
 function render() {
   const q = state.q.trim().toLowerCase();
-  for (const cat of ["own", "other"]) {
+  for (const cat of ["tech", "own", "other"]) {
     const all = state.links.filter((l) => l.category === cat);
     const list = all.filter((l) => (!state.area || l.areas.includes(state.area)) &&
       (!q || [l.title, l.note, l.url, ...l.areas].some((v) => (v || "").toLowerCase().includes(q))));

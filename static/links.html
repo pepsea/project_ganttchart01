@@ -26,20 +26,33 @@
   </header>
 
   <main class="links-main">
-    <section class="link-section own">
+    <!-- 左: 自社技術リンク -->
+    <section class="link-section tech">
       <div class="sec-head">
-        <h2>自社サービスの WEB リンク</h2>
-        <button class="primary" data-add="own">＋ 追加</button>
+        <h2>自社技術リンク</h2>
+        <button class="primary" data-add="tech">＋ 追加</button>
       </div>
-      <ul id="list-own" class="link-list"></ul>
+      <ul id="list-tech" class="link-list"></ul>
     </section>
-    <section class="link-section other">
-      <div class="sec-head">
-        <h2>その他の参考リンク</h2>
-        <button class="primary" data-add="other">＋ 追加</button>
-      </div>
-      <ul id="list-other" class="link-list"></ul>
-    </section>
+
+    <!-- 右: WEB リンク（自社サービス・その他参考を縦に） -->
+    <div class="web-links">
+      <h2 class="col-title">WEB リンク</h2>
+      <section class="link-section own">
+        <div class="sec-head">
+          <h2>自社サービス</h2>
+          <button class="primary" data-add="own">＋ 追加</button>
+        </div>
+        <ul id="list-own" class="link-list"></ul>
+      </section>
+      <section class="link-section other">
+        <div class="sec-head">
+          <h2>その他参考</h2>
+          <button class="primary" data-add="other">＋ 追加</button>
+        </div>
+        <ul id="list-other" class="link-list"></ul>
+      </section>
+    </div>
   </main>
 
   <div id="toast" class="toast" role="status"></div>
@@ -50,8 +63,9 @@
       <h2 id="link-title">リンクを追加</h2>
       <label><span>欄</span>
         <select name="category">
-          <option value="own">自社サービスの WEB リンク</option>
-          <option value="other">その他の参考リンク</option>
+          <option value="tech">自社技術リンク（左）</option>
+          <option value="own">WEB リンク：自社サービス（右上）</option>
+          <option value="other">WEB リンク：その他参考（右下）</option>
         </select>
       </label>
       <label><span>名前 <span class="req">*</span></span><input name="title" required placeholder="例: 受託解析サービス 公式サイト"></label>

@@ -1,6 +1,6 @@
 """参考リンク API
 
-「自社サービスの WEB リンク（own）」と「その他の参考リンク（other）」を管理する。
+「自社技術リンク（tech）」「自社サービスの WEB リンク（own）」「その他の参考リンク（other）」を管理する。
 """
 
 import asyncio
@@ -17,7 +17,7 @@ from db import ensure_master, get_db
 
 router = APIRouter(prefix="/api/links", tags=["参考リンク"])
 
-Category = Literal["own", "other"]
+Category = Literal["tech", "own", "other"]
 
 
 def init_db() -> None:
@@ -25,7 +25,7 @@ def init_db() -> None:
         db.execute(
             """CREATE TABLE IF NOT EXISTS ref_links (
                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                   category   TEXT NOT NULL DEFAULT 'other',  -- own = 自社サービスの WEB リンク / other = その他の参考リンク
+                   category   TEXT NOT NULL DEFAULT 'other',  -- tech = 自社技術リンク / own = 自社サービスの WEB リンク / other = その他の参考リンク
                    title      TEXT NOT NULL,                   -- 名前
                    url        TEXT NOT NULL,
                    note       TEXT NOT NULL DEFAULT '',        -- 説明

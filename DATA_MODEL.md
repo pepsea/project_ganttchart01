@@ -100,7 +100,7 @@
 | テーブル | 列 | 内容 |
 |---|---|---|
 | `ref_links` | id | |
-| | category | 欄: `own` = 自社サービスの WEB リンク / `other` = その他の参考リンク |
+| | category | 欄: `tech` = 自社技術リンク / `own` = WEB リンク（自社サービス） / `other` = WEB リンク（その他参考） |
 | | title / url / note | 名前 / URL / 説明 |
 | | areas | 領域（JSON 配列） |
 | | sort_order | 欄の中での表示順 |
