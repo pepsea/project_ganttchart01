@@ -21,6 +21,7 @@ import cases
 import documents
 import groups
 import links
+import people
 import platforms
 import services
 from csvutil import decode_csv, parse_date
@@ -217,6 +218,7 @@ app.include_router(services.router)
 app.include_router(documents.router)
 app.include_router(links.router)
 app.include_router(groups.router)
+app.include_router(people.router)
 app.include_router(auth.router)
 app.include_router(backup.router)
 # ログイン必須（/login と /static 以外。API は 401、画面はログイン画面へ転送）

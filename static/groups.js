@@ -177,7 +177,7 @@ function renderDetail() {
   vs.append(vh, el("div", `vision-text${g.vision ? "" : " hint"}`, g.vision || "未記入（「✎ 編集」から入力）"));
   root.append(vs);
 
-  root.append(renderGoals(g), renderAchievements(g), renderRelations(g));
+  root.append(renderGoals(g), renderAchievements(g), renderRelations(g), renderMembers(g));
 }
 
 // ---- 目標（達成基準・時期）: クリックで編集
@@ -308,6 +308,114 @@ function renderRelations(g) {
     relRow("関連基盤技術", g.platforms, (no) => `/platforms?id=${encodeURIComponent(no)}`, platformName),
   );
   return rel;
+}
+
+// ---- メンバーの担当・タスク（一番下。PL・メンバーごとに、担当領域・基盤技術・案件・グループ・サービス・タスクを表示）
+const TASK_STATES = [["overdue", "期限超過"], ["soon", "期限3日以内"], ["active", "実施中"], ["waiting", "開始前"]];
+const personCache = new Map();
+let personSelected = null;
+
+function renderMembers(g) {
+  const sec = el("section", "gp-section");
+  const h = el("h3", "", "メンバーの担当・タスク");
+  h.append(el("span", "hint", "名前を選ぶと、その人の担当とガントチャートのタスクを表示（表示のみ）"));
+  sec.append(h);
+  const names = [...new Set([g.pl, ...people(g)].filter(Boolean))];
+  if (!names.length) {
+    sec.append(el("p", "hint", "PL・メンバーが未設定です（「✎ 編集」から登録）"));
+    return sec;
+  }
+  if (!names.includes(personSelected)) personSelected = names[0];
+  const tabs = el("div", "person-tabs");
+  const body = el("div", "person-body");
+  for (const n of names) {
+    const b = el("button", n === personSelected ? "on" : "", n);
+    b.type = "button";
+    if (n === g.pl) b.append(el("small", "", "PL"));
+    b.addEventListener("click", () => {
+      personSelected = n;
+      tabs.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+      loadPerson(n, body);
+    });
+    tabs.append(b);
+  }
+  sec.append(tabs, body);
+  loadPerson(personSelected, body);
+  return sec;
+}
+
+async function loadPerson(name, body) {
+  body.innerHTML = "";
+  body.append(el("p", "hint", "読み込み中…"));
+  try {
+    if (!personCache.has(name)) personCache.set(name, await api(`/api/people/${encodeURIComponent(name)}`));
+    if (personSelected === name) renderPerson(personCache.get(name), body);
+  } catch (err) {
+    body.innerHTML = "";
+    body.append(el("p", "error", `読み込めませんでした: ${err.message}`));
+  }
+}
+
+function extLink(text, href, cls = "rel-chip") {
+  const a = el("a", cls);
+  a.href = href;
+  a.target = "_blank";
+  a.rel = "noopener";
+  if (typeof text === "string") a.textContent = text; else a.append(...text);
+  return a;
+}
+const roleTag = (role) => el("span", `role-tag${role === "PL" ? " pl" : ""}`, role);
+
+function renderPerson(d, body) {
+  body.innerHTML = "";
+  const row = (label, content) => {
+    const r = el("div", "rel-row");
+    r.append(el("span", "lbl", label));
+    const box = el("div", "rel-chips");
+    if (Array.isArray(content) && content.length) box.append(...content);
+    else box.append(el("span", "hint", "なし"));
+    r.append(box);
+    body.append(r);
+  };
+  row("担当領域", d.areas.map((a) => el("span", "area-pill", a)));
+  row("担当基盤技術", d.platforms.map((p) => extLink([roleTag(p.role), el("b", "", p.name), p.title, el("span", "arrow", "↗")],
+    `/platforms?id=${encodeURIComponent(p.name)}`)));
+  row("担当案件", d.cases.map((c) => {
+    const a = extLink([roleTag(c.role), el("b", "", c.case_no), c.name, el("span", "case-st", c.status), el("span", "arrow", "↗")],
+      `/cases?case=${encodeURIComponent(c.case_no)}`);
+    return a;
+  }));
+  row("担当グループ", d.groups.map((x) => extLink([roleTag(x.role), x.name, el("span", "arrow", "↗")], `/groups?id=${x.id}&year=all`)));
+  row("担当サービス", d.services.map((x) => extLink([roleTag(x.role), el("b", "", x.service_no), x.name, el("span", "arrow", "↗")],
+    `/services#svc-${encodeURIComponent(x.service_no)}`)));
+
+  // タスク（ガントチャートの担当者 = この人）。状態は色で表示
+  const th = el("div", "person-task-head");
+  th.append(el("b", "", `タスク ${d.tasks.length} 件`));
+  const legend = el("span", "task-legend");
+  for (const [k, label] of TASK_STATES) {
+    const n = d.task_counts[k] || 0;
+    const lg = el("span", `lg st-${k}`);
+    lg.append(el("i"), `${label} ${n}`);
+    legend.append(lg);
+  }
+  th.append(legend, extLink("ガントチャートで開く ↗", `/?q=${encodeURIComponent(d.name)}`, "g-link"));
+  body.append(th);
+  if (!d.tasks.length) {
+    body.append(el("p", "hint", "担当のタスクはありません"));
+    return;
+  }
+  const ul = el("ul", "person-tasks");
+  for (const t of d.tasks) {
+    const li = el("li", `st-${t.state}`);
+    const label = TASK_STATES.find(([k]) => k === t.state)[1];
+    li.append(el("span", "st-badge", label), el("span", "t-name", t.task));
+    const pj = t.project ? extLink(`${t.project}${t.project_name ? `｜${t.project_name}` : ""}`, `/?pj=${encodeURIComponent(t.project)}`, "t-pj") : el("span", "t-pj none", "PJ名なし");
+    li.append(pj, el("span", "t-area", t.area), el("span", "t-date", `${slashDate(t.start_date)} 〜 ${slashDate(t.end_date)}`));
+    li.title = `${t.task}\n${label} / 優先度 ${t.priority}\n${t.start_date} 〜 ${t.end_date}`;
+    ul.append(li);
+  }
+  body.append(ul);
 }
 
 // ---- 達成したことの追加・編集
@@ -568,6 +676,7 @@ $("#form-year").addEventListener("submit", async (e) => {
 
 // ------------------------------------------------------------ 読み込み
 async function reload(selectId = state.current) {
+  personCache.clear();
   const info = await api("/api/groups/years");
   state.currentYear = info.current;
   state.years = info.years;

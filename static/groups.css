@@ -206,3 +206,38 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .year-list .spacer { flex: 1; }
 .year-list button { padding: 1px 10px; font-size: 12px; }
 .year-list button:disabled { opacity: .35; cursor: default; }
+
+/* メンバーの担当・タスク */
+.person-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.person-tabs button { padding: 3px 12px; font-size: 12.5px; border-radius: 999px; }
+.person-tabs button small { margin-left: 5px; font-size: 10px; font-weight: 700; color: var(--muted); }
+.person-tabs button.on { background: var(--gc, var(--accent)); border-color: var(--gc, var(--accent)); color: #fff; font-weight: 700; }
+.person-tabs button.on small { color: #fff; opacity: .85; }
+.person-body .rel-row .lbl { flex-basis: 96px; }
+.area-pill { font-size: 11.5px; padding: 1px 9px; border-radius: 999px; background: #eef0f4; border: 1px solid var(--line-strong); }
+.role-tag { font-size: 10px; font-weight: 700; padding: 0 5px; border-radius: 3px; background: #eef0f4; color: var(--muted); }
+.role-tag.pl { background: #e3ecff; color: #2f5bd0; }
+.case-st { font-size: 10.5px; color: var(--muted); }
+.person-task-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin: 12px 0 6px; padding-top: 10px; border-top: 1px solid var(--line); }
+.person-task-head .g-link { margin-left: auto; }
+.task-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: #3b4252; }
+.task-legend .lg { display: inline-flex; align-items: center; gap: 4px; }
+.task-legend i { width: 12px; height: 12px; border-radius: 3px; border: 1px solid; }
+.person-tasks { list-style: none; margin: 0; padding: 0; }
+.person-tasks li { display: grid; grid-template-columns: 86px minmax(0, 1.4fr) minmax(0, 1fr) auto auto; gap: 10px; align-items: center;
+  padding: 5px 8px; margin-bottom: 3px; border-radius: 5px; border-left: 4px solid; font-size: 13px; }
+.person-tasks .st-badge { font-size: 11px; font-weight: 700; text-align: center; border-radius: 999px; padding: 0 6px; background: rgba(255,255,255,.7); }
+.person-tasks .t-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.person-tasks .t-pj { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); text-decoration: none; }
+.person-tasks .t-pj.none { color: var(--muted); }
+.person-tasks .t-area { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.person-tasks .t-date { font-size: 12px; color: #3b4252; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* 状態の色（ガントチャートと同じ）: 期限超過 = 赤、3 日以内 = オレンジ、実施中 = 青、開始前 = 灰 */
+.st-overdue { --bg: #ffd4d4; --bd: #e5484d; --fg: #a3161b; }
+.st-soon { --bg: #ffe2b3; --bd: #f5a524; --fg: #8a5100; }
+.st-active { --bg: #dbe8ff; --bd: #3b6fe0; --fg: #1f4fbf; }
+.st-waiting { --bg: #f1f2f5; --bd: #b8bdc7; --fg: #5b6270; }
+.person-tasks li { background: var(--bg); border-left-color: var(--bd); }
+.person-tasks li .st-badge { color: var(--fg); }
+.task-legend .lg i { background: var(--bg); border-color: var(--bd); }
+@media (max-width: 900px) { .person-tasks li { grid-template-columns: 80px minmax(0, 1fr) auto; } .person-tasks .t-pj, .person-tasks .t-area { display: none; } }
