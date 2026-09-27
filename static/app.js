@@ -432,11 +432,14 @@ function syncReadonlyCells(row, task, areaCell, projCell, assigneeCell) {
   projCell.title = `PJ名: ${pjText(task.project) || "なし"}（修正はクリックしてタスク詳細で）`;
 }
 
+// 実施中 = 今日が開始日〜終了日の間（期限超過・3 日以内の色を優先）
+const isActive = (task) => parseDate(task.start_date) <= todayMs() && todayMs() <= parseDate(task.end_date);
+
 function syncTaskCell(cell, task) {
   cell.innerHTML = "";
   cell.append(el("span", "t-name", task.task));
   if (task.detail) cell.append(el("span", "t-has-detail", "詳細"));
-  cell.dataset.status = deadlineStatus(task);
+  cell.dataset.status = deadlineStatus(task) || (isActive(task) ? "active" : "");
   cell.title = `${task.task}（クリックで詳細）${task.detail ? "\n\n" + snippet(task.detail) : ""}`;
 }
 

@@ -385,6 +385,7 @@ button.danger-btn:disabled { opacity: .4; cursor: not-allowed; }
 .task-cell .t-has-detail { flex: 0 0 auto; font-size: 10px; color: var(--muted); border: 1px solid var(--line-strong); border-radius: 3px; padding: 0 3px; line-height: 14px; }
 .task-cell[data-status="overdue"] { background: #ffd4d4; color: #a3161b; font-weight: 600; }
 .task-cell[data-status="soon"] { background: #ffe2b3; color: #8a5100; font-weight: 600; }
+.task-cell[data-status="active"] { background: #dbe8ff; color: #1f4fbf; font-weight: 600; }
 dialog textarea {
   padding: 6px 8px;
   border: 1px solid var(--line-strong);
