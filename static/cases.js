@@ -515,19 +515,21 @@ function fillCustomerSelect(current = "") {
 function syncLinks() {
   document.querySelectorAll("#case-form .open-link").forEach((a) => {
     const url = safeUrl(form[a.dataset.for].value.trim());
-    form[a.dataset.for].classList.toggle("missing", !url); // リンクが無い欄は赤背景
+    form[a.dataset.for].classList.toggle("missing", !url && !("free" in a.dataset)); // リンクが無い欄は赤背景（自由リンクは除く）
     if (url) {
       a.href = url;
       a.setAttribute("aria-disabled", "false");
       a.title = url;
+      if ("free" in a.dataset) a.textContent = `${form[a.dataset.for.replace("_url", "_label")].value.trim() || "開く"} ↗`;
     } else {
       a.removeAttribute("href");
       a.setAttribute("aria-disabled", "true");
       a.title = "URL を入力すると開けます";
+      if ("free" in a.dataset) a.textContent = "開く ↗";
     }
   });
 }
-for (const [key] of LINKS) form[key].addEventListener("input", syncLinks);
+for (const key of [...LINKS.map(([k]) => k), "link1_url", "link2_url", "link1_label", "link2_label"]) form[key].addEventListener("input", syncLinks);
 
 function openDrawer(c = null) {
   state.current = c;
@@ -542,7 +544,7 @@ function openDrawer(c = null) {
     $("#d-no").textContent = c.case_no;
     $("#d-title").textContent = c.name;
     for (const k of ["name", "detail", "status", "pl", "assignees", "start_date", "end_date",
-      "box_url", "teams_url", "overview_url", "plan_url"]) form[k].value = c[k] || "";
+      "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url"]) form[k].value = c[k] || "";
     renderAreaChecks(c.areas);
     $("#btn-delete").hidden = false;
     $("#logs").hidden = false;
@@ -568,7 +570,7 @@ form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const body = {};
   for (const k of ["case_no", "customer", "name", "detail", "status", "pl", "assignees", "start_date", "end_date",
-    "box_url", "teams_url", "overview_url", "plan_url"]) body[k] = form[k].value.trim();
+    "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url"]) body[k] = form[k].value.trim();
   body.start_date ||= null;
   body.end_date ||= null;
   body.areas = [...form.querySelectorAll('input[name="areas"]:checked')].map((i) => i.value);

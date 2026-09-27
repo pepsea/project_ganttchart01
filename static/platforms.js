@@ -280,6 +280,8 @@ function renderDetail() {
   const links = el("span", "pf-links");
   links.append(el("span", "role", "リンク"), linkButton("研究計画", p.plan_url, "研究計画"),
     linkButton("BOX", p.box_url, "BOX"), linkButton("Teams", p.teams_url, "Teams"));
+  // 自由リンク（任意）: 登録されているときだけ表示
+  if (safeUrl(p.link_url)) links.append(linkButton(p.link_label || "リンク", p.link_url, p.link_label || "自由リンク"));
   team.append(links);
   titleBox.append(team);
   // この基盤に関連するサービス（サービス画面へのリンク）
@@ -352,7 +354,8 @@ function renderDetail() {
     // PL とメンバーは同じ行に並べる
     info.append(field("PL", "owner", p.owner, "例: 田中"), field("メンバー（複数はスペース区切り）", "members", p.members, "例: 佐藤 鈴木"),
       field("研究計画のリンク", "plan_url", p.plan_url, "https://"), field("BOX のリンク", "box_url", p.box_url, "https://"),
-      field("Teams のリンク", "teams_url", p.teams_url, "https://"));
+      field("Teams のリンク", "teams_url", p.teams_url, "https://"),
+      field("自由リンクの名前", "link_label", p.link_label, "例: 解析マニュアル"), field("自由リンクの URL", "link_url", p.link_url, "https://"));
     const areaBox = el("div", "full");
     areaBox.append(el("div", "hint", "領域（複数選択可）"));
     const chips = el("div", "chips-select");
@@ -436,6 +439,8 @@ function collectUnsaved() {
     plan_url: root.querySelector('input[name="plan_url"]').value.trim(),
     box_url: root.querySelector('input[name="box_url"]').value.trim(),
     teams_url: root.querySelector('input[name="teams_url"]').value.trim(),
+    link_label: root.querySelector('input[name="link_label"]').value.trim(),
+    link_url: root.querySelector('input[name="link_url"]').value.trim(),
   };
 }
 function restoreUnsaved(v) {
@@ -448,6 +453,8 @@ function restoreUnsaved(v) {
   root.querySelector('input[name="plan_url"]').value = v.plan_url;
   root.querySelector('input[name="box_url"]').value = v.box_url;
   root.querySelector('input[name="teams_url"]').value = v.teams_url;
+  root.querySelector('input[name="link_label"]').value = v.link_label || "";
+  root.querySelector('input[name="link_url"]').value = v.link_url || "";
   root.querySelectorAll('input[name="areas"]').forEach((i) => {
     i.checked = v.areas.includes(i.value);
     i.closest("label").classList.toggle("on", i.checked);

@@ -20,8 +20,9 @@ router = APIRouter(prefix="/api/cases", tags=["案件管理"])
 STATUSES = ("顧客開発", "打診", "見積提出", "契約中", "ブリーフィング前", "実施中", "QC", "アフターフォロー", "キャンセル")
 Status = Literal[STATUSES]
 URL_FIELDS = ("box_url", "teams_url", "overview_url", "plan_url")
+FREE_LINK_COLS = ("link1_label", "link1_url", "link2_label", "link2_url")  # 自由リンク 2 つ（名前と URL）
 CASE_COLS = ("case_no", "customer", "name", "status", "pl", "assignees", "areas",
-             "start_date", "end_date", *URL_FIELDS, "detail")
+             "start_date", "end_date", *URL_FIELDS, "detail", *FREE_LINK_COLS)
 
 
 # ---------------------------------------------------------------- DB
@@ -89,7 +90,7 @@ def init_db() -> None:
         if not has_progress:
             db.execute(LEGACY_NOTES_COPY)
         cols = {r["name"] for r in db.execute("PRAGMA table_info(cases)")}
-        for col in ("project", "detail"):
+        for col in ("project", "detail", *FREE_LINK_COLS):
             if col not in cols:
                 db.execute(f"ALTER TABLE cases ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
         if sample_data_enabled() and db.execute("SELECT COUNT(*) FROM cases").fetchone()[0] == 0:
@@ -179,8 +180,12 @@ class CaseIn(BaseModel):
     teams_url: str = ""
     overview_url: str = ""
     plan_url: str = ""
+    link1_label: str = ""  # 自由リンク 1 の名前
+    link1_url: str = ""
+    link2_label: str = ""  # 自由リンク 2 の名前
+    link2_url: str = ""
 
-    @field_validator("case_no", "customer", "name", "pl", mode="before")
+    @field_validator("case_no", "customer", "name", "pl", "link1_label", "link2_label", mode="before")
     @classmethod
     def strip(cls, v):
         return v.strip() if isinstance(v, str) else v
@@ -195,7 +200,7 @@ class CaseIn(BaseModel):
     def uniq_areas(cls, v: list[str]):
         return list(dict.fromkeys(a.strip() for a in v if a.strip()))
 
-    @field_validator(*URL_FIELDS, mode="before")
+    @field_validator(*URL_FIELDS, "link1_url", "link2_url", mode="before")
     @classmethod
     def check_url(cls, v):
         v = (v or "").strip()
@@ -214,7 +219,8 @@ class CaseIn(BaseModel):
                 json.dumps(self.areas, ensure_ascii=False),
                 self.start_date.isoformat() if self.start_date else None,
                 self.end_date.isoformat() if self.end_date else None,
-                self.box_url, self.teams_url, self.overview_url, self.plan_url, self.detail.strip())
+                self.box_url, self.teams_url, self.overview_url, self.plan_url, self.detail.strip(),
+                self.link1_label, self.link1_url, self.link2_label, self.link2_url)
 
 
 class StatusIn(BaseModel):
@@ -287,7 +293,8 @@ def list_statuses() -> list[str]:
 
 # エクスポートの基本列（月報・進捗メモの列はこの後ろに日付ごとに並ぶ）
 EXPORT_HEADERS = ["案件番号", "状況", "顧客名", "案件名", "PL", "担当者", "領域", "開始日", "終了予定日",
-                  "BOXリンク", "Teamsリンク", "案件概要書リンク", "試験計画書リンク", "案件詳細"]
+                  "BOXリンク", "Teamsリンク", "案件概要書リンク", "試験計画書リンク", "案件詳細",
+                  "自由リンク1の名前", "自由リンク1", "自由リンク2の名前", "自由リンク2"]
 # 日付パターンの列名: 月報_YYYY-MM / 進捗_YYYY-MM-DD（旧形式の 週次_YYYY-MM-DD も読み込める）
 MONTH_COL = re.compile(r"^月報_(\d{4})[-/](\d{1,2})$")
 NOTE_COL = re.compile(r"^(?:進捗|週次)_(\d{4}[-/]\d{1,2}[-/]\d{1,2})$")
@@ -330,6 +337,7 @@ def export_csv() -> Response:
         w.writerow([c["case_no"], c["status"], c["customer"], c["name"], c["pl"], c["assignees"],
                     " ".join(c["areas"]), c["start_date"] or "", c["end_date"] or "",
                     c["box_url"], c["teams_url"], c["overview_url"], c["plan_url"], c["detail"],
+                    c["link1_label"], c["link1_url"], c["link2_label"], c["link2_url"],
                     *(monthly.get((c["id"], m), "") for m in months),
                     *(notes.get((c["id"], wk), "") for wk in weeks)])
     filename = f"cases_{datetime.now():%Y%m%d_%H%M%S}.csv"
@@ -360,6 +368,7 @@ IMPORT_ALIASES = {
     "案件概要書リンク": "overview_url", "案件概要書": "overview_url", "overview_url": "overview_url",
     "試験計画書リンク": "plan_url", "試験計画書": "plan_url", "plan_url": "plan_url",
     "案件詳細": "detail", "detail": "detail",
+    "自由リンク1の名前": "link1_label", "自由リンク1": "link1_url", "自由リンク2の名前": "link2_label", "自由リンク2": "link2_url",
     "最新進捗週": "note_week", "最新進捗メモ": "note_body",  # 旧形式
 }
 

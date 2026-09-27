@@ -37,7 +37,8 @@ def init_db() -> None:
         cols = {r["name"] for r in db.execute("PRAGMA table_info(platforms)")}
         for col, default in [("title", "''"), ("owner", "''"), ("members", "''"), ("areas", "'[]'"),
                              ("vision", "''"), ("updated_at", "''"), ("area", "''"),
-                             ("plan_url", "''"), ("box_url", "''"), ("teams_url", "''")]:  # 研究計画・BOX・Teams のリンク
+                             ("plan_url", "''"), ("box_url", "''"), ("teams_url", "''"),  # 研究計画・BOX・Teams のリンク
+                             ("link_label", "''"), ("link_url", "''")]:  # 自由リンク（名前と URL）
             if col not in cols:
                 db.execute(f"ALTER TABLE platforms ADD COLUMN {col} TEXT NOT NULL DEFAULT {default}")
         # 一時期の単一領域（area 列）を複数領域（areas）へ引き継ぐ
@@ -135,8 +136,10 @@ class PlatformIn(BaseModel):
     plan_url: str = ""      # 研究計画のリンク
     box_url: str = ""       # BOX のリンク
     teams_url: str = ""     # Teams のリンク
+    link_label: str = ""    # 自由リンクの名前
+    link_url: str = ""      # 自由リンクの URL
 
-    _urls = field_validator("plan_url", "box_url", "teams_url", mode="before")(classmethod(lambda cls, v: check_url(v)))
+    _urls = field_validator("plan_url", "box_url", "teams_url", "link_url", mode="before")(classmethod(lambda cls, v: check_url(v)))
 
     @field_validator("members", mode="before")
     @classmethod
@@ -197,7 +200,7 @@ def fetch_platform(db: sqlite3.Connection, name: str) -> dict:
 
 
 PLATFORM_SELECT = """
-    SELECT p.name, p.title, p.owner, p.members, p.areas, p.vision, p.plan_url, p.box_url, p.teams_url, p.updated_at,
+    SELECT p.name, p.title, p.owner, p.members, p.areas, p.vision, p.plan_url, p.box_url, p.teams_url, p.link_label, p.link_url, p.updated_at,
            (SELECT COUNT(*) FROM platform_topics d WHERE d.platform = p.name) AS topic_count,
            (SELECT MAX(meeting_date) FROM platform_topics d WHERE d.platform = p.name) AS last_topic_date,
            (SELECT MAX(month) FROM platform_monthly m WHERE m.platform = p.name) AS last_month,
@@ -247,17 +250,17 @@ def export_platforms(area: str = "", person: str = "") -> Response:
             monthly = {(r["platform"], r["month"]): r["body"] for r in db.execute(q, names)}
     months = sorted({m for _, m in monthly}, reverse=True)
     rows = [["基盤番号", "基盤名", "領域", "PL", "メンバー", "全体目標", "研究計画リンク", "BOXリンク", "Teamsリンク",
-             "目標の達成", "目標の総数", "次の期限",
+             "自由リンクの名前", "自由リンク", "目標の達成", "目標の総数", "次の期限",
              "タスク数", "ディスカッション数", "最新のディスカッション日", *(f"月報_{m}" for m in months)]]
     for p in ps:
         rows.append([p["name"], p["title"], "、".join(p["areas"]), p["owner"], p["members"], p["vision"],
-                     p["plan_url"], p["box_url"], p["teams_url"], p["goal_done"], p["goal_total"], p["next_due"] or "", p["task_count"], p["topic_count"],
+                     p["plan_url"], p["box_url"], p["teams_url"], p["link_label"], p["link_url"], p["goal_done"], p["goal_total"], p["next_due"] or "", p["task_count"], p["topic_count"],
                      p["last_topic_date"] or "", *(monthly.get((p["name"], m), "") for m in months)])
     return csv_response(rows, "platforms")
 
 
 BACKUP_HEADERS = ["種別", "基盤番号", "基盤名", "領域", "PL", "メンバー", "全体目標", "研究計画リンク", "BOXリンク", "Teamsリンク",
-                  "目標", "状態", "期限", "メモ", "リンク", "日付", "トピック", "内容", "月", "月報"]
+                  "自由リンクの名前", "自由リンク", "目標", "状態", "期限", "メモ", "リンク", "日付", "トピック", "内容", "月", "月報"]
 
 
 @router.get("/export-backup.csv")
@@ -272,7 +275,7 @@ def export_backup(area: str = "", person: str = "") -> Response:
         for p in ps:
             add(種別="基盤", 基盤番号=p["name"], 基盤名=p["title"], 領域="、".join(p["areas"]), PL=p["owner"],
                 メンバー=p["members"], 全体目標=p["vision"], 研究計画リンク=p["plan_url"], BOXリンク=p["box_url"],
-                Teamsリンク=p["teams_url"])
+                Teamsリンク=p["teams_url"], 自由リンクの名前=p["link_label"], 自由リンク=p["link_url"])
         for p in ps:
             for g in db.execute(f"SELECT * FROM platform_goals WHERE platform = ? {GOAL_ORDER}", (p["name"],)):
                 add(種別="目標", 基盤番号=p["name"], 目標=g["title"], 状態=g["status"], 期限=g["due_date"] or "",
@@ -370,9 +373,11 @@ def _import_platform(db: sqlite3.Connection, name: str, r: dict, line: int, resu
     cur = to_platform(db.execute("SELECT * FROM platforms WHERE name = ?", (name,)).fetchone())
     data = {"title": cur.get("title", ""), "areas": cur["areas"], "owner": cur.get("owner", ""),
             "members": cur.get("members", ""), "vision": cur.get("vision", ""),
-            "plan_url": cur.get("plan_url", ""), "box_url": cur.get("box_url", ""), "teams_url": cur.get("teams_url", "")}
+            "plan_url": cur.get("plan_url", ""), "box_url": cur.get("box_url", ""), "teams_url": cur.get("teams_url", ""),
+            "link_label": cur.get("link_label", ""), "link_url": cur.get("link_url", "")}
     for col, key in (("基盤名", "title"), ("PL", "owner"), ("メンバー", "members"), ("全体目標", "vision"),
-                     ("研究計画リンク", "plan_url"), ("BOXリンク", "box_url"), ("Teamsリンク", "teams_url")):
+                     ("研究計画リンク", "plan_url"), ("BOXリンク", "box_url"), ("Teamsリンク", "teams_url"),
+                     ("自由リンクの名前", "link_label"), ("自由リンク", "link_url")):
         if r.get(col):
             data[key] = r[col]
     if r.get("領域"):
@@ -384,10 +389,10 @@ def _import_platform(db: sqlite3.Connection, name: str, r: dict, line: int, resu
     for a in pin.areas:
         ensure_master(db, "areas", a)
     db.execute(
-        "UPDATE platforms SET title=?, areas=?, owner=?, members=?, vision=?, plan_url=?, box_url=?, teams_url=?,"
+        "UPDATE platforms SET title=?, areas=?, owner=?, members=?, vision=?, plan_url=?, box_url=?, teams_url=?, link_label=?, link_url=?,"
         " updated_at=datetime('now','localtime') WHERE name=?",
         (pin.title, json.dumps(pin.areas, ensure_ascii=False), pin.owner, pin.members, pin.vision,
-         pin.plan_url, pin.box_url, pin.teams_url, name))
+         pin.plan_url, pin.box_url, pin.teams_url, pin.link_label.strip(), pin.link_url, name))
     result["platforms_updated"] += 1
     for h in headers:
         m = MONTH_COL.match(h)
@@ -525,10 +530,10 @@ def update_platform(name: str, p: PlatformIn) -> dict:
         for a in p.areas:
             ensure_master(db, "areas", a)
         db.execute(
-            "UPDATE platforms SET title=?, areas=?, owner=?, members=?, vision=?, plan_url=?, box_url=?, teams_url=?,"
+            "UPDATE platforms SET title=?, areas=?, owner=?, members=?, vision=?, plan_url=?, box_url=?, teams_url=?, link_label=?, link_url=?,"
             " updated_at=datetime('now','localtime') WHERE name=?",
             (p.title.strip(), json.dumps(p.areas, ensure_ascii=False), p.owner.strip(), p.members,
-             p.vision.strip(), p.plan_url, p.box_url, p.teams_url, name),
+             p.vision.strip(), p.plan_url, p.box_url, p.teams_url, p.link_label.strip(), p.link_url, name),
         )
         return fetch_platform(db, name)
 

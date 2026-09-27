@@ -36,6 +36,7 @@
 | | start_date / end_date | 開始日 / 終了予定日（空欄可） |
 | | box_url / teams_url / overview_url / plan_url | 各リンク |
 | | detail | 案件詳細 |
+| | link1_label / link1_url / link2_label / link2_url | 自由リンク 1・2（名前と URL。任意） |
 | | created_at / updated_at | 作成・更新日時 |
 | | project | （未使用。旧 PJ名。PJ名 = 案件番号に統一） |
 | `case_notes` | id, case_id, week, body, updated_at | （未使用）旧・週次進捗メモ（week = その週の月曜日。案件×週で一意）。`case_progress` 作成時に 1 回だけ引き継ぎ済み |
@@ -53,6 +54,7 @@
 | | areas | 領域（JSON 配列。1 つ目が一覧のグループ） |
 | | vision | 全体目標 |
 | | plan_url / box_url / teams_url | 研究計画 / BOX / Teams のリンク |
+| | link_label / link_url | 自由リンク（名前と URL。任意） |
 | | updated_at | 基本情報の更新日時 |
 | | area | （未使用。旧・単一領域。起動時に areas へ引き継ぎ） |
 | `platform_goals` | id, platform, title, due_date, status, note, url, created_at, updated_at | 目標（状態: 未着手・取組中・達成・保留。url は目標のリンク） |

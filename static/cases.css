@@ -480,3 +480,8 @@ a.link-ic:hover { filter: brightness(1.12); color: #fff; }
 .card-due { margin-top: 4px; }
 .due-label.missing { background: #ffd4d4; border-color: #e5484d; color: #a3161b; font-weight: 600; }
 .due-label.missing small { color: #a3161b; }
+
+/* 自由リンク（名前 + URL） */
+.free-links { margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--line-strong); display: grid; gap: 4px; }
+.link-field.free .free-name { flex: 0 0 34%; }
+.link-field.free .open-link { max-width: 12em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -103,6 +103,19 @@
               <a class="open-link" data-for="plan_url" target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
             </div>
           </div>
+          <!-- 自由リンク（名前を付けて 2 つまで。未入力でも赤くしない） -->
+          <div class="free-links">
+            <div class="link-field free">
+              <label class="free-name">自由リンク 1 の名前<input name="link1_label" placeholder="例: 見積書"></label>
+              <label>URL<input name="link1_url" type="url" placeholder="https://"></label>
+              <a class="open-link" data-for="link1_url" data-free target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
+            </div>
+            <div class="link-field free">
+              <label class="free-name">自由リンク 2 の名前<input name="link2_label" placeholder="例: 納品データ"></label>
+              <label>URL<input name="link2_url" type="url" placeholder="https://"></label>
+              <a class="open-link" data-for="link2_url" data-free target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
+            </div>
+          </div>
         </section>
         <p class="error" id="case-error"></p>
         <div class="form-actions">
