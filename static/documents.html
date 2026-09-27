@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>共有資料</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/documents.css">
+</head>
+<body>
+  <header class="toolbar">
+    <nav class="nav">
+      <a href="/">ガントチャート</a>
+      <a href="/cases">案件管理</a>
+      <a href="/platforms">基盤技術</a>
+      <a href="/services">サービス</a>
+      <a href="/documents" class="active">共有資料</a>
+      <a href="/links">参考リンク</a>
+      <a href="/admin">管理</a>
+    </nav>
+    <div class="tools">
+      <button id="btn-add" class="primary">＋ 資料を追加</button>
+      <input id="q" type="search" class="search" placeholder="資料名・目的・領域で検索">
+      <label class="filter">領域 <select id="f-area"><option value="">すべて</option></select></label>
+    </div>
+    <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
+  </header>
+
+  <main class="doc-main">
+    <p id="doc-count" class="hint"></p>
+    <div class="doc-table-wrap">
+      <table class="doc-table">
+        <thead>
+          <tr>
+            <th class="c-title">資料名</th>
+            <th class="c-purpose">目的</th>
+            <th class="c-areas">領域</th>
+            <th class="c-date">作成日時</th>
+            <th class="c-links">資料リンク</th>
+            <th class="c-edit"></th>
+          </tr>
+        </thead>
+        <tbody id="doc-list"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <!-- 資料の追加・編集 -->
+  <dialog id="dlg-doc">
+    <form id="form-doc" method="dialog" autocomplete="off">
+      <h2 id="doc-title">資料を追加</h2>
+      <label><span>資料名 <span class="req">*</span></span><input name="title" required placeholder="例: 2026 年度 サービス紹介資料"></label>
+      <label><span>目的</span><textarea name="purpose" rows="3" placeholder="例: 顧客への初回説明に使う"></textarea></label>
+      <label class="date-field"><span>作成日時</span><input name="created_date" type="datetime-local"></label>
+      <div class="field">
+        <span class="field-label">領域（複数選択可）</span>
+        <div id="doc-areas" class="chips-select"></div>
+      </div>
+      <fieldset>
+        <legend>資料リンク（最大 4 つ）</legend>
+        <div class="link-rows">
+          <div class="link-row"><span class="no">1</span>
+            <input name="link1_label" placeholder="表示名（例: 日本語版）">
+            <input name="link1_url" type="url" placeholder="https://"></div>
+          <div class="link-row"><span class="no">2</span>
+            <input name="link2_label" placeholder="表示名（例: 英語版）">
+            <input name="link2_url" type="url" placeholder="https://"></div>
+          <div class="link-row"><span class="no">3</span>
+            <input name="link3_label" placeholder="表示名（例: スライド）">
+            <input name="link3_url" type="url" placeholder="https://"></div>
+          <div class="link-row"><span class="no">4</span>
+            <input name="link4_label" placeholder="表示名（例: 補足資料）">
+            <input name="link4_url" type="url" placeholder="https://"></div>
+        </div>
+      </fieldset>
+      <p class="error" id="doc-error"></p>
+      <div class="actions doc-actions">
+        <button type="button" id="doc-delete" class="danger-outline">削除…</button>
+        <span class="spacer"></span>
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="primary" id="doc-submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 資料の削除（パスワードで確認） -->
+  <dialog id="dlg-doc-delete">
+    <form id="form-doc-delete" method="dialog">
+      <h2 class="danger">資料の削除</h2>
+      <p>次の資料をこの一覧から削除します。<strong>この操作は元に戻せません。</strong>（リンク先の資料そのものは削除されません）</p>
+      <p id="doc-delete-target" class="summary"></p>
+      <label><span>確認のため、パスワードを入力してください</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <p class="error" id="doc-delete-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="danger-btn">削除する</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/documents.js"></script>
+</body>
+</html>

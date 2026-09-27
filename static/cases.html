@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>案件管理</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/cases.css">
+</head>
+<body>
+  <header class="toolbar">
+    <nav class="nav">
+      <a href="/">ガントチャート</a>
+      <a href="/cases" class="active">案件管理</a>
+      <a href="/platforms">基盤技術</a>
+      <a href="/services">サービス</a>
+      <a href="/documents">共有資料</a>
+      <a href="/links">参考リンク</a>
+      <a href="/admin">管理</a>
+    </nav>
+    <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
+    <div class="tools">
+      <button id="btn-add" class="primary">＋ 案件追加</button>
+      <div class="seg" role="tablist" id="view-tabs">
+        <button data-view="board" class="on">カンバン</button>
+        <button data-view="list">一覧</button>
+        <button data-view="timeline">タイムライン</button>
+      </div>
+      <span class="sep"></span>
+      <input id="q" type="search" placeholder="案件番号（PJ名）・顧客名・案件名で検索" class="search">
+      <label class="filter">領域 <select id="f-area"><option value="">すべて</option></select></label>
+      <label class="filter">担当 <select id="f-person"><option value="">すべて</option></select></label>
+      <label class="filter check"><input type="checkbox" id="f-cancel"> キャンセルも表示</label>
+      <span class="sep"></span>
+      <a class="button" href="/api/cases/export.csv">CSV エクスポート</a>
+      <button id="btn-import">CSV インポート</button>
+      <input type="file" id="import-file" accept=".csv,text/csv" hidden>
+    </div>
+  </header>
+
+  <!-- 状況ごとの件数（クリックで絞り込み） -->
+  <div id="summary" class="summary-bar"></div>
+
+  <main id="view" class="case-view"></main>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <!-- 案件詳細（右側ドロワー） -->
+  <dialog id="drawer" class="drawer">
+    <div class="drawer-head">
+      <div>
+        <div id="d-no" class="d-no"></div>
+        <h2 id="d-title">案件追加</h2>
+      </div>
+      <button type="button" class="icon-btn" data-close title="閉じる">✕</button>
+    </div>
+    <div class="drawer-body">
+      <form id="case-form" class="case-form" autocomplete="off">
+        <section>
+          <h3>基本情報</h3>
+          <div class="grid2">
+            <label><span>案件番号 <span class="req">*</span></span>
+              <span class="select-add"><select name="case_no" required></select>
+                <a class="button pj-link" id="d-no-link" hidden>ガント ↗</a></span></label>
+            <label><span>状況</span><select name="status"></select></label>
+            <label class="full"><span>案件名 <span class="req">*</span></span><input name="name" required></label>
+            <label><span>顧客名</span>
+              <span class="select-add"><select name="customer"></select></span></label>
+            <label><span>PL</span><input name="pl"></label>
+            <label class="full"><span>担当者（複数はスペース区切り）</span><input name="assignees" placeholder="例: 鈴木 高橋"></label>
+            <label><span>開始日</span><input type="date" name="start_date"></label>
+            <label><span>終了予定日</span><input type="date" name="end_date"></label>
+          </div>
+          <div class="field">
+            <span class="field-label">領域（複数選択可）</span>
+            <div id="area-checks" class="chips-select"></div>
+          </div>
+        </section>
+        <section>
+          <h3>案件詳細</h3>
+          <textarea name="detail" rows="6" class="detail-text"
+            placeholder="目的、検体・サンプル、手法、納品物、スケジュール、特記事項など"></textarea>
+        </section>
+        <section>
+          <h3>リンク</h3>
+          <div class="links-edit">
+            <div class="link-field">
+              <label>BOX<input name="box_url" type="url" placeholder="https://"></label>
+              <a class="open-link" data-for="box_url" target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
+            </div>
+            <div class="link-field">
+              <label>Teams<input name="teams_url" type="url" placeholder="https://"></label>
+              <a class="open-link" data-for="teams_url" target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
+            </div>
+            <div class="link-field">
+              <label>案件概要書<input name="overview_url" type="url" placeholder="https://"></label>
+              <a class="open-link" data-for="overview_url" target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
+            </div>
+            <div class="link-field">
+              <label>試験計画書<input name="plan_url" type="url" placeholder="https://"></label>
+              <a class="open-link" data-for="plan_url" target="_blank" rel="noopener noreferrer" aria-disabled="true">開く ↗</a>
+            </div>
+          </div>
+        </section>
+        <p class="error" id="case-error"></p>
+        <div class="form-actions">
+          <button type="button" id="btn-delete" class="danger-outline">案件を削除</button>
+          <span class="spacer"></span>
+          <button type="button" data-close>閉じる</button>
+          <button type="submit" class="primary" id="btn-save">保存</button>
+        </div>
+      </form>
+
+      <div id="logs">
+      <div class="log-tabs seg" role="tablist">
+        <button type="button" data-log="weekly" class="on">週次進捗メモ</button>
+        <button type="button" data-log="monthly">月報</button>
+      </div>
+      <section id="notes-section" class="notes">
+        <form id="note-form" class="note-form">
+          <div class="note-week">
+            <label>週 <input type="date" name="week" required></label>
+            <span id="note-week-label" class="hint"></span>
+          </div>
+          <textarea name="body" rows="4" required placeholder="今週の進捗、課題、次週の予定など"></textarea>
+          <div class="note-actions">
+            <span id="note-state" class="hint"></span>
+            <button type="submit" class="primary">進捗を保存</button>
+          </div>
+        </form>
+        <ol id="note-list" class="note-list"></ol>
+      </section>
+
+      <section id="monthly-section" class="notes" hidden>
+        <form id="monthly-form" class="note-form">
+          <div class="note-week">
+            <label>月 <input type="month" name="month" required></label>
+            <span id="monthly-label" class="hint"></span>
+          </div>
+          <textarea name="body" rows="6" required placeholder="今月の実施内容、成果、課題、来月の予定など"></textarea>
+          <div class="note-actions">
+            <span id="monthly-state" class="hint"></span>
+            <button type="submit" class="primary">月報を保存</button>
+          </div>
+        </form>
+        <ol id="monthly-list" class="note-list"></ol>
+      </section>
+      </div>
+
+      <!-- ガントチャートのタスク（PJ名 = この案件番号） -->
+      <section id="tasks-section" class="case-tasks">
+        <h3>ガントチャートのタスク <span id="case-task-count" class="hint"></span>
+          <a id="case-task-link" class="jump-link">ガントチャートで表示 ↗</a></h3>
+        <div id="case-task-list"></div>
+      </section>
+    </div>
+  </dialog>
+
+  <!-- CSV インポート -->
+  <dialog id="dlg-import">
+    <form id="form-import" method="dialog">
+      <h2>案件 CSV インポート</h2>
+      <p id="import-filename" class="filename"></p>
+      <ul class="import-notes">
+        <li>必須列: <b>案件番号</b>・<b>案件名</b>（列名は CSV エクスポートと同じ。UTF-8 / Shift_JIS）</li>
+        <li>案件番号が一致する案件は<b>更新</b>、一致しない案件は<b>追加</b>されます</li>
+        <li>更新時、空欄のセルや CSV に無い列は元の値のまま残ります</li>
+        <li>領域は「、」やスペース区切りで複数指定できます。未登録の顧客・PJ名・領域・案件番号は自動登録されます</li>
+        <li>「月報_2026-09」「週次_2026-09-21」のような日付の列は、その月の月報・その週の週次進捗メモとして登録されます（同じ月・週は上書き、空欄は変更なし）</li>
+        <li>エラーのある行が 1 行でもあれば、何も取り込まれません</li>
+      </ul>
+      <p class="error" id="import-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="primary">取り込む</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 案件削除（案件番号入力で確認） -->
+  <dialog id="dlg-delete">
+    <form id="form-delete" method="dialog">
+      <h2 class="danger">案件の削除</h2>
+      <p>案件と、その週次進捗メモをすべて削除します。<strong>この操作は元に戻せません。</strong></p>
+      <label><span>確認のため、案件番号 <strong id="delete-no"></strong> を入力してください</span>
+        <input name="confirm" autocomplete="off">
+      </label>
+      <p class="error" id="delete-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="danger-btn" disabled>削除する</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/cases.js"></script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ガントチャート</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="toolbar">
+    <nav class="nav">
+      <a href="/" class="active">ガントチャート</a>
+      <a href="/cases">案件管理</a>
+      <a href="/platforms">基盤技術</a>
+      <a href="/services">サービス</a>
+      <a href="/documents">共有資料</a>
+      <a href="/links">参考リンク</a>
+      <a href="/admin">管理</a>
+    </nav>
+    <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
+    <div class="tools">
+      <button id="btn-add" class="primary">＋ タスク追加</button>
+      <input id="q" type="search" class="search" placeholder="PJ名・タスク名・担当者で検索">
+      <label class="filter">領域
+        <select id="filter-areas"><option value="">すべて</option></select>
+      </label>
+      <label class="filter">PJ名
+        <select id="filter-projects"><option value="">すべて</option></select>
+      </label>
+      <span id="pj-actions" class="pj-actions" hidden>
+        <a id="pj-jump" class="button" title="この案件を案件管理で開く">案件管理で開く ↗</a>
+      </span>
+      <label class="filter">担当者
+        <select id="filter-assignees"><option value="">すべて</option></select>
+      </label>
+      <span class="sep"></span>
+      <label class="filter">表示
+        <select id="zoom">
+          <option value="36">日（広い）</option>
+          <option value="26" selected>日</option>
+          <option value="14">週</option>
+          <option value="6">月</option>
+        </select>
+      </label>
+      <button id="btn-today">今日へ移動</button>
+      <button id="btn-compact" title="担当者・優先度・日付の列を折りたたむ">列を折りたたむ</button>
+      <span class="legend">
+        <span><i style="background:#ffd4d4;border:1px solid #e5484d"></i>期限超過</span>
+        <span><i style="background:#ffe2b3;border:1px solid #f5a524"></i>期限3日以内</span>
+      </span>
+      <span class="sep"></span>
+      <a id="btn-export" class="button" href="/api/export.csv">CSV エクスポート</a>
+      <button id="btn-import">CSV インポート</button>
+      <input type="file" id="import-file" accept=".csv,text/csv" hidden>
+    </div>
+  </header>
+
+  <main id="scroller" class="scroller">
+    <div id="gantt" class="gantt"></div>
+  </main>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <!-- タスク追加 / 詳細 -->
+  <dialog id="dlg-task">
+    <form id="form-task" method="dialog">
+      <h2 id="task-title">タスク追加</h2>
+      <p id="task-meta" class="task-meta" hidden></p>
+      <label>領域 <select name="area" required></select></label>
+      <label><span>PJ名</span>
+        <span class="select-add"><select name="project"></select>
+          <a class="button pj-link" id="t-pj-link" hidden>開く ↗</a></span>
+      </label>
+      <label>タスク <input name="task" required placeholder="例: 発現変動解析"></label>
+      <label>担当者 <input name="assignee" placeholder="例: 田中"></label>
+      <label>優先度
+        <select name="priority">
+          <option>高</option><option selected>中</option><option>低</option>
+        </select>
+      </label>
+      <div class="row2">
+        <label>開始日 <input type="date" name="start_date" required></label>
+        <label>終了日 <input type="date" name="end_date" required></label>
+      </div>
+      <label>詳細 <textarea name="detail" rows="7" placeholder="目的、手順、サンプル情報、メモなど"></textarea></label>
+      <p class="error" id="task-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="primary" id="task-submit">追加</button>
+      </div>
+    </form>
+  </dialog>
+
+
+  <!-- タスク削除（誤削除防止のため名前入力で確認） -->
+  <dialog id="dlg-delete">
+    <form id="form-delete" method="dialog">
+      <h2 class="danger">タスクの削除</h2>
+      <p>次のタスクを削除します。<strong>この操作は元に戻せません。</strong></p>
+      <p id="delete-summary" class="summary"></p>
+      <label><span>確認のため、本日の日付 <strong id="delete-name"></strong>（8 桁）を入力してください</span>
+        <input name="confirm" autocomplete="off" inputmode="numeric" placeholder="例: 20260927">
+      </label>
+      <p class="error" id="delete-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="danger-btn" disabled>削除する</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- CSV インポート -->
+  <dialog id="dlg-import">
+    <form id="form-import" method="dialog">
+      <h2>CSV インポート</h2>
+      <p class="hint">列: id, 領域, PJ名, タスク, 担当者, 優先度, 開始日, 終了日（UTF-8 / Shift_JIS）</p>
+      <p id="import-filename" class="filename"></p>
+      <label class="radio"><input type="radio" name="mode" value="append" checked>
+        追加・更新（id が一致するタスクは上書き、それ以外は追加）</label>
+      <label class="radio"><input type="radio" name="mode" value="replace">
+        置き換え（既存タスクをすべて削除してから取り込み）</label>
+      <label id="replace-confirm" hidden>確認のため「置き換え」と入力してください
+        <input name="confirm" autocomplete="off">
+      </label>
+      <p class="error" id="import-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="primary">取り込む</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

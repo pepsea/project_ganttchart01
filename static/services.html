@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>サービス</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/services.css">
+</head>
+<body>
+  <header class="toolbar">
+    <nav class="nav">
+      <a href="/">ガントチャート</a>
+      <a href="/cases">案件管理</a>
+      <a href="/platforms">基盤技術</a>
+      <a href="/services" class="active">サービス</a>
+      <a href="/documents">共有資料</a>
+      <a href="/links">参考リンク</a>
+      <a href="/admin">管理</a>
+    </nav>
+    <div class="tools">
+      <button id="btn-add" class="primary">＋ サービス追加</button>
+      <input id="q" type="search" class="search" placeholder="サービス名・番号・基盤番号で検索">
+      <label class="filter">領域 <select id="f-area"><option value="">すべて</option></select></label>
+      <label class="filter">メンバー <select id="f-person"><option value="">すべて</option></select></label>
+      <span class="sep"></span>
+      <a class="button" id="btn-export" href="/api/services/export.csv" title="表示中の絞り込み（領域・メンバー）を反映">CSV エクスポート</a>
+      <button id="btn-import">CSV インポート</button>
+      <input type="file" id="import-file" accept=".csv,text/csv" hidden>
+    </div>
+    <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
+  </header>
+
+  <!-- 親リンク（サービス画面の一番上） -->
+  <div class="parent-bar">
+    <span class="parent-lbl">親リンク</span>
+    <span id="parent-link"></span>
+    <button id="btn-parent-edit" class="edit-btn" title="親リンクを設定・変更">✎</button>
+  </div>
+
+  <div class="svc-layout">
+    <!-- 左 1/3: 主要サービスパッケージ -->
+    <aside class="pkg-panel">
+      <div class="pkg-head">
+        <h2>主要サービスパッケージ</h2>
+        <button id="btn-pkg-add" class="primary">＋ パッケージ追加</button>
+      </div>
+      <div id="pkg-list" class="pkg-list"></div>
+    </aside>
+
+    <!-- 右 2/3: サービス一覧 -->
+    <main class="svc-main">
+      <p id="svc-count" class="hint"></p>
+      <div id="svc-list" class="svc-list"></div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <!-- サービスの追加・編集 -->
+  <dialog id="dlg-svc">
+    <form id="form-svc" method="dialog" autocomplete="off">
+      <h2 id="svc-title">サービス追加</h2>
+      <div class="svc-grid">
+        <label><span>サービス番号 <span class="req">*</span></span><input name="service_no" required placeholder="例: S-001"></label>
+        <label><span>サービス名 <span class="req">*</span></span><input name="name" required placeholder="例: 血漿プロテオーム解析サービス"></label>
+        <label><span>PL</span><input name="pl" placeholder="例: 田中"></label>
+        <label><span>担当者（複数はスペース区切り）</span><input name="members" placeholder="例: 佐藤 鈴木"></label>
+      </div>
+      <div class="field">
+        <span class="field-label">領域（複数選択可）</span>
+        <div id="svc-areas" class="chips-select"></div>
+      </div>
+      <div class="field">
+        <span class="field-label">関連する基盤技術（複数選択可）</span>
+        <div id="svc-platforms" class="chips-select platforms"></div>
+      </div>
+      <div class="svc-grid three">
+        <label><span>BOX</span><input name="box_url" type="url" placeholder="https://"></label>
+        <label><span>サービス紹介資料（日本語）</span><input name="intro_ja_url" type="url" placeholder="https://"></label>
+        <label><span>サービス紹介資料（英語）</span><input name="intro_en_url" type="url" placeholder="https://"></label>
+      </div>
+      <label><span>サービスのゴール</span><textarea name="goal" rows="3" placeholder="このサービスで実現したいこと・目指す姿"></textarea></label>
+      <label><span>課題</span><textarea name="issues" rows="4" placeholder="現状の課題、解決すべきこと（1 行に 1 つ）"></textarea></label>
+      <p class="error" id="svc-error"></p>
+      <div class="actions svc-actions">
+        <button type="button" id="svc-delete" class="danger-outline">削除…</button>
+        <span class="spacer"></span>
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="primary" id="svc-submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 親リンクの設定 -->
+  <dialog id="dlg-parent">
+    <form id="form-parent" method="dialog" autocomplete="off">
+      <h2>親リンクの設定</h2>
+      <p class="hint">サービス画面の一番上に表示するリンクです（例: 全社のサービス一覧、事業部のポータル）。</p>
+      <label><span>表示名</span><input name="label" placeholder="例: 受託解析サービス ポータル"></label>
+      <label><span>URL</span><input name="url" type="url" placeholder="https://"></label>
+      <p class="error" id="parent-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- パッケージの追加・編集 -->
+  <dialog id="dlg-pkg">
+    <form id="form-pkg" method="dialog" autocomplete="off">
+      <h2 id="pkg-title">パッケージ追加</h2>
+      <label><span>パッケージ名 <span class="req">*</span></span><input name="name" required placeholder="例: マルチオミクス統合解析パッケージ"></label>
+      <div class="svc-grid three">
+        <label><span>パッケージ資料（日本語）</span><input name="intro_ja_url" type="url" placeholder="https://"></label>
+        <label><span>パッケージ資料（英語）</span><input name="intro_en_url" type="url" placeholder="https://"></label>
+        <label><span>BOX</span><input name="box_url" type="url" placeholder="https://"></label>
+      </div>
+      <div class="field">
+        <span class="field-label">関連サービス（複数選択可）</span>
+        <div id="pkg-services" class="chips-select platforms"></div>
+      </div>
+      <p class="error" id="pkg-error"></p>
+      <div class="actions svc-actions">
+        <button type="button" id="pkg-delete" class="danger-outline">削除…</button>
+        <span class="spacer"></span>
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="primary" id="pkg-submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- パッケージの削除（パスワードで確認） -->
+  <dialog id="dlg-pkg-delete">
+    <form id="form-pkg-delete" method="dialog">
+      <h2 class="danger">パッケージの削除</h2>
+      <p>次のパッケージを削除します。<strong>この操作は元に戻せません。</strong>（サービスは削除されません）</p>
+      <p id="pkg-delete-target" class="summary"></p>
+      <label><span>確認のため、パスワードを入力してください</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <p class="error" id="pkg-delete-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="danger-btn">削除する</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- CSV インポート -->
+  <dialog id="dlg-import">
+    <form id="form-import" method="dialog">
+      <h2>サービス CSV インポート</h2>
+      <p id="import-filename" class="filename"></p>
+      <ul class="import-notes">
+        <li>列名は CSV エクスポートと同じ（必須: <b>サービス番号</b>。新規は<b>サービス名</b>も必須）。UTF-8 / Shift_JIS</li>
+        <li>サービス番号が一致するサービスは<b>更新</b>、一致しないものは<b>追加</b>されます</li>
+        <li>更新時、空欄のセルや CSV に無い列は元の値のまま残ります</li>
+        <li>領域・関連する基盤技術は「、」やスペース区切りで複数指定。基盤番号は管理サイトに登録済みのものだけ使えます</li>
+        <li>エラーのある行が 1 行でもあれば、何も取り込まれません</li>
+      </ul>
+      <p class="error" id="import-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="primary">取り込む</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- サービスの削除（パスワードで確認） -->
+  <dialog id="dlg-svc-delete">
+    <form id="form-svc-delete" method="dialog">
+      <h2 class="danger">サービスの削除</h2>
+      <p>次のサービスを削除します。<strong>この操作は元に戻せません。</strong>（ガントチャートのタスクは削除されません）</p>
+      <p id="svc-delete-target" class="summary"></p>
+      <label><span>確認のため、パスワードを入力してください</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <p class="error" id="svc-delete-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="danger-btn">削除する</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/services.js"></script>
+</body>
+</html>

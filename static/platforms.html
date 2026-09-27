@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>基盤技術</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/platforms.css">
+</head>
+<body>
+  <header class="toolbar">
+    <nav class="nav">
+      <a href="/">ガントチャート</a>
+      <a href="/cases">案件管理</a>
+      <a href="/platforms" class="active">基盤技術</a>
+      <a href="/services">サービス</a>
+      <a href="/documents">共有資料</a>
+      <a href="/links">参考リンク</a>
+      <a href="/admin">管理</a>
+    </nav>
+    <details class="export-menu" id="export-menu">
+      <summary class="button">CSV エクスポート ▾</summary>
+      <div class="export-panel">
+        <p class="hint" id="export-scope"></p>
+        <a class="export-item backup" data-export="export-backup.csv">
+          <b>全データ（バックアップ用）</b>
+          <span>基盤・目標・ディスカッション・月報をすべて 1 ファイルに。インポートすると、データが空の状態からでも元に戻せます</span>
+        </a>
+        <a class="export-item" data-export="export.csv">
+          <b>基盤一覧＋月報</b>
+          <span>1 基盤 1 行。全体目標・目標の達成状況に加え、月報をすべて月ごとの列に展開</span>
+        </a>
+        <div class="export-item monthly">
+          <b>月報一覧</b>
+          <span>基盤 × 月で 1 行。月を指定するとその月の全基盤の月報のみ</span>
+          <div class="row">
+            <input type="month" id="export-month">
+            <a class="button primary-link" data-export="export-monthly.csv" data-month>この月を出力</a>
+            <a class="button" data-export="export-monthly.csv">全期間を出力</a>
+          </div>
+        </div>
+        <a class="export-item" data-export="export-goals.csv">
+          <b>目標一覧</b>
+          <span>基盤ごとの目標（状態・期限・メモ）</span>
+        </a>
+        <a class="export-item" data-export="export-topics.csv">
+          <b>ディスカッション一覧</b>
+          <span>日付・トピック・内容（決定事項・宿題）</span>
+        </a>
+      </div>
+    </details>
+    <button id="btn-import">CSV インポート</button>
+    <input type="file" id="import-file" accept=".csv,text/csv" hidden>
+    <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
+  </header>
+
+  <div class="pf-layout">
+    <!-- 基盤の一覧 -->
+    <aside class="pf-list">
+      <div class="pf-list-head">
+        <b>基盤一覧</b>
+        <a href="/admin" class="hint">基盤番号の登録は管理サイト ↗</a>
+      </div>
+      <div class="pf-list-filter">
+        <label class="filter">領域 <select id="f-area"><option value="">すべて</option></select></label>
+        <label class="filter">メンバー <select id="f-person"><option value="">すべて</option></select></label>
+      </div>
+      <ul id="pf-items"></ul>
+    </aside>
+
+    <!-- 選択した基盤の詳細 -->
+    <main class="pf-detail" id="detail">
+      <p class="hint pf-empty">左の一覧から基盤を選択してください。</p>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <!-- CSV インポート -->
+  <dialog id="dlg-import">
+    <form id="form-import" method="dialog">
+      <h2>基盤技術 CSV インポート</h2>
+      <p id="import-filename" class="filename"></p>
+      <p class="hint">エクスポートした 5 種類の CSV を取り込めます（種類は列名から自動判別。UTF-8 / Shift_JIS）。</p>
+      <ul class="import-notes">
+        <li><b>全データ（バックアップ用）</b>: 基盤・目標・ディスカッション・月報をすべて復元（データが空でも元に戻せる。取り込み直しても重複しない）</li>
+        <li><b>基盤一覧＋月報</b>: 基盤番号で照合して基盤名・領域・PL・メンバー・全体目標を更新。「月報_YYYY-MM」列はその月の月報として登録・上書き。未登録の基盤番号は新規登録</li>
+        <li><b>月報一覧</b>: 月＋基盤番号で登録・上書き</li>
+        <li><b>目標一覧</b>: 基盤番号＋目標で照合し、状態・期限・メモを更新（なければ追加）</li>
+        <li><b>ディスカッション一覧</b>: 基盤番号＋日付＋トピックで照合し、内容を更新（なければ追加）</li>
+        <li>空欄のセルは元の値のまま。削除は行いません。エラーのある行が 1 行でもあれば何も取り込みません</li>
+      </ul>
+      <p class="error" id="import-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="primary">取り込む</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 目標の追加・編集（目標をクリックで開く） -->
+  <dialog id="dlg-goal">
+    <form id="form-goal" method="dialog">
+      <h2 id="goal-title">目標の編集</h2>
+      <p id="goal-meta" class="hint"></p>
+      <div class="goal-form-grid">
+        <label><span>状態</span><select name="status"></select></label>
+        <label><span>期限</span><input type="date" name="due_date"></label>
+      </div>
+      <label><span>目標 <span class="req">*</span></span><input name="title" required placeholder="例: プロテオーム解析の自動化"></label>
+      <label><span>メモ</span><textarea name="note" rows="4" placeholder="補足、達成条件、関連情報など"></textarea></label>
+      <label><span>リンク</span><input name="url" type="url" placeholder="https://（資料・報告書など）"></label>
+      <p class="error" id="goal-error"></p>
+      <div class="actions goal-actions">
+        <button type="button" id="goal-delete" class="danger-outline">削除…</button>
+        <span class="spacer"></span>
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="primary" id="goal-submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 目標・月報の削除（パスワードで確認） -->
+  <dialog id="dlg-goal-delete">
+    <form id="form-goal-delete" method="dialog">
+      <h2 class="danger" id="goal-delete-title">目標の削除</h2>
+      <p><span id="goal-delete-lead">次の目標を削除します。</span><strong>この操作は元に戻せません。</strong></p>
+      <p id="goal-delete-name" class="summary"></p>
+      <label><span>確認のため、パスワードを入力してください</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <p class="error" id="goal-delete-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="danger-btn">削除する</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="/static/platforms.js"></script>
+</body>
+</html>

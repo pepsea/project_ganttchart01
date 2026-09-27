@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>管理サイト</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+  <header class="toolbar">
+    <nav class="nav">
+      <a href="/">ガントチャート</a>
+      <a href="/cases">案件管理</a>
+      <a href="/platforms">基盤技術</a>
+      <a href="/services">サービス</a>
+      <a href="/documents">共有資料</a>
+      <a href="/links">参考リンク</a>
+      <a href="/admin" class="active">管理</a>
+    </nav>
+    <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
+    <p class="admin-lead">選択肢（マスタ）の登録・修正・削除を行います。名前を修正すると使用中のタスク・案件にも反映されます。使用中の項目は削除できません（項目にマウスを置くと使用状況を表示）。</p>
+  </header>
+
+  <main class="admin">
+    <div id="cards" class="admin-grid"></div>
+
+    <!-- バックアップ・復元（全データ） -->
+    <section class="admin-card backup-card">
+      <header>
+        <h2>バックアップ <span class="count">全データ（ガントチャート・案件管理・基盤技術・選択肢）</span></h2>
+        <p class="desc">すべての記録を 1 つのファイル（JSON）に保存し、そのファイルから元に戻せます。サーバーにも月 1 回と、アプリの起動（アップデート）のたびに自動で保存しています。</p>
+      </header>
+      <div class="backup-body">
+        <div class="backup-actions">
+          <a class="button primary-link" href="/api/admin/backup" id="btn-download">⬇ 今すぐバックアップをダウンロード</a>
+          <button id="btn-server-save">サーバーに保存</button>
+          <button id="btn-restore-file">ファイルから復元…</button>
+          <input type="file" id="restore-file" accept=".json,application/json" hidden>
+        </div>
+        <div id="backup-summary" class="backup-summary"></div>
+        <h3>サーバーに保存されたバックアップ <span class="hint" id="auto-keep"></span></h3>
+        <ul id="server-backups" class="server-backups"></ul>
+      </div>
+    </section>
+  </main>
+
+  <!-- サーバー上のバックアップの削除（パスワードで確認） -->
+  <dialog id="dlg-backup-delete">
+    <form id="form-backup-delete" method="dialog">
+      <h2 class="danger">バックアップの削除</h2>
+      <p>次のバックアップをサーバーから削除します。<strong>この操作は元に戻せません。</strong></p>
+      <p id="backup-delete-target" class="summary"></p>
+      <label><span>確認のため、パスワードを入力してください</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <p class="error" id="backup-delete-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="danger-btn">削除する</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 復元（パスワードで確認） -->
+  <dialog id="dlg-restore">
+    <form id="form-restore" method="dialog">
+      <h2 class="danger">バックアップから復元</h2>
+      <p>現在の<strong>すべてのデータを、バックアップの内容に置き換えます。</strong>
+        復元の直前の状態はサーバーに自動保存されるので、あとから戻すこともできます。</p>
+      <p id="restore-target" class="summary"></p>
+      <label><span>確認のため、パスワードを入力してください</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <p class="error" id="restore-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="danger-btn">復元する</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script src="/static/admin.js"></script>
+</body>
+</html>
