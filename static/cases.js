@@ -73,12 +73,21 @@ function areaColor(area) {
   return `hsl(${(210 + i * 67) % 360} 62% 50%)`;
 }
 
+// 終了予定日: 過ぎたら赤（overdue）、2 週間を切ったらオレンジ（soon）。アフターフォロー・キャンセルは対象外
+const SOON_DAYS = 14;
+const daysToEnd = (c) => Math.round((parseDate(c.end_date) - todayMs()) / DAY_MS);
 function deadlineStatus(c) {
   if (!c.end_date || NO_DEADLINE.has(c.status)) return "";
-  const left = Math.round((parseDate(c.end_date) - todayMs()) / DAY_MS);
+  const left = daysToEnd(c);
   if (left < 0) return "overdue";
-  if (left <= 3) return "soon";
+  if (left < SOON_DAYS) return "soon";
   return "";
+}
+function deadlineTitle(c) {
+  if (!c.end_date) return "終了予定日: 未設定";
+  const left = daysToEnd(c);
+  const note = left < 0 ? `（${-left} 日超過）` : left === 0 ? "（本日）" : `（あと ${left} 日）`;
+  return `終了予定日: ${c.end_date}${NO_DEADLINE.has(c.status) ? "" : note}`;
 }
 
 async function api(path, options = {}) {
@@ -202,9 +211,9 @@ function linkIcons(c) {
 }
 
 function dueLabel(c) {
-  if (!c.end_date) return null;
-  const span = el("span", `due ${deadlineStatus(c)}`, `〜${shortDate(c.end_date)}`);
-  span.title = `終了予定日: ${c.end_date}`;
+  const span = el("span", `due-label ${deadlineStatus(c)}${c.end_date ? "" : " none"}`);
+  span.append(el("small", "", "終了予定"), c.end_date ? shortDate(c.end_date) : "未設定");
+  span.title = deadlineTitle(c);
   return span;
 }
 
@@ -254,8 +263,7 @@ function renderCard(c) {
 
   const top = el("div", "card-top");
   top.append(caseNoTag(c));
-  const due = dueLabel(c);
-  if (due) top.append(due);
+  top.append(dueLabel(c));
   card.append(top, el("div", "title", c.name));
   if (c.customer) card.append(el("div", "cust", c.customer));
 
@@ -340,9 +348,14 @@ function renderList() {
     cell(people(c).join("、"));
     cell(areaChips(c));
     cell(c.start_date || "", "nowrap");
-    const endTd = cell(c.end_date || "", "nowrap");
-    const ds = deadlineStatus(c);
-    if (ds) endTd.append(el("span", `due ${ds}`, ds === "overdue" ? " 超過" : " 間近"));
+    const endTd = cell("", "nowrap");
+    if (c.end_date) {
+      const ds = deadlineStatus(c);
+      const d = el("span", `due-label ${ds}`, c.end_date);
+      if (ds) d.append(el("small", "", ds === "overdue" ? " 超過" : " 2週間以内"));
+      d.title = deadlineTitle(c);
+      endTd.append(d);
+    }
     cell(linkIcons(c), "nowrap");
     const memo = cell("", "memo-cell");
     if (c.last_note_date) memo.append(el("span", "wk", `${shortDate(c.last_note_date)}（全 ${c.note_count} 件）`), c.last_note);
