@@ -189,23 +189,14 @@ function areaChips(c) {
   return box;
 }
 
+// 最初の画面（カード・一覧）には未設定のリンクだけを赤で出す（設定済みのリンクは詳細画面の「開く」から）
 function linkIcons(c) {
   const box = el("span", "links");
   for (const [key, short, label] of LINKS) {
-    const url = safeUrl(c[key]);
-    if (url) {
-      const a = el("a", "link-ic", short);
-      a.href = url;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      a.title = `${label}を開く`;
-      a.addEventListener("click", (e) => e.stopPropagation());
-      box.append(a);
-    } else {
-      const s = el("span", "link-ic", short);
-      s.title = `${label}: 未設定`;
-      box.append(s);
-    }
+    if (safeUrl(c[key])) continue;
+    const s = el("span", "link-ic", short);
+    s.title = `${label}: 未設定（案件を開いて登録）`;
+    box.append(s);
   }
   return box;
 }
@@ -303,7 +294,7 @@ async function changeStatus(c, status) {
 const COLUMNS = [
   ["status", "状況"], ["case_no", "案件番号"], ["customer", "顧客名"], ["name", "案件名"], ["pl", "PL"],
   ["assignees", "担当者"], ["areas", "領域"], ["start_date", "開始日"], ["end_date", "終了予定日"],
-  ["links", "リンク"], ["last_note_date", "最新の進捗"],
+  ["links", "未設定リンク"], ["last_note_date", "最新の進捗"],
 ];
 
 function renderList() {
