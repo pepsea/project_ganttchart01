@@ -276,10 +276,12 @@ function renderDetail() {
   if (p.owner) team.append(el("span", "role", "PL"), el("b", "", p.owner));
   if (p.members) team.append(el("span", "role", "メンバー"), el("span", "", people(p).join("・")));
   if (!p.owner && !p.members) team.append(el("span", "hint", "PL・メンバー未設定"));
+  // 研究計画・BOX・Teams のリンクはメンバーの隣に並べる
+  const links = el("span", "pf-links");
+  links.append(el("span", "role", "リンク"), linkButton("研究計画", p.plan_url, "研究計画"),
+    linkButton("BOX", p.box_url, "BOX"), linkButton("Teams", p.teams_url, "Teams"));
+  team.append(links);
   titleBox.append(team);
-  const links = el("div", "pf-links");
-  links.append(linkButton("研究計画", p.plan_url, "研究計画"), linkButton("BOX", p.box_url, "BOX"),
-    linkButton("Teams", p.teams_url, "Teams"));
   // この基盤に関連するサービス（サービス画面へのリンク）
   const related = state.services.filter((s) => s.platforms.includes(p.name));
   if (related.length) {
@@ -292,9 +294,8 @@ function renderDetail() {
       a.rel = "noopener";
       rel.append(a);
     }
-    titleBox.append(links, rel);
+    titleBox.append(rel);
   }
-  if (!titleBox.contains(links)) titleBox.append(links);
   head.append(titleBox, el("span", "spacer"));
 
   const open = state.goals.filter((g) => g.status !== "達成" && g.status !== "保留");

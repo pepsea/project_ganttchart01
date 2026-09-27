@@ -469,3 +469,10 @@ table.tasks td { border-bottom-color: var(--line); }
 .pf-services .role { font-size: 10.5px; font-weight: 700; color: var(--muted); border: 1px solid var(--line-strong); border-radius: 4px; padding: 0 5px; }
 .svc-chip { color: var(--accent); text-decoration: none; font-weight: 600; border: 1px solid #c9d7fb; background: #f4f7ff; border-radius: 6px; padding: 1px 8px; }
 .svc-chip:hover { border-color: var(--accent); }
+
+/* 研究計画・BOX・Teams: メンバーの隣（縦線で区切る）。未設定は赤背景 */
+.team-line { align-items: center; }
+.team-line .pf-links { display: inline-flex; align-items: center; gap: 5px; margin: 0 0 0 6px; padding-left: 12px; border-left: 1px solid var(--line-strong); }
+.team-line .pf-links .role { margin-right: 2px; }
+.team-line .pf-link { font-size: 12px; padding: 1px 10px; }
+.team-line span.pf-link { background: #ffd4d4; color: #a3161b; border: 1px solid #f2b8b9; }
