@@ -805,9 +805,8 @@ function renderTasks(p, tasks) {
     return sec;
   }
   const table = el("table", "tasks");
-  table.innerHTML = "<thead><tr><th>タスク</th><th>領域</th><th>担当者</th><th>優先度</th><th>期間</th><th>終了日</th></tr></thead>";
+  table.innerHTML = "<thead><tr><th>タスク</th><th>領域</th><th>担当者</th><th>優先度</th><th>開始日</th><th>終了日</th><th>残り日数</th></tr></thead>";
   const tbody = el("tbody");
-  const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
   for (const t of tasks) {
     const tr = el("tr");
     const left = daysLeft(t.end_date);
@@ -819,9 +818,12 @@ function renderTasks(p, tasks) {
     td(t.assignee || "—", "nowrap");
     const pr = td(t.priority, "nowrap prio");
     pr.dataset.v = t.priority;
-    td(`${md(t.start_date)} 〜 ${md(t.end_date)}`, "nowrap");
-    const end = td(slashDate(t.end_date), `nowrap ${due}`);
-    if (due) end.title = due === "overdue" ? `期限超過（${-left} 日経過）` : `期限まであと ${left} 日`;
+    td(slashDate(t.start_date), "nowrap");
+    td(slashDate(t.end_date), "nowrap");
+    // 終了日までの日数: 1 週間以内は赤文字、終了日を過ぎたら赤背景に白文字
+    const rest = left < 0 ? `${-left} 日超過` : left === 0 ? "今日まで" : `あと ${left} 日`;
+    const rc = td(rest, `nowrap days-left${left < 0 ? " over" : left <= 7 ? " near" : ""}`);
+    rc.title = `終了日 ${t.end_date}（${rest}）`;
     tbody.append(tr);
   }
   table.append(tbody);

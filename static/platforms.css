@@ -514,3 +514,8 @@ table.pf-table .goal-cell .meter { width: 70px; flex: 0 0 70px; }
 .pf-backbar { display: flex; align-items: center; gap: 12px; padding: 8px 20px; border-bottom: 1px solid var(--line-strong); background: #f7f9fc; }
 .pf-backbar button { padding: 3px 12px; font-weight: 600; }
 .pf-detail-view .pf-detail { flex: 1; }
+
+/* ガントチャートのタスク: 終了日までの日数（1 週間以内は赤文字、終了日を過ぎたら赤背景に白文字） */
+table.tasks td.days-left { font-variant-numeric: tabular-nums; text-align: right; }
+table.tasks td.days-left.near { color: var(--today); font-weight: 700; }
+table.tasks td.days-left.over { background: var(--today); color: #fff; font-weight: 700; }
