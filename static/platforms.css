@@ -519,3 +519,4 @@ table.pf-table .goal-cell .meter { width: 70px; flex: 0 0 70px; }
 table.tasks td.days-left { font-variant-numeric: tabular-nums; text-align: right; }
 table.tasks td.days-left.near { color: var(--today); font-weight: 700; }
 table.tasks td.days-left.over { background: var(--today); color: #fff; font-weight: 700; }
+table.tasks td.t-name.active { background: #dbe8ff; color: #1f4fbf; font-weight: 600; }

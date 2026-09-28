@@ -811,8 +811,10 @@ function renderTasks(p, tasks) {
     const tr = el("tr");
     const left = daysLeft(t.end_date);
     const due = left < 0 ? "overdue" : left <= 3 ? "soon" : "";
+    // 実施中 = 今日が開始日〜終了日の間（期限超過・3 日以内の色を優先。ガントチャートと同じ）
+    const active = !due && daysLeft(t.start_date) <= 0 ? "active" : "";
     const td = (text, c = "") => { const x = el("td", c, text); tr.append(x); return x; };
-    const name = td(t.task, due ? `t-name ${due}` : "t-name");
+    const name = td(t.task, `t-name ${due || active}`.trim());
     if (t.detail) name.title = t.detail;
     td(t.area, "nowrap");
     td(t.assignee || "—", "nowrap");
