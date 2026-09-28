@@ -2,7 +2,8 @@
 
 - バックアップは JSON（全テーブルの全行）。テーブル・列はデータベースから自動で読み取るので、今後項目が増えても対象になる
 - 復元は全データの置き換え。パスワードが必要で、直前の状態を自動でサーバーに保存してから実行する
-- サーバーには毎週日曜日に自動でバックアップを保存し、直近 AUTO_KEEP 週分を残す（日曜に止まっていたときは、次に動いたときに保存）
+- サーバーには毎週日曜日に自動でバックアップを保存する（日曜に止まっていたときは、次に動いたときに保存）
+- サーバー上のバックアップは、作成から KEEP_DAYS 日（約 3 か月）を過ぎたら自動で削除する（最新の 1 つは残す）
 - バックアップファイルはダウンロードでき、手元のファイルをサーバーにアップロード（保存のみ。復元は別操作）もできる
 - アプリの起動のたび（アップデートでテーブルを更新する前）にもバックアップを保存し、直近 STARTUP_KEEP 回分を残す
 - 復元のあとには MIGRATIONS（テーブルの作成・列の追加）を実行し、古い形式のバックアップも新しいアプリで使えるようにする
@@ -26,7 +27,8 @@ router = APIRouter(prefix="/api/admin", tags=["バックアップ"])
 BACKUP_DIR = DATA_DIR / "backups"
 FORMAT = "gantt-pm-backup"
 VERSION = 1
-AUTO_KEEP = 26  # 自動バックアップ（毎週日曜日）を残す数 = 26 週（約半年）分
+AUTO_KEEP = 14  # 自動バックアップ（毎週日曜日）を残す数の上限 = 14 週分
+KEEP_DAYS = 92  # サーバー上のバックアップを残す日数（約 3 か月）。これより古いものは自動で削除
 STARTUP_KEEP = 10
 NAME_RE = re.compile(r"^(auto|manual|pre-restore|startup|upload)-\d{8}-\d{6}\.json$")
 MIGRATIONS: list = []  # main.py が登録する（テーブルの作成・列の追加）
@@ -198,10 +200,34 @@ def ensure_weekly_backup(now: datetime | None = None) -> str | None:
     return name
 
 
+def _created(name: str) -> datetime | None:
+    """ファイル名（種類-YYYYmmdd-HHMMSS.json）から作成日時"""
+    m = re.search(r"(\d{8}-\d{6})\.json$", name)
+    return datetime.strptime(m.group(1), "%Y%m%d-%H%M%S") if m else None
+
+
+def prune_old_backups(now: datetime | None = None) -> list[str]:
+    """作成から KEEP_DAYS 日を過ぎたサーバー上のバックアップを削除する（すべての種類。最新の 1 つは必ず残す）"""
+    if not BACKUP_DIR.exists():
+        return []
+    limit = (now or datetime.now()) - timedelta(days=KEEP_DAYS)
+    files = [(c, f) for f in BACKUP_DIR.glob("*.json") if NAME_RE.match(f.name) and (c := _created(f.name))]
+    if not files:
+        return []
+    newest = max(files)[1]
+    removed = []
+    for created, f in files:
+        if created < limit and f != newest:
+            f.unlink(missing_ok=True)
+            removed.append(f.name)
+    return removed
+
+
 async def auto_backup_loop() -> None:
     while True:
         try:
             ensure_weekly_backup()
+            prune_old_backups()
         except Exception as e:  # noqa: BLE001  バックアップの失敗でアプリを止めない
             print(f"[backup] 自動バックアップに失敗しました: {e}")
         await asyncio.sleep(3600)
@@ -226,7 +252,7 @@ def download_backup() -> Response:
 def current_summary() -> dict:
     data = dump()
     return {"tables": summary(data), "server_backups": list_server_backups(), "auto_keep": AUTO_KEEP,
-            "startup_keep": STARTUP_KEEP}
+            "startup_keep": STARTUP_KEEP, "keep_days": KEEP_DAYS}
 
 
 @router.post("/backups", status_code=201)

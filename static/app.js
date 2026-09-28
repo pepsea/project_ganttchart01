@@ -886,7 +886,8 @@ $("#btn-today").addEventListener("click", () => scrollToDate(todayMs(), true));
 $("#btn-compact").addEventListener("click", (e) => {
   const c = centerDate();
   state.compact = !state.compact;
-  e.target.textContent = state.compact ? "列を展開" : "列を折りたたむ";
+  e.target.textContent = state.compact ? "展開" : "折り畳み";
+  e.target.title = state.compact ? "折りたたんだ列を元に戻す" : "担当者・優先度・日付の列を折りたたむ";
   render();
   scrollToDate(c, true);
 });

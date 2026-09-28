@@ -17,6 +17,12 @@ services:
       # 既定は Docker ボリューム gantt-data。Linux サーバーでは .env で DATA_PATH=./data（ホストのフォルダ）を推奨
       - ${DATA_PATH:-gantt-data}:/data
     restart: unless-stopped
+    # ログの上限: 1 ファイル 10MB × 3 ファイル（古いものから自動で消える）
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   gantt-data:

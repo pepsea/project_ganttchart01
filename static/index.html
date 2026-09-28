@@ -44,18 +44,19 @@
           <option value="6">月</option>
         </select>
       </label>
-      <button id="btn-today">今日へ移動</button>
-      <button id="btn-compact" title="担当者・優先度・日付の列を折りたたむ">列を折りたたむ</button>
-      <span class="legend">
+      <button id="btn-today" title="今日の位置へ移動">今日</button>
+      <button id="btn-compact" title="担当者・優先度・日付の列を折りたたむ">折り畳み</button>
+      <span class="sep"></span>
+      <a id="btn-export" class="button" href="/api/export.csv" title="CSV エクスポート">CSV E</a>
+      <button id="btn-import" title="CSV インポート">CSV I</button>
+      <input type="file" id="import-file" accept=".csv,text/csv" hidden>
+    </div>
+    <!-- 2 行目: 色の説明 -->
+      <span class="legend legend-row">
         <span><i style="background:#ffd4d4;border:1px solid #e5484d"></i>期限超過</span>
         <span><i style="background:#ffe2b3;border:1px solid #f5a524"></i>期限3日以内</span>
         <span><i style="background:#dbe8ff;border:1px solid #3b6fe0"></i>実施中</span>
       </span>
-      <span class="sep"></span>
-      <a id="btn-export" class="button" href="/api/export.csv">CSV エクスポート</a>
-      <button id="btn-import">CSV インポート</button>
-      <input type="file" id="import-file" accept=".csv,text/csv" hidden>
-    </div>
   </header>
 
   <main id="scroller" class="scroller">

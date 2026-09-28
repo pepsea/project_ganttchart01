@@ -236,7 +236,7 @@ async function loadBackups() {
     s.append(`${t.label} `, el("b", "", String(t.rows)));
     sum.append(s);
   }
-  $("#auto-keep").textContent = `（毎週日曜日の自動保存は直近 ${d.auto_keep} 週分、起動時の保存は直近 ${d.startup_keep} 回分を保持）`;
+  $("#auto-keep").textContent = `（毎週日曜日と起動時に自動保存。作成から ${d.keep_days} 日（約 3 か月）を過ぎたものは自動で削除）`;
   const ul = $("#server-backups");
   ul.innerHTML = "";
   if (!d.server_backups.length) ul.append(el("li", "empty", "まだありません"));

@@ -9,11 +9,12 @@ function setupCsvTools(opts) {
   const exp = document.createElement("a");
   exp.className = "button";
   exp.href = opts.exportUrl;
-  exp.textContent = "CSV エクスポート";
-  exp.title = "すべてのデータを CSV でダウンロード（このファイルをインポートすれば元に戻せます）";
+  exp.textContent = "CSV E";
+  exp.title = "CSV エクスポート：すべてのデータを CSV でダウンロード（このファイルをインポートすれば元に戻せます）";
   const imp = document.createElement("button");
   imp.type = "button";
-  imp.textContent = "CSV インポート";
+  imp.textContent = "CSV I";
+  imp.title = "CSV インポート";
   const file = document.createElement("input");
   file.type = "file";
   file.accept = ".csv,text/csv";

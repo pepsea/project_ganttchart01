@@ -481,3 +481,9 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 /* ガントチャート: タスクごとの区切り線（表・タイムラインとも薄い線で区切る） */
 .g-row:not(.g-head) { border-bottom: 1px solid #d3d8e0; }
 .g-row:not(.g-head):nth-child(even) .g-track { background: rgba(120, 130, 150, .035); }
+
+/* ガントチャート: 色の説明はツールバーの 2 行目 */
+.legend-row { flex-basis: 100%; padding-top: 2px; order: 100; } /* ログアウト（order: 99）より後ろ */
+/* ガントチャート: ログアウトは 1 行目（メニューの行）の右端に置き、ツールバーを 3 行に収める */
+.toolbar:has(.legend-row) .logout { order: 1; }
+.toolbar:has(.legend-row) .tools { order: 2; }
