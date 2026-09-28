@@ -207,7 +207,7 @@ class CaseIn(BaseModel):
     customer: str = ""
     name: str = Field(min_length=1)
     detail: str = ""
-    status: Status = "顧客開発"
+    status: Status = "打診"  # 案件追加の初期値
     pl: str = ""
     assignees: str = ""
     areas: list[str] = []
@@ -524,7 +524,7 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                     label = "開始日" if key == "start_date" else "終了予定日"
                     data[key] = parse_date(v, line, label).isoformat() if v else None
                 elif key == "status":
-                    data[key] = v or data.get("status") or "顧客開発"
+                    data[key] = v or data.get("status") or "打診"
                 else:
                     data[key] = v
             try:

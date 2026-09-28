@@ -687,7 +687,7 @@ function openDrawer(c = null) {
     $("#d-no").textContent = "新規";
     $("#d-dates").textContent = "";
     $("#d-title").textContent = "案件追加";
-    sel.value = state.status || "顧客開発";
+    sel.value = state.status || "打診"; // 案件追加の初期値は「打診」（状況で絞り込み中ならその状況）
     renderAreaChecks(state.area ? [state.area] : []);
     $("#case-top-actions").hidden = true;
     $("#btn-delete").hidden = true;
