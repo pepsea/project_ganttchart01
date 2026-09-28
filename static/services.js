@@ -89,7 +89,7 @@ function filtered() {
   return state.services.filter((s) =>
     (!state.area || s.areas.includes(state.area)) &&
     (!state.person || s.pl === state.person || people(s).includes(state.person)) &&
-    (!q || [s.service_no, s.name, ...s.platforms, ...s.platforms.map(platformTitle)]
+    (!q || [s.service_no, s.name, s.pl, s.members, s.goal, ...s.areas, ...s.platforms, ...s.platforms.map(platformTitle)]
       .some((v) => (v || "").toLowerCase().includes(q))));
 }
 
@@ -100,6 +100,7 @@ function refreshFilters() {
   for (const a of state.areas) fa.append(new Option(a, a));
   if (!state.areas.includes(state.area)) state.area = "";
   fa.value = state.area;
+  renderAreaChips();
 
   const names = [...new Set(state.services.flatMap((s) => [s.pl, ...people(s)]).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, "ja"));
@@ -417,6 +418,29 @@ function renderPackages() {
     card.append(svcs);
     box.append(card);
   }
+}
+
+// 領域の札（すべて + 各領域）。押すとその領域で絞り込み、もう一度押すと解除
+function renderAreaChips() {
+  const box = $("#area-chips");
+  box.innerHTML = "";
+  const counts = Object.fromEntries(state.areas.map((a) => [a, state.services.filter((s) => s.areas.includes(a)).length]));
+  const chip = (value, label, n) => {
+    const b = el("button", `area-chip${state.area === value ? " on" : ""}`);
+    b.type = "button";
+    if (value) b.style.setProperty("--c", areaColor(value));
+    b.append(label, el("span", "n", String(n)));
+    b.addEventListener("click", () => {
+      state.area = state.area === value ? "" : value;
+      $("#f-area").value = state.area;
+      renderAreaChips();
+      render();
+      syncExport();
+    });
+    box.append(b);
+  };
+  chip("", "すべて", state.services.length);
+  for (const a of state.areas) if (counts[a]) chip(a, a, counts[a]);
 }
 
 // 関連サービスをクリック: 絞り込みで隠れていれば解除して、右側でそのサービスを開く

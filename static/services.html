@@ -20,11 +20,6 @@
       <a href="/links">参考リンク</a>
       <a href="/admin">管理</a>
     </nav>
-    <div class="tools">
-      <input id="q" type="search" class="search" placeholder="サービス名・番号・基盤番号で検索">
-      <label class="filter">領域 <select id="f-area"><option value="">すべて</option></select></label>
-      <label class="filter">メンバー <select id="f-person"><option value="">すべて</option></select></label>
-    </div>
     <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
     <!-- CSV（全画面共通: ログアウトの隣） -->
     <span class="csv-tools">
@@ -56,6 +51,13 @@
       <div class="pkg-head svc-head">
         <h2>サービス一覧 <span id="svc-count" class="hint"></span></h2>
         <button id="btn-add" class="primary">＋ サービス追加</button>
+      </div>
+      <!-- 絞り込み: 検索・領域（札を押して選ぶ）・メンバー -->
+      <div class="svc-filter">
+        <input id="q" type="search" class="search" placeholder="サービス名・番号・基盤・PL・担当者・領域で検索">
+        <label class="filter">メンバー <select id="f-person"><option value="">すべて</option></select></label>
+        <select id="f-area" hidden><option value="">すべて</option></select>
+        <div id="area-chips" class="area-chips" role="group" aria-label="領域で絞り込み"></div>
       </div>
       <div id="svc-list" class="svc-list"></div>
     </main>
