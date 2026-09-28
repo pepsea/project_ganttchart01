@@ -511,3 +511,7 @@ a.link-ic.free { background: #2fa36b; border-color: #2fa36b; max-width: 9em; ove
 /* 案件番号の検索欄 */
 .case-no-q { width: 100%; margin-bottom: 4px; font-size: 12.5px; }
 .select-add select[name="case_no"] { width: 100%; max-width: 100%; }
+
+/* 詳細画面の一番上: 案件の終了・削除 */
+.case-top-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 0 0 12px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+.case-top-actions .archive-note { margin: 0; flex-basis: 100%; }

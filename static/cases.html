@@ -59,6 +59,12 @@
       <button type="button" class="icon-btn" data-close title="閉じる">✕</button>
     </div>
     <div class="drawer-body">
+      <!-- 案件の終了・削除（一番上） -->
+      <div class="case-top-actions" id="case-top-actions">
+        <button type="button" id="btn-finish" class="finish-btn" title="案件を終了してアーカイブ（カンバンの一番右）へ移す">✓ 案件を終了</button>
+        <button type="button" id="btn-delete" class="danger-outline">案件を削除</button>
+        <p class="hint archive-note" id="archive-note" hidden>この案件は終了（アーカイブ）しています。戻すときは「状況」を選び直して「保存」してください。</p>
+      </div>
       <form id="case-form" class="case-form" autocomplete="off">
         <section>
           <h3>基本情報</h3>
@@ -87,12 +93,8 @@
           <textarea name="detail" rows="6" class="detail-text"
             placeholder="目的、検体・サンプル、手法、納品物、スケジュール、特記事項など"></textarea>
         </section>
-        <p class="hint archive-note" id="archive-note" hidden>この案件は終了（アーカイブ）しています。戻すときは上の「状況」を選び直して「保存」してください。</p>
         <p class="error" id="case-error"></p>
         <div class="form-actions">
-          <button type="button" id="btn-delete" class="danger-outline">案件を削除</button>
-          <button type="button" id="btn-finish" class="finish-btn" title="案件を終了してアーカイブ（カンバンの一番右）へ移す">✓ 案件を終了</button>
-          <button type="button" id="btn-add-trial" title="案件番号・企業名・顧客名・案件名を引き継いで、新しい試験を登録">＋ 同じ案件番号で試験を追加</button>
           <span class="spacer"></span>
           <button type="button" data-close>閉じる</button>
           <button type="submit" class="primary" id="btn-save">保存</button>

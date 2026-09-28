@@ -596,8 +596,8 @@ function openDrawer(c = null) {
     for (const k of ["name", "detail", "status", "pl", "assignees", "start_date", "end_date",
       "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url", "contact"]) form[k].value = c[k] || "";
     renderAreaChecks(c.areas);
+    $("#case-top-actions").hidden = false;
     $("#btn-delete").hidden = false;
-    $("#btn-add-trial").hidden = false;
     $("#btn-finish").hidden = c.status === ARCHIVE;
     $("#archive-note").hidden = c.status !== ARCHIVE;
     $("#logs").hidden = false;
@@ -609,8 +609,8 @@ function openDrawer(c = null) {
     $("#d-title").textContent = "案件追加";
     sel.value = state.status || "顧客開発";
     renderAreaChecks(state.area ? [state.area] : []);
+    $("#case-top-actions").hidden = true;
     $("#btn-delete").hidden = true;
-    $("#btn-add-trial").hidden = true;
     $("#btn-finish").hidden = true;
     $("#archive-note").hidden = true;
     $("#logs").hidden = true;
@@ -619,7 +619,9 @@ function openDrawer(c = null) {
   syncLinks();
   syncNoCopy();
   if (!drawer.open) drawer.showModal();
-  (c ? $("#note-form").body : form.case_no).focus();
+  // 一番上（終了・削除ボタン）から表示する。入力欄にフォーカスしても画面は動かさない
+  (c ? $("#note-form").body : form.case_no).focus({ preventScroll: true });
+  $("#drawer .drawer-body").scrollTop = 0;
 }
 
 // 案件の終了: アーカイブ（カンバンの一番右）へ移す。戻すときは状況を選び直して保存
@@ -628,24 +630,6 @@ $("#btn-finish").addEventListener("click", async () => {
   if (!c) return;
   await changeStatus(c, ARCHIVE);
   if (c.status === ARCHIVE) drawer.close();
-});
-
-// 同じ案件番号で試験を追加: 案件番号・企業名・顧客名（個人名）・案件名・PL・担当者・領域を引き継いで新規入力
-$("#btn-add-trial").addEventListener("click", () => {
-  const c = state.current;
-  if (!c) return;
-  openDrawer(null);
-  fillCaseNoSelect(c.case_no);
-  fillCustomerSelect(c.customer || "");
-  form.contact.value = c.contact || "";
-  form.name.value = c.name;
-  form.pl.value = c.pl || "";
-  form.assignees.value = c.assignees || "";
-  renderAreaChecks(c.areas);
-  $("#d-no").textContent = `${c.case_no}（新しい試験）`;
-  $("#d-title").textContent = "同じ案件番号で試験を追加";
-  syncNoCopy();
-  form.name.focus();
 });
 
 form.addEventListener("submit", async (e) => {
