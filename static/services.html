@@ -24,12 +24,14 @@
       <input id="q" type="search" class="search" placeholder="サービス名・番号・基盤番号で検索">
       <label class="filter">領域 <select id="f-area"><option value="">すべて</option></select></label>
       <label class="filter">メンバー <select id="f-person"><option value="">すべて</option></select></label>
-      <span class="sep"></span>
+    </div>
+    <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
+    <!-- CSV（全画面共通: ログアウトの隣） -->
+    <span class="csv-tools">
       <a class="button" id="btn-export" href="/api/services/export.csv" title="CSV エクスポート：表示中の絞り込み（領域・メンバー）を反映">CSV E</a>
       <button id="btn-import" title="CSV インポート">CSV I</button>
       <input type="file" id="import-file" accept=".csv,text/csv" hidden>
-    </div>
-    <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
+    </span>
   </header>
 
   <!-- 親リンク（サービス画面の一番上） -->

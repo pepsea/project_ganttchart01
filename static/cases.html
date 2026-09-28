@@ -21,6 +21,12 @@
       <a href="/admin">管理</a>
     </nav>
     <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
+    <!-- CSV（全画面共通: ログアウトの隣） -->
+    <span class="csv-tools">
+      <a class="button" href="/api/cases/export.csv" title="CSV エクスポート">CSV E</a>
+      <button id="btn-import" title="CSV インポート">CSV I</button>
+      <input type="file" id="import-file" accept=".csv,text/csv" hidden>
+    </span>
     <div class="tools">
       <button id="btn-add" class="primary">＋ 案件追加</button>
       <div class="seg" role="tablist" id="view-tabs">
@@ -33,10 +39,6 @@
       <label class="filter">領域 <select id="f-area"><option value="">すべて</option></select></label>
       <label class="filter">担当 <select id="f-person"><option value="">すべて</option></select></label>
       <label class="filter check"><input type="checkbox" id="f-cancel"> キャンセルも表示</label>
-      <span class="sep"></span>
-      <a class="button" href="/api/cases/export.csv" title="CSV エクスポート">CSV E</a>
-      <button id="btn-import" title="CSV インポート">CSV I</button>
-      <input type="file" id="import-file" accept=".csv,text/csv" hidden>
     </div>
   </header>
 

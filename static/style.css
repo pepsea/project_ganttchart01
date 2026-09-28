@@ -487,3 +487,9 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 
 /* ガントチャート: 色の説明はツールバーの 2 行目 */
 .toolbar > .legend-row { flex-basis: 100%; padding-top: 2px; order: 100; } /* ツールバーの最後の行 */
+
+/* CSV E / CSV I は全画面でログアウトの隣（1 行目） */
+.toolbar > .csv-tools { order: 1; display: inline-flex; align-items: center; gap: 6px; }
+.toolbar > .csv-tools .export-menu { margin-left: 0; }
+.toolbar > .csv-tools #btn-import { margin-left: 0; }
+.toolbar > .csv-tools .export-panel { right: auto; left: 0; }  /* 左寄りに置いたので、メニューは右へ開く */

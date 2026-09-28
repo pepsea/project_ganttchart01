@@ -3,9 +3,10 @@
 // CSV エクスポート・インポートのボタン（共有資料・参考リンク・グループ目標で共通）
 // setupCsvTools({ exportUrl, importUrl, note, summary(result) => 文字列, after: async () => 再読み込み, toast })
 function setupCsvTools(opts) {
-  const tools = document.querySelector(".toolbar .tools");
-  const sep = document.createElement("span");
-  sep.className = "sep";
+  // 全画面共通: ログアウトの隣に置く
+  const tools = document.createElement("span");
+  tools.className = "csv-tools";
+  document.querySelector(".toolbar .logout").after(tools);
   const exp = document.createElement("a");
   exp.className = "button";
   exp.href = opts.exportUrl;
@@ -19,7 +20,7 @@ function setupCsvTools(opts) {
   file.type = "file";
   file.accept = ".csv,text/csv";
   file.hidden = true;
-  tools.append(sep, exp, imp, file);
+  tools.append(exp, imp, file);
 
   imp.addEventListener("click", () => {
     file.value = "";
