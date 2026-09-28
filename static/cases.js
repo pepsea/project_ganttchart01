@@ -506,16 +506,34 @@ function renderAreaChecks(selected) {
   }
 }
 
-// 案件番号: 登録済みの番号をすべて選べる（同じ番号で試験が複数ある場合は「試験名」で区別）
+// 案件番号の選択肢: 登録済みの番号（検索欄で番号・案件名から絞り込める）。
+// 終了（アーカイブ）した案件だけの番号は出さない（今の案件の番号は残す）。同じ番号で試験が複数ある場合は「試験名」で区別
 function fillCaseNoSelect(current = "") {
-  const used = new Set(state.cases.filter((x) => x.id !== state.current?.id).map((x) => x.case_no));
-  const opts = [...state.masters.case_nos];
+  const others = state.cases.filter((x) => x.id !== state.current?.id);
+  const byNo = new Map();
+  for (const c of others) {
+    if (!byNo.has(c.case_no)) byNo.set(c.case_no, []);
+    byNo.get(c.case_no).push(c);
+  }
+  const finished = (n) => byNo.has(n) && byNo.get(n).every((c) => c.status === ARCHIVE);
+  let opts = state.masters.case_nos.filter((n) => n === current || !finished(n));
   if (current && !opts.includes(current)) opts.push(current);
+  const label = (n) => {
+    const cs = byNo.get(n) || [];
+    return cs.length ? `${n}｜${cs[0].name}（登録済み・試験を追加）` : n;
+  };
+  const q = ($("#case-no-q").value || "").trim().toLowerCase();
+  if (q) opts = opts.filter((n) => n === current || label(n).toLowerCase().includes(q));
   const sel = form.case_no;
   sel.innerHTML = "";
-  sel.append(new Option(opts.length ? "選択してください" : "案件番号がありません（管理サイトで登録）", ""));
-  for (const n of opts) sel.append(new Option(used.has(n) ? `${n}（登録済み・試験を追加）` : n, n));
+  sel.append(new Option(opts.length ? (q ? `${opts.length} 件見つかりました` : "選択してください") : (q ? "該当する案件番号がありません" : "案件番号がありません（管理サイトで登録）"), ""));
+  for (const n of opts) sel.append(new Option(label(n), n));
   sel.value = current;
+  // 検索で 1 件に絞れたら自動で選ぶ
+  if (q && !current && opts.length === 1) {
+    sel.value = opts[0];
+    syncNoCopy();
+  }
 }
 
 // 詳細パネル: 案件番号（= PJ名）からガントチャートへ移動
@@ -530,6 +548,8 @@ function syncNoCopy() {
   }
 }
 form.case_no.addEventListener("change", syncNoCopy);
+// 検索し直すたびに絞り込み直す（編集中の案件の番号だけは常に残す）
+$("#case-no-q").addEventListener("input", () => fillCaseNoSelect(state.current?.case_no || ""));
 
 function fillCustomerSelect(current = "") {
   const opts = [...state.masters.customers];
@@ -568,6 +588,7 @@ function openDrawer(c = null) {
   const sel = form.status;
   sel.innerHTML = "";
   for (const s of state.statuses) sel.append(new Option(s, s));
+  $("#case-no-q").value = "";
   fillCaseNoSelect(c?.case_no || "");
   fillCustomerSelect(c?.customer || "");
   if (c) {

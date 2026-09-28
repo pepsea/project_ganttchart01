@@ -507,3 +507,6 @@ a.link-ic.free { background: #2fa36b; border-color: #2fa36b; max-width: 9em; ove
 .finish-btn { background: #2fa36b; border-color: #2fa36b; color: #fff; font-weight: 600; }
 .finish-btn:hover { filter: brightness(1.08); }
 .archive-note { background: #eef0f3; border-radius: 6px; padding: 6px 10px; }
+
+/* 案件番号の検索欄 */
+.case-no-q { width: 100%; margin-bottom: 4px; font-size: 12.5px; }
