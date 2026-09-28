@@ -630,6 +630,12 @@ function openDrawer(c = null) {
   fillCustomerSelect(c?.customer || "");
   if (c) {
     $("#d-no").textContent = caseLabel(c);
+    // 登録日・終了日（自動で記録。右上に薄く表示）
+    const day = (v) => (v ? v.slice(0, 10).replaceAll("-", "/") : "");
+    $("#d-dates").textContent = [c.created_at && `登録 ${day(c.created_at)}`, c.finished_at && `終了 ${day(c.finished_at)}`]
+      .filter(Boolean).join("　");
+    $("#d-dates").title = [c.created_at && `登録日時 ${c.created_at.slice(0, 16)}`, c.finished_at && `終了日時 ${c.finished_at.slice(0, 16)}`]
+      .filter(Boolean).join("\n");
     $("#d-title").textContent = c.name;
     for (const k of ["name", "detail", "status", "pl", "assignees", "start_date", "end_date",
       "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url", "contact"]) form[k].value = c[k] || "";
@@ -644,6 +650,7 @@ function openDrawer(c = null) {
     loadCaseTasks(c);
   } else {
     $("#d-no").textContent = "新規";
+    $("#d-dates").textContent = "";
     $("#d-title").textContent = "案件追加";
     sel.value = state.status || "顧客開発";
     renderAreaChecks(state.area ? [state.area] : []);

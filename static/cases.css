@@ -533,3 +533,6 @@ a.link-ic.free { background: #2fa36b; border-color: #2fa36b; max-width: 9em; ove
 .card.mini { padding: 6px 10px; gap: 2px; }
 .card.mini .title { font-size: 12.5px; font-weight: 600; }
 .card.mini .mini-link { display: none; }
+
+/* 詳細画面の右上: 登録日・終了日（自動で記録）を薄く */
+.d-dates { margin-left: auto; margin-right: 10px; font-size: 11.5px; color: #a0a6b1; white-space: nowrap; align-self: flex-start; padding-top: 4px; font-variant-numeric: tabular-nums; }

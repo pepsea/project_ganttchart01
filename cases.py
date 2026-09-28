@@ -92,7 +92,8 @@ def init_db() -> None:
         if not has_progress:
             db.execute(LEGACY_NOTES_COPY)
         cols = {r["name"] for r in db.execute("PRAGMA table_info(cases)")}
-        for col in ("project", "detail", *FREE_LINK_COLS, "trial", "contact"):  # trial = 試験名 / contact = 顧客名（個人名）
+        # trial = 試験名 / contact = 顧客名（個人名）/ finished_at = 終了日時（アーカイブにした日時。自動）
+        for col in ("project", "detail", *FREE_LINK_COLS, "trial", "contact", "finished_at"):
             if col not in cols:
                 db.execute(f"ALTER TABLE cases ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
         if sample_data_enabled() and db.execute("SELECT COUNT(*) FROM cases").fetchone()[0] == 0:
@@ -308,6 +309,24 @@ def fetch_case(db: sqlite3.Connection, case_id: int) -> dict:
     return to_case(row)
 
 
+def sync_finished(db: sqlite3.Connection, case_id: int) -> None:
+    """終了日時を自動で記録: アーカイブにしたらその日時（既にあればそのまま）、アーカイブ以外に戻したら空欄"""
+    db.execute("""UPDATE cases SET finished_at = CASE WHEN status = 'アーカイブ'
+                    THEN COALESCE(NULLIF(finished_at, ''), datetime('now', 'localtime')) ELSE '' END
+                  WHERE id = ?""", (case_id,))
+
+
+def parse_datetime(value: str, line: int, col: str) -> str:
+    """CSV の日時（YYYY-MM-DD[ HH:MM[:SS]]、/ 区切りも可）を YYYY-MM-DD HH:MM:SS に"""
+    v = value.strip().replace("/", "-").replace("T", " ")
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(v, fmt).strftime("%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            pass
+    raise HTTPException(422, f"{line} 行目: {col}「{value}」を日時として解釈できません（YYYY-MM-DD または YYYY-MM-DD HH:MM）")
+
+
 def case_label(case_no: str, trial: str) -> str:
     if not trial:
         return case_no
@@ -363,7 +382,8 @@ def list_statuses() -> list[str]:
 # エクスポートの基本列（月報・進捗メモの列はこの後ろに日付ごとに並ぶ）
 EXPORT_HEADERS = ["案件番号", "試験名", "状況", "企業名", "顧客名（個人名）", "案件名", "PL", "担当者", "領域", "開始日", "終了予定日",
                   "BOXリンク", "Teamsリンク", "案件概要書リンク", "試験計画書リンク", "案件詳細",
-                  "自由リンク1の名前", "自由リンク1", "自由リンク2の名前", "自由リンク2"]
+                  "自由リンク1の名前", "自由リンク1", "自由リンク2の名前", "自由リンク2",
+                  "登録日", "終了日"]  # 登録日 = 案件を登録した日時、終了日 = アーカイブにした日時（どちらも自動で記録）
 # 日付パターンの列名: 月報_YYYY-MM / 進捗_YYYY-MM-DD（旧形式の 週次_YYYY-MM-DD も読み込める）
 MONTH_COL = re.compile(r"^月報_(\d{4})[-/](\d{1,2})$")
 NOTE_COL = re.compile(r"^(?:進捗|週次)_(\d{4}[-/]\d{1,2}[-/]\d{1,2})$")
@@ -407,6 +427,7 @@ def export_csv() -> Response:
                     " ".join(c["areas"]), c["start_date"] or "", c["end_date"] or "",
                     c["box_url"], c["teams_url"], c["overview_url"], c["plan_url"], c["detail"],
                     c["link1_label"], c["link1_url"], c["link2_label"], c["link2_url"],
+                    (c["created_at"] or "")[:16], (c["finished_at"] or "")[:16],
                     *(monthly.get((c["id"], m), "") for m in months),
                     *(notes.get((c["id"], wk), "") for wk in weeks)])
     filename = f"cases_{datetime.now():%Y%m%d_%H%M%S}.csv"
@@ -439,6 +460,7 @@ IMPORT_ALIASES = {
     "案件概要書リンク": "overview_url", "案件概要書": "overview_url", "overview_url": "overview_url",
     "試験計画書リンク": "plan_url", "試験計画書": "plan_url", "plan_url": "plan_url",
     "案件詳細": "detail", "detail": "detail",
+    "登録日": "created_at", "終了日": "finished_at",
     "自由リンク1の名前": "link1_label", "自由リンク1": "link1_url", "自由リンク2の名前": "link2_label", "自由リンク2": "link2_url",
     "最新進捗週": "note_week", "最新進捗メモ": "note_body",  # 旧形式
 }
@@ -523,6 +545,15 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                     c.values()).lastrowid
                 added += 1
 
+            # 登録日・終了日（CSV に書いてあれば、その日時で記録。無ければ自動）
+            if rec.get("created_at"):
+                db.execute("UPDATE cases SET created_at = ? WHERE id = ?",
+                           (parse_datetime(rec["created_at"], line, "登録日"), case_id))
+            if rec.get("finished_at"):
+                db.execute("UPDATE cases SET finished_at = ? WHERE id = ?",
+                           (parse_datetime(rec["finished_at"], line, "終了日"), case_id))
+            sync_finished(db, case_id)
+
             if rec.get("note_week") and rec.get("note_body"):
                 day = parse_date(rec["note_week"], line, "最新進捗週").isoformat()
                 _import_note(db, case_id, day, rec["note_body"])
@@ -557,6 +588,7 @@ def create_case(c: CaseIn) -> dict:
             f"INSERT INTO cases({', '.join(CASE_COLS)}) VALUES ({', '.join('?' * len(CASE_COLS))})",
             c.values(), c.case_no,
         )
+        sync_finished(db, cur.lastrowid)
         return fetch_case(db, cur.lastrowid)
 
 
@@ -573,6 +605,7 @@ def update_case(case_id: int, c: CaseIn) -> dict:
             " updated_at = datetime('now', 'localtime') WHERE id = ?",
             (*c.values(), case_id), c.case_no,
         )
+        sync_finished(db, case_id)
         return fetch_case(db, case_id)
 
 
@@ -582,6 +615,7 @@ def update_status(case_id: int, s: StatusIn) -> dict:
         fetch_case(db, case_id)
         db.execute("UPDATE cases SET status = ?, updated_at = datetime('now', 'localtime') WHERE id = ?",
                    (s.status, case_id))
+        sync_finished(db, case_id)
         return fetch_case(db, case_id)
 
 
