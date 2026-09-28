@@ -554,6 +554,7 @@ function fillCaseNoSelect(current = "") {
   const finished = (n) => byNo.has(n) && byNo.get(n).every((c) => c.status === ARCHIVE);
   let opts = state.masters.case_nos.filter((n) => n === current || !finished(n));
   if (current && !opts.includes(current)) opts.push(current);
+  sortNames(opts);
   // 表示は番号だけ。プルダウンの中の検索欄では、番号と案件名で探せる（data-search）
   const sel = form.case_no;
   sel.innerHTML = "";
@@ -583,9 +584,13 @@ form.case_no.addEventListener("change", syncNoCopy);
 searchSelect(form.case_no, { placeholder: "番号・案件名で検索" });
 searchSelect(form.customer, { placeholder: "企業名で検索", allowEmpty: true });
 
+// 選択肢の並び: 数字は数の順（C-2026-2 → C-2026-10）、日本語は五十音順
+const sortNames = (list) => list.sort((a, b) => a.localeCompare(b, "ja", { numeric: true, sensitivity: "base" }));
+
 function fillCustomerSelect(current = "") {
   const opts = [...state.masters.customers];
   if (current && !opts.includes(current)) opts.push(current);
+  sortNames(opts);
   const sel = form.customer;
   sel.innerHTML = "";
   sel.append(new Option("（未選択）", ""));
