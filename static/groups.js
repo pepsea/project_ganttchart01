@@ -129,7 +129,7 @@ async function select(id) {
 }
 
 // ------------------------------------------------------------ 詳細
-// 並び: 見出し → 大目標 → 目標（達成基準・時期）→ 年度ごとの達成したこと → 関連サービス・関連基盤技術
+// 並び: 見出し → 大目標 → 目標（達成基準・時期）→ 年度ごとの達成したこと → 関連基盤技術（目標の達成状況）→ 関連サービス
 function renderDetail() {
   const g = state.groups.find((x) => x.id === state.current);
   const root = $("#detail");
@@ -177,7 +177,7 @@ function renderDetail() {
   vs.append(vh, el("div", `vision-text${g.vision ? "" : " hint"}`, g.vision || "未記入（「✎ 編集」から入力）"));
   root.append(vs);
 
-  root.append(renderGoals(g), renderAchievements(g), renderRelations(g));
+  root.append(renderGoals(g), renderAchievements(g), renderPlatformRelations(g), renderServiceRelations(g));
 }
 
 // ---- 目標（達成基準・時期）: クリックで編集
@@ -281,33 +281,78 @@ function renderAchievements(g) {
   return sec;
 }
 
-// ---- 関連サービス・関連基盤技術（一番下。クリックでそれぞれの画面を別タブで開く）
-function renderRelations(g) {
-  const rel = el("section", "gp-section");
-  const rh = el("h3", "", "関連サービス・関連基盤技術");
-  rh.append(el("span", "hint", "クリックでそれぞれの画面を開く（「✎ 編集」から変更）"));
-  rel.append(rh);
-  const relRow = (label, items, href, nameOf) => {
-    const row = el("div", "rel-row");
-    row.append(el("span", "lbl", label));
-    const chips = el("div", "rel-chips");
-    for (const no of items) {
-      const a = el("a", "rel-chip");
-      a.href = href(no);
-      a.target = "_blank";
-      a.rel = "noopener";
-      a.append(el("b", "", no), nameOf(no), el("span", "arrow", "↗"));
-      chips.append(a);
-    }
-    if (!items.length) chips.append(el("span", "hint", "なし"));
-    row.append(chips);
-    return row;
-  };
-  rel.append(
-    relRow("関連サービス", g.services, (no) => `/services#svc-${encodeURIComponent(no)}`, serviceName),
-    relRow("関連基盤技術", g.platforms, (no) => `/platforms?id=${encodeURIComponent(no)}`, platformName),
-  );
-  return rel;
+// 関連基盤技術（上）: 基盤ごとに目標の達成状況（達成数・進み具合）と目標の一覧
+function renderPlatformRelations(g) {
+  const sec = el("section", "gp-section");
+  const h = el("h3", "", "関連基盤技術");
+  h.append(el("span", "hint", "目標の達成状況（基盤名をクリックで基盤技術の画面を開く。「✎ 編集」から変更）"));
+  sec.append(h);
+  if (!g.platforms.length) {
+    sec.append(el("p", "hint", "なし"));
+    return sec;
+  }
+  const list = el("div", "pf-rel-list");
+  for (const no of g.platforms) {
+    const pf = state.platforms.find((p) => p.name === no) || { name: no, title: "", goal_done: 0, goal_total: 0 };
+    const item = el("div", "pf-rel");
+    const top = el("div", "pf-rel-top");
+    const a = el("a", "pf-rel-name");
+    a.href = `/platforms?id=${encodeURIComponent(no)}`;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.append(el("b", "", no), pf.title || "（基盤名未設定）", el("span", "arrow", "↗"));
+    const meter = el("div", "meter");
+    const bar = el("i");
+    bar.style.width = pf.goal_total ? `${(pf.goal_done / pf.goal_total) * 100}%` : "0";
+    meter.append(bar);
+    const rate = el("span", "pf-rel-rate", pf.goal_total ? `${pf.goal_done} / ${pf.goal_total} 達成` : "目標なし");
+    top.append(a, meter, rate);
+    item.append(top);
+    // 目標の一覧（読み込み後に表示）
+    const ul = el("ul", "pf-rel-goals");
+    ul.append(el("li", "hint", "読み込み中…"));
+    item.append(ul);
+    api(`/api/platforms/${encodeURIComponent(no)}/goals`).then((goals) => {
+      ul.innerHTML = "";
+      if (!goals.length) {
+        ul.append(el("li", "hint", "目標はまだありません"));
+        return;
+      }
+      for (const t of goals) {
+        const li = el("li");
+        const st = el("span", "status-badge", t.status);
+        st.dataset.v = t.status;
+        const due = goalDue(t);
+        li.classList.toggle("done", t.status === "達成");
+        li.append(st, el("span", "g-t", t.title),
+          el("span", `g-due ${due}`, t.due_date ? `期限 ${slashDate(t.due_date)}` : ""));
+        ul.append(li);
+      }
+    }).catch(() => { ul.innerHTML = ""; ul.append(el("li", "hint", "目標を読み込めませんでした")); });
+    list.append(item);
+  }
+  sec.append(list);
+  return sec;
+}
+
+// 関連サービス（下）
+function renderServiceRelations(g) {
+  const sec = el("section", "gp-section");
+  const h = el("h3", "", "関連サービス");
+  h.append(el("span", "hint", "クリックでサービスの画面を開く（「✎ 編集」から変更）"));
+  sec.append(h);
+  const chips = el("div", "rel-chips");
+  for (const no of g.services) {
+    const a = el("a", "rel-chip");
+    a.href = `/services#svc-${encodeURIComponent(no)}`;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.append(el("b", "", no), serviceName(no), el("span", "arrow", "↗"));
+    chips.append(a);
+  }
+  if (!g.services.length) chips.append(el("span", "hint", "なし"));
+  sec.append(chips);
+  return sec;
 }
 
 // ---- 達成したことの追加・編集
