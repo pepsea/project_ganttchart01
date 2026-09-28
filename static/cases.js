@@ -440,16 +440,30 @@ function renderTimeline() {
   const DAY_W = 4;
   const LEFT_W = 320;
   const all = filtered();
-  const dated = all.filter((c) => c.start_date && c.end_date)
-    .sort((a, b) => a.start_date.localeCompare(b.start_date) || byEnd(a, b));
-  const undated = all.length - dated.length;
-
   const today = todayMs();
+  // 日付が分からない案件も表示する: 開始日だけ・終了予定日だけは点線の帯、どちらも無い案件は一番下にまとめる
+  const span = (c) => {
+    if (c.start_date && c.end_date) return { s: parseDate(c.start_date), e: parseDate(c.end_date), kind: "" };
+    if (c.start_date) {
+      const s0 = parseDate(c.start_date);
+      return { s: s0, e: Math.max(today, s0 + 7 * DAY_MS), kind: "no-end" };
+    }
+    if (c.end_date) {
+      const e0 = parseDate(c.end_date);
+      return { s: e0 - 7 * DAY_MS, e: e0, kind: "no-start" };
+    }
+    return null;
+  };
+  const dated = all.filter((c) => span(c))
+    .sort((a, b) => span(a).s - span(b).s || byEnd(a, b));
+  const undated = all.filter((c) => !span(c)).sort(byEnd);
+
   let min = today - 60 * DAY_MS;
   let max = today + 120 * DAY_MS;
   for (const c of dated) {
-    min = Math.min(min, parseDate(c.start_date) - 14 * DAY_MS);
-    max = Math.max(max, parseDate(c.end_date) + 30 * DAY_MS);
+    const { s, e } = span(c);
+    min = Math.min(min, s - 14 * DAY_MS);
+    max = Math.max(max, e + 30 * DAY_MS);
   }
   const m0 = new Date(min);
   const start = Date.UTC(m0.getUTCFullYear(), m0.getUTCMonth(), 1);
@@ -493,7 +507,7 @@ function renderTimeline() {
   head.append(hl, ht);
   tl.append(head, bg);
 
-  for (const c of dated) {
+  const addRow = (c) => {
     const row = el("div", "tl-row");
     const left = el("div", "tl-left");
     left.append(el("span", "no", caseLabel(c)), el("span", "nm", `${c.customer ? c.customer + "｜" : ""}${c.name}`));
@@ -501,21 +515,37 @@ function renderTimeline() {
     left.addEventListener("click", () => openDrawer(c));
     const track = el("div", "tl-track");
     track.style.width = `${W}px`;
-    const bar = el("div", "tl-bar", c.status);
+    const sp = span(c);
+    const bar = el("div", `tl-bar ${sp ? sp.kind : "no-date"}`, c.status);
     bar.style.setProperty("--c", STATUS_COLOR[c.status]);
-    const s = x(parseDate(c.start_date));
-    bar.style.left = `${s}px`;
-    bar.style.width = `${Math.max(x(parseDate(c.end_date) + DAY_MS) - s, 6)}px`;
-    bar.title = `${caseLabel(c)} ${c.name}\n${c.status}\n${c.start_date} 〜 ${c.end_date}`;
-    const after = el("span", "after", [c.pl && `PL ${c.pl}`, shortDate(c.end_date)].filter(Boolean).join(" / "));
-    bar.append(after);
+    let note;
+    if (sp) {
+      const s = x(sp.s);
+      bar.style.left = `${s}px`;
+      bar.style.width = `${Math.max(x(sp.e + DAY_MS) - s, 6)}px`;
+      note = sp.kind === "no-end" ? "終了予定 未定" : sp.kind === "no-start" ? `開始日 未定・〜${shortDate(c.end_date)}` : shortDate(c.end_date);
+    } else {
+      bar.style.left = `${x(today)}px`; // 日付が無い案件は今日の位置に札を置く
+      note = "開始日・終了予定日 未定";
+    }
+    bar.title = `${caseLabel(c)} ${c.name}\n${c.status}\n${c.start_date || "開始日未定"} 〜 ${c.end_date || "終了予定日未定"}`;
+    bar.append(el("span", "after", [c.pl && `PL ${c.pl}`, note].filter(Boolean).join(" / ")));
     bar.addEventListener("click", () => openDrawer(c));
     track.append(bar);
     row.append(left, track);
     tl.append(row);
+  };
+  dated.forEach(addRow);
+  if (undated.length) {
+    const sep = el("div", "tl-row tl-sep");
+    const sl = el("div", "tl-left", `日付未設定（${undated.length} 件）`);
+    const st = el("div", "tl-track");
+    st.style.width = `${W}px`;
+    sep.append(sl, st);
+    tl.append(sep);
+    undated.forEach(addRow);
   }
   view.append(tl);
-  if (undated) view.append(el("div", "tl-note", `※ 開始日・終了予定日が未設定の案件 ${undated} 件はタイムラインに表示されません（カンバン・一覧で確認できます）。`));
   view.scrollLeft = Math.max(0, x(today) - 200);
 }
 
