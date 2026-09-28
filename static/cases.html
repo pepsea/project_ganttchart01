@@ -209,6 +209,22 @@
   </dialog>
 
   <!-- 案件削除（案件番号入力で確認） -->
+  <!-- 案件の終了（アーカイブへ）: 案件番号の入力で確認 -->
+  <dialog id="dlg-finish">
+    <form id="form-finish" method="dialog">
+      <h2>案件の終了</h2>
+      <p>案件 <strong id="finish-target"></strong> を終了し、アーカイブ（カンバンの一番右）へ移します。<br>
+        戻すときは、案件を開いて「状況」を選び直して保存してください。</p>
+      <label><span>確認のため、案件番号 <strong id="finish-no"></strong> を入力してください</span>
+        <input name="confirm" autocomplete="off">
+      </label>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="primary" disabled>終了する</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="dlg-delete">
     <form id="form-delete" method="dialog">
       <h2 class="danger">案件の削除</h2>

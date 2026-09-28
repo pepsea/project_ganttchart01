@@ -319,9 +319,38 @@ function renderCard(c) {
   return card;
 }
 
+// 案件の終了（アーカイブ）の確認: 案件番号を入力しないと「終了する」を押せない
+function confirmFinish(c) {
+  return new Promise((resolve) => {
+    const dlg = $("#dlg-finish");
+    const f = $("#form-finish");
+    const ok = f.querySelector("button[type=submit]");
+    f.reset();
+    ok.disabled = true;
+    $("#finish-target").textContent = `「${caseLabel(c)} ${c.name}」`;
+    $("#finish-no").textContent = `「${c.case_no}」`;
+    let done = false;
+    const finish = (v) => {
+      if (done) return;
+      done = true;
+      f.confirm.oninput = f.onsubmit = null;
+      dlg.querySelector("[data-close]").onclick = null;
+      dlg.onclose = null;
+      if (dlg.open) dlg.close();
+      resolve(v);
+    };
+    f.confirm.oninput = () => { ok.disabled = f.confirm.value.trim() !== c.case_no; };
+    f.onsubmit = (e) => { e.preventDefault(); if (f.confirm.value.trim() === c.case_no) finish(true); };
+    dlg.querySelector("[data-close]").onclick = () => finish(false);
+    dlg.onclose = () => finish(false); // Esc で閉じたとき
+    dlg.showModal();
+    f.confirm.focus();
+  });
+}
+
 async function changeStatus(c, status) {
   if (status === "キャンセル" && !confirm(`案件「${c.name}」をキャンセルにしますか？`)) return;
-  if (status === ARCHIVE && !confirm(`案件「${caseLabel(c)} ${c.name}」を終了してアーカイブに移しますか？\n（戻すときは、案件を開いて状況を選び直して保存）`)) return;
+  if (status === ARCHIVE && !(await confirmFinish(c))) return;
   const prev = c.status;
   try {
     Object.assign(c, await api(`/api/cases/${c.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }));
