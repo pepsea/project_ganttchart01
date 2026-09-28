@@ -438,7 +438,7 @@ function renderList() {
 // ---- タイムライン（開始日〜終了予定日、状況で色分け）
 function renderTimeline() {
   const DAY_W = 4;
-  const LEFT_W = 320;
+  const LEFT_W = 360;
   const all = filtered();
   const today = todayMs();
   // 日付が分からない案件も表示する: 開始日だけ・終了予定日だけは点線の帯、どちらも無い案件は一番下にまとめる
@@ -510,7 +510,11 @@ function renderTimeline() {
   const addRow = (c) => {
     const row = el("div", "tl-row");
     const left = el("div", "tl-left");
-    left.append(el("span", "no", caseLabel(c)), el("span", "nm", `${c.customer ? c.customer + "｜" : ""}${c.name}`));
+    // 2 段: 上に案件番号・企業名（小さく）、下に案件名（太字）
+    const top = el("div", "tl-meta");
+    top.append(el("span", "no", caseLabel(c)));
+    if (c.customer) top.append(el("span", "cu", c.customer));
+    left.append(top, el("div", "nm", c.name));
     left.title = `${caseLabel(c)} ${c.customer} ${c.name}`;
     left.addEventListener("click", () => openDrawer(c));
     const track = el("div", "tl-track");
