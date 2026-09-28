@@ -594,7 +594,7 @@ function openDrawer(c = null) {
     $("#d-no").textContent = caseLabel(c);
     $("#d-title").textContent = c.name;
     for (const k of ["name", "detail", "status", "pl", "assignees", "start_date", "end_date",
-      "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url", "trial", "contact"]) form[k].value = c[k] || "";
+      "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url", "contact"]) form[k].value = c[k] || "";
     renderAreaChecks(c.areas);
     $("#btn-delete").hidden = false;
     $("#btn-add-trial").hidden = false;
@@ -645,14 +645,16 @@ $("#btn-add-trial").addEventListener("click", () => {
   $("#d-no").textContent = `${c.case_no}（新しい試験）`;
   $("#d-title").textContent = "同じ案件番号で試験を追加";
   syncNoCopy();
-  form.trial.focus();
+  form.name.focus();
 });
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const body = {};
   for (const k of ["case_no", "customer", "name", "detail", "status", "pl", "assignees", "start_date", "end_date",
-    "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url", "trial", "contact"]) body[k] = form[k].value.trim();
+    "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url", "contact"]) body[k] = form[k].value.trim();
+  // 試験名（番号）は入力しない: 編集では今の値を引き継ぎ、新規で同じ案件番号があればサーバーが自動で番号を付ける
+  body.trial = state.current && state.current.case_no === body.case_no ? state.current.trial || "" : "";
   body.start_date ||= null;
   body.end_date ||= null;
   body.areas = [...form.querySelectorAll('input[name="areas"]:checked')].map((i) => i.value);
