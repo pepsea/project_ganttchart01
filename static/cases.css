@@ -510,3 +510,4 @@ a.link-ic.free { background: #2fa36b; border-color: #2fa36b; max-width: 9em; ove
 
 /* 案件番号の検索欄 */
 .case-no-q { width: 100%; margin-bottom: 4px; font-size: 12.5px; }
+.select-add select[name="case_no"] { width: 100%; max-width: 100%; }

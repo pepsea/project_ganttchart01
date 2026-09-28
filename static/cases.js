@@ -518,16 +518,14 @@ function fillCaseNoSelect(current = "") {
   const finished = (n) => byNo.has(n) && byNo.get(n).every((c) => c.status === ARCHIVE);
   let opts = state.masters.case_nos.filter((n) => n === current || !finished(n));
   if (current && !opts.includes(current)) opts.push(current);
-  const label = (n) => {
-    const cs = byNo.get(n) || [];
-    return cs.length ? `${n}｜${cs[0].name}（登録済み・試験を追加）` : n;
-  };
+  // 表示は番号だけ（検索は番号と案件名で行う）
+  const searchText = (n) => [n, ...(byNo.get(n) || []).map((c) => c.name)].join(" ").toLowerCase();
   const q = ($("#case-no-q").value || "").trim().toLowerCase();
-  if (q) opts = opts.filter((n) => n === current || label(n).toLowerCase().includes(q));
+  if (q) opts = opts.filter((n) => n === current || searchText(n).includes(q));
   const sel = form.case_no;
   sel.innerHTML = "";
   sel.append(new Option(opts.length ? (q ? `${opts.length} 件見つかりました` : "選択してください") : (q ? "該当する案件番号がありません" : "案件番号がありません（管理サイトで登録）"), ""));
-  for (const n of opts) sel.append(new Option(label(n), n));
+  for (const n of opts) sel.append(new Option(n, n));
   sel.value = current;
   // 検索で 1 件に絞れたら自動で選ぶ
   if (q && !current && opts.length === 1) {
