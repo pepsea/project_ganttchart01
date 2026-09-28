@@ -851,10 +851,10 @@ function syncPjActions() {
   const a = $("#pj-jump");
   if (isCase) {
     a.href = casesUrl(pj);
-    a.textContent = "案件管理で開く ↗";
+    a.textContent = "← 案件管理で開く";
   } else if (isPlatform) {
     a.href = `/platforms?id=${encodeURIComponent(pj)}`;
-    a.textContent = "基盤技術で開く ↗";
+    a.textContent = "← 基盤技術で開く";
   }
 }
 

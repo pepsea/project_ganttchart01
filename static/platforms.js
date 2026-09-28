@@ -804,10 +804,9 @@ function renderTasks(p, tasks) {
     legend.append(x);
   }
   h.append(legend);
-  const link = el("a", "button right", "ガントチャートで編集 ↗");
+  // ガントチャートへは同じ画面のまま移る（新しいタブを開かない）。ガントチャートの「基盤技術で開く」で戻れる
+  const link = el("a", "button right", "ガントチャートで編集 →");
   link.href = `/?pj=${enc(p.name)}`;
-  link.target = "_blank";
-  link.rel = "noopener";
   h.append(link);
   sec.append(h);
   if (!tasks.length) {
@@ -889,8 +888,8 @@ function renderTasks(p, tasks) {
     bar.append(el("span", `prio p-${t.priority}`), el("span", "lbl", t.task));
     bar.title = `${t.task}\n領域: ${t.area} / 担当: ${t.assignee || "-"} / 優先度: ${t.priority}\n${t.start_date} 〜 ${t.end_date}（${rest}）`;
     track.append(bar);
-    // クリックでガントチャート（この基盤のタスク）を開いて編集
-    const openGantt = () => window.open(`/?pj=${enc(p.name)}`, "_blank", "noopener");
+    // クリックでガントチャート（この基盤のタスク）へ移って編集（同じ画面のまま）
+    const openGantt = () => { location.href = `/?pj=${enc(p.name)}`; };
     name.addEventListener("click", openGantt);
     bar.addEventListener("click", openGantt);
     row.append(lc, track);
