@@ -17,7 +17,9 @@ from db import DB_PATH, ensure_master, get_db, sample_data_enabled
 
 router = APIRouter(prefix="/api/cases", tags=["案件管理"])
 
-STATUSES = ("顧客開発", "打診", "見積提出", "契約中", "ブリーフィング前", "実施中", "QC", "アフターフォロー", "キャンセル")
+# アーカイブ = 終了した案件（カンバンの一番右）。状況を選び直せば元に戻せる
+STATUSES = ("顧客開発", "打診", "見積提出", "契約中", "ブリーフィング前", "実施中", "QC", "アフターフォロー", "キャンセル",
+            "アーカイブ")
 Status = Literal[STATUSES]
 URL_FIELDS = ("box_url", "teams_url", "overview_url", "plan_url")
 FREE_LINK_COLS = ("link1_label", "link1_url", "link2_label", "link2_url")  # 自由リンク 2 つ（名前と URL）

@@ -500,3 +500,10 @@ a.link-ic.free { background: #2fa36b; border-color: #2fa36b; max-width: 9em; ove
 /* 試験名（同じ案件番号の案件を区別） */
 .no-wrap { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .trial-tag { font-size: 10.5px; font-weight: 700; padding: 0 6px; border-radius: 4px; background: #fff1d6; color: #8a5a00; border: 1px solid #f5d08a; white-space: nowrap; }
+
+/* アーカイブ（終了した案件）: カンバンの一番右 */
+.col.archive { background: #eef0f3; }
+.col.archive .card { opacity: .75; }
+.finish-btn { background: #2fa36b; border-color: #2fa36b; color: #fff; font-weight: 600; }
+.finish-btn:hover { filter: brightness(1.08); }
+.archive-note { background: #eef0f3; border-radius: 6px; padding: 6px 10px; }

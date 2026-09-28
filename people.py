@@ -90,7 +90,7 @@ def person(name: str) -> dict:
             add_areas([r["area"]])
 
         cases = []
-        for r in db.execute("SELECT * FROM cases WHERE status <> 'キャンセル' ORDER BY COALESCE(end_date, '9999'), case_no"):
+        for r in db.execute("SELECT * FROM cases WHERE status NOT IN ('キャンセル', 'アーカイブ') ORDER BY COALESCE(end_date, '9999'), case_no"):
             role = _role(name, r["pl"], r["assignees"])
             if role:
                 a = json.loads(r["areas"] or "[]")

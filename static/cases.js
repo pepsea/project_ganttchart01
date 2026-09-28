@@ -12,9 +12,11 @@ const STATUS_COLOR = {
   QC: "#d99a00",
   アフターフォロー: "#1f9fb4",
   キャンセル: "#a9adb6",
+  アーカイブ: "#6b7280",
 };
 // 期限（終了予定日）の色分け対象外
-const NO_DEADLINE = new Set(["アフターフォロー", "キャンセル"]);
+const NO_DEADLINE = new Set(["アフターフォロー", "キャンセル", "アーカイブ"]);
+const ARCHIVE = "アーカイブ"; // 終了した案件（カンバンの一番右）
 const LINKS = [
   ["box_url", "BOX", "BOX"],
   ["teams_url", "Teams", "Teams"],
@@ -253,6 +255,7 @@ function renderBoard() {
   for (const s of statuses) {
     const col = el("div", "col");
     if (s === "キャンセル") col.classList.add("cancel");
+    if (s === ARCHIVE) col.classList.add("archive");
     col.style.setProperty("--c", STATUS_COLOR[s]);
     const items = list.filter((c) => c.status === s).sort(byEnd);
     const head = el("div", "col-head");
@@ -317,6 +320,7 @@ function renderCard(c) {
 
 async function changeStatus(c, status) {
   if (status === "キャンセル" && !confirm(`案件「${c.name}」をキャンセルにしますか？`)) return;
+  if (status === ARCHIVE && !confirm(`案件「${caseLabel(c)} ${c.name}」を終了してアーカイブに移しますか？\n（戻すときは、案件を開いて状況を選び直して保存）`)) return;
   const prev = c.status;
   try {
     Object.assign(c, await api(`/api/cases/${c.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }));
@@ -574,6 +578,8 @@ function openDrawer(c = null) {
     renderAreaChecks(c.areas);
     $("#btn-delete").hidden = false;
     $("#btn-add-trial").hidden = false;
+    $("#btn-finish").hidden = c.status === ARCHIVE;
+    $("#archive-note").hidden = c.status !== ARCHIVE;
     $("#logs").hidden = false;
     loadNotes(c);
     loadMonthly(c);
@@ -585,6 +591,8 @@ function openDrawer(c = null) {
     renderAreaChecks(state.area ? [state.area] : []);
     $("#btn-delete").hidden = true;
     $("#btn-add-trial").hidden = true;
+    $("#btn-finish").hidden = true;
+    $("#archive-note").hidden = true;
     $("#logs").hidden = true;
     $("#tasks-section").hidden = true;
   }
@@ -593,6 +601,14 @@ function openDrawer(c = null) {
   if (!drawer.open) drawer.showModal();
   (c ? $("#note-form").body : form.case_no).focus();
 }
+
+// 案件の終了: アーカイブ（カンバンの一番右）へ移す。戻すときは状況を選び直して保存
+$("#btn-finish").addEventListener("click", async () => {
+  const c = state.current;
+  if (!c) return;
+  await changeStatus(c, ARCHIVE);
+  if (c.status === ARCHIVE) drawer.close();
+});
 
 // 同じ案件番号で試験を追加: 案件番号・顧客名・案件名・PL・担当者・領域を引き継いで新規入力
 $("#btn-add-trial").addEventListener("click", () => {
