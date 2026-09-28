@@ -790,10 +790,20 @@ function renderMonthly(p) {
 }
 
 // ---- タスク（表示のみ）: ガントチャートで PJ名 = 基盤番号 のタスク。編集はガントチャートで行う
+// ガントチャートのタスク（PJ名 = 基盤番号）: ガントチャートと同じ形で表示（表示のみ。編集はガントチャートで）
+// 左: タスク名（実施中 = 青、3 日以内 = オレンジ、超過 = 赤）・担当者・開始日・終了日・残り日数
+// 右: 日付の帯（領域の色）、今日の線、土日
 function renderTasks(p, tasks) {
   const sec = el("section", "pf-section pf-tasks");
   const h = el("h3", "", "ガントチャートのタスク");
   h.append(el("span", "hint", `${tasks.length} 件（表示のみ。追加・編集はガントチャートで）`));
+  const legend = el("span", "pg-legend");
+  for (const [cls, label] of [["overdue", "期限超過"], ["soon", "期限3日以内"], ["active", "実施中"]]) {
+    const x = el("span", cls);
+    x.append(el("i"), label);
+    legend.append(x);
+  }
+  h.append(legend);
   const link = el("a", "button right", "ガントチャートで編集 ↗");
   link.href = `/?pj=${enc(p.name)}`;
   link.target = "_blank";
@@ -804,34 +814,93 @@ function renderTasks(p, tasks) {
     sec.append(el("p", "hint", "この基盤のタスクはまだありません。ガントチャートでタスクを追加し、PJ名にこの基盤番号を選ぶと表示されます。"));
     return sec;
   }
-  const table = el("table", "tasks");
-  table.innerHTML = "<thead><tr><th>タスク</th><th>領域</th><th>担当者</th><th>優先度</th><th>開始日</th><th>終了日</th><th>残り日数</th></tr></thead>";
-  const tbody = el("tbody");
+
+  const DAY_W = 16;
+  const today = todayMs();
+  let min = today - 7 * DAY_MS;
+  let max = today + 21 * DAY_MS;
   for (const t of tasks) {
-    const tr = el("tr");
+    min = Math.min(min, parseDate(t.start_date) - 3 * DAY_MS);
+    max = Math.max(max, parseDate(t.end_date) + 7 * DAY_MS);
+  }
+  const days = Math.round((max - min) / DAY_MS) + 1;
+  const W = days * DAY_W;
+  const x = (ms) => ((ms - min) / DAY_MS) * DAY_W;
+
+  const wrap = el("div", "pg-scroll");
+  const grid = el("div", "pg");
+  grid.style.setProperty("--track-w", `${W}px`);
+
+  // 見出し: 左の列名と、右の月・日
+  const head = el("div", "pg-row pg-head");
+  const hl = el("div", "pg-left");
+  for (const t of ["タスク", "担当者", "開始日", "終了日", "残り日数"]) hl.append(el("span", "", t));
+  const ht = el("div", "pg-track");
+  const bg = el("div", "pg-bg"); // 土日・月の区切り・今日の線（全行の後ろ）
+  for (let i = 0; i < days; i++) {
+    const ms = min + i * DAY_MS;
+    const d = new Date(ms);
+    const dow = d.getUTCDay();
+    if (d.getUTCDate() === 1 || i === 0) {
+      const m = el("div", "pg-month", `${d.getUTCFullYear()}年${d.getUTCMonth() + 1}月`);
+      m.style.left = `${x(ms)}px`;
+      ht.append(m);
+      if (i) {
+        const line = el("div", "pg-mline");
+        line.style.left = `${x(ms)}px`;
+        bg.append(line);
+      }
+    }
+    const day = el("div", `pg-day${dow === 0 || dow === 6 ? " weekend" : ""}${ms === today ? " today" : ""}`, String(d.getUTCDate()));
+    day.style.left = `${x(ms)}px`;
+    ht.append(day);
+    if (dow === 0 || dow === 6) {
+      const we = el("div", "pg-weekend");
+      we.style.left = `${x(ms)}px`;
+      bg.append(we);
+    }
+  }
+  const tline = el("div", "pg-today");
+  tline.style.left = `${x(today) + DAY_W / 2}px`;
+  bg.append(tline);
+  head.append(hl, ht);
+  grid.append(head);
+
+  const body = el("div", "pg-body");
+  body.append(bg);
+  for (const t of tasks) {
     const left = daysLeft(t.end_date);
     const due = left < 0 ? "overdue" : left <= 3 ? "soon" : "";
-    // 実施中 = 今日が開始日〜終了日の間（期限超過・3 日以内の色を優先。ガントチャートと同じ）
-    const active = !due && daysLeft(t.start_date) <= 0 ? "active" : "";
-    const td = (text, c = "") => { const x = el("td", c, text); tr.append(x); return x; };
-    const name = td(t.task, `t-name ${due || active}`.trim());
-    if (t.detail) name.title = t.detail;
-    td(t.area, "nowrap");
-    td(t.assignee || "—", "nowrap");
-    const pr = td(t.priority, "nowrap prio");
-    pr.dataset.v = t.priority;
-    td(slashDate(t.start_date), "nowrap");
-    td(slashDate(t.end_date), "nowrap");
-    // 終了日までの日数: 1 週間以内は赤文字、終了日を過ぎたら赤背景に白文字
+    const active = !due && daysLeft(t.start_date) <= 0 ? "active" : ""; // 実施中 = 今日が開始日〜終了日の間
+    const row = el("div", "pg-row");
+    const lc = el("div", "pg-left");
+    const name = el("span", `t-name ${due || active}`.trim(), t.task);
+    name.title = `${t.task}${t.detail ? "\n\n" + t.detail : ""}`;
     const rest = left < 0 ? `${-left} 日超過` : left === 0 ? "今日まで" : `あと ${left} 日`;
-    const rc = td(rest, `nowrap days-left${left < 0 ? " over" : left <= 7 ? " near" : ""}`);
-    rc.title = `終了日 ${t.end_date}（${rest}）`;
-    tbody.append(tr);
+    const rc = el("span", `days-left${left < 0 ? " over" : left <= 7 ? " near" : ""}`, rest);
+    lc.append(name, el("span", "who", t.assignee || "—"), el("span", "dt", slashDate(t.start_date)),
+      el("span", "dt", slashDate(t.end_date)), rc);
+    const track = el("div", "pg-track");
+    const bar = el("div", "pg-bar");
+    const s0 = x(parseDate(t.start_date));
+    bar.style.left = `${s0}px`;
+    bar.style.width = `${Math.max(x(parseDate(t.end_date) + DAY_MS) - s0, 6)}px`;
+    bar.style.setProperty("--c", areaColor(t.area));
+    bar.append(el("span", `prio p-${t.priority}`), el("span", "lbl", t.task));
+    bar.title = `${t.task}\n領域: ${t.area} / 担当: ${t.assignee || "-"} / 優先度: ${t.priority}\n${t.start_date} 〜 ${t.end_date}（${rest}）`;
+    track.append(bar);
+    // クリックでガントチャート（この基盤のタスク）を開いて編集
+    const openGantt = () => window.open(`/?pj=${enc(p.name)}`, "_blank", "noopener");
+    name.addEventListener("click", openGantt);
+    bar.addEventListener("click", openGantt);
+    row.append(lc, track);
+    body.append(row);
   }
-  table.append(tbody);
-  const wrap = el("div", "table-scroll");
-  wrap.append(table);
+  grid.append(body);
+  wrap.append(grid);
   sec.append(wrap);
+  // 開いたときに今日のあたりが見えるように
+  requestAnimationFrame(() => { wrap.scrollLeft = Math.max(0, x(today) - 7 * DAY_W); });
   return sec;
 }
 

@@ -520,3 +520,48 @@ table.tasks td.days-left { font-variant-numeric: tabular-nums; text-align: right
 table.tasks td.days-left.near { color: var(--today); font-weight: 700; }
 table.tasks td.days-left.over { background: var(--today); color: #fff; font-weight: 700; }
 table.tasks td.t-name.active { background: #dbe8ff; color: #1f4fbf; font-weight: 600; }
+
+/* ---- 基盤のガントチャート（ガントチャートと同じ形。表示のみ） */
+.pg-legend { display: inline-flex; gap: 10px; font-size: 11.5px; font-weight: 400; color: var(--muted); }
+.pg-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.pg-legend i { width: 12px; height: 10px; border-radius: 3px; display: inline-block; }
+.pg-legend .overdue i { background: #ffd4d4; border: 1px solid #e5484d; }
+.pg-legend .soon i { background: #ffe2b3; border: 1px solid #f5a524; }
+.pg-legend .active i { background: #dbe8ff; border: 1px solid #3b6fe0; }
+.pg-scroll { overflow-x: auto; border: 1px solid var(--line-strong); border-radius: 8px; }
+.pg { --left-w: 520px; width: calc(var(--left-w) + var(--track-w)); position: relative; font-size: 12.5px; }
+.pg-row { display: flex; height: 30px; border-bottom: 1px solid #d3d8e0; }
+.pg-body .pg-row:last-child { border-bottom: 0; }
+.pg-left { position: sticky; left: 0; z-index: 3; flex: 0 0 var(--left-w); width: var(--left-w); display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px 84px 84px 78px; align-items: center; background: var(--panel); border-right: 1px solid var(--line-strong); }
+.pg-left > span { padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 100%; display: flex; align-items: center; }
+.pg-left .t-name { font-weight: 600; }
+.pg-left .t-name.overdue { background: #ffd4d4; color: #a3161b; }
+.pg-left .t-name.soon { background: #ffe2b3; color: #8a5100; }
+.pg-left .t-name.active { background: #dbe8ff; color: #1f4fbf; }
+.pg-left .dt { font-variant-numeric: tabular-nums; color: #3b4252; }
+.pg-left .days-left { justify-content: flex-end; font-variant-numeric: tabular-nums; }
+.pg-left .days-left.near { color: var(--today); font-weight: 700; }
+.pg-left .days-left.over { background: var(--today); color: #fff; font-weight: 700; }
+.pg-track { position: relative; flex: 0 0 var(--track-w); width: var(--track-w); }
+.pg-head { height: 40px; background: #f7f8fa; border-bottom: 1px solid var(--line-strong); }
+.pg-head .pg-left { background: #f7f8fa; font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.pg-month { position: absolute; top: 2px; font-size: 11px; font-weight: 700; color: #3b4252; white-space: nowrap; padding-left: 3px; }
+.pg-day { position: absolute; bottom: 3px; width: 16px; text-align: center; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pg-day.weekend { color: #b0b4bc; }
+.pg-day.today { color: #fff; background: var(--today); border-radius: 3px; font-weight: 700; }
+.pg-body { position: relative; }
+.pg-bg { position: absolute; top: 0; bottom: 0; left: var(--left-w); width: var(--track-w); pointer-events: none; z-index: 0; }
+.pg-weekend { position: absolute; top: 0; bottom: 0; width: 16px; background: rgba(120, 130, 150, .07); }
+.pg-mline { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--line-strong); }
+.pg-today { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--today); opacity: .7; }
+.pg-body .pg-row { position: relative; z-index: 1; }
+.pg-body .pg-track { background: transparent; }
+.pg-bar { position: absolute; top: 6px; height: 18px; border-radius: 5px; background: var(--c); color: #fff; font-size: 11px; line-height: 18px;
+  padding: 0 6px; display: flex; align-items: center; gap: 4px; overflow: hidden; white-space: nowrap; box-shadow: 0 1px 2px rgba(0, 0, 0, .15); }
+.pg-bar .prio { width: 7px; height: 7px; border-radius: 50%; background: #fff; flex: 0 0 auto; }
+.pg-bar .prio.p-高 { background: #ffb3b5; }
+.pg-bar .prio.p-低 { background: #b8f0cf; }
+.pg-bar .lbl { overflow: hidden; text-overflow: ellipsis; }
+.pg-body .pg-left .t-name, .pg-bar { cursor: pointer; }
+.pg-body .pg-left .t-name:hover { text-decoration: underline; }
