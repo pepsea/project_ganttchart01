@@ -519,20 +519,17 @@ function fillCaseNoSelect(current = "") {
   const finished = (n) => byNo.has(n) && byNo.get(n).every((c) => c.status === ARCHIVE);
   let opts = state.masters.case_nos.filter((n) => n === current || !finished(n));
   if (current && !opts.includes(current)) opts.push(current);
-  // 表示は番号だけ（検索は番号と案件名で行う）
-  const searchText = (n) => [n, ...(byNo.get(n) || []).map((c) => c.name)].join(" ").toLowerCase();
-  const q = ($("#case-no-q").value || "").trim().toLowerCase();
-  if (q) opts = opts.filter((n) => n === current || searchText(n).includes(q));
+  // 表示は番号だけ。プルダウンの中の検索欄では、番号と案件名で探せる（data-search）
   const sel = form.case_no;
   sel.innerHTML = "";
-  sel.append(new Option(opts.length ? (q ? `${opts.length} 件見つかりました` : "選択してください") : (q ? "該当する案件番号がありません" : "案件番号がありません（管理サイトで登録）"), ""));
-  for (const n of opts) sel.append(new Option(n, n));
-  sel.value = current;
-  // 検索で 1 件に絞れたら自動で選ぶ
-  if (q && !current && opts.length === 1) {
-    sel.value = opts[0];
-    syncNoCopy();
+  sel.append(new Option(opts.length ? "選択してください" : "案件番号がありません（管理サイトで登録）", ""));
+  for (const n of opts) {
+    const o = new Option(n, n);
+    o.dataset.search = (byNo.get(n) || []).map((c) => c.name).join(" ");
+    sel.append(o);
   }
+  sel.value = current;
+  sel._ss?.refresh();
 }
 
 // 詳細パネル: 案件番号（= PJ名）からガントチャートへ移動
@@ -547,8 +544,9 @@ function syncNoCopy() {
   }
 }
 form.case_no.addEventListener("change", syncNoCopy);
-// 検索し直すたびに絞り込み直す（編集中の案件の番号だけは常に残す）
-$("#case-no-q").addEventListener("input", () => fillCaseNoSelect(state.current?.case_no || ""));
+// 案件番号・企業名は、プルダウンの中で検索して選べる
+searchSelect(form.case_no, { placeholder: "番号・案件名で検索" });
+searchSelect(form.customer, { placeholder: "企業名で検索", allowEmpty: true });
 
 function fillCustomerSelect(current = "") {
   const opts = [...state.masters.customers];
@@ -558,6 +556,7 @@ function fillCustomerSelect(current = "") {
   sel.append(new Option("（未選択）", ""));
   for (const n of opts) sel.append(new Option(n, n));
   sel.value = current;
+  sel._ss?.refresh();
 }
 
 // リンク: 有効な URL が入力されたら「開く」をアクティブにする
@@ -587,7 +586,6 @@ function openDrawer(c = null) {
   const sel = form.status;
   sel.innerHTML = "";
   for (const s of state.statuses) sel.append(new Option(s, s));
-  $("#case-no-q").value = "";
   fillCaseNoSelect(c?.case_no || "");
   fillCustomerSelect(c?.customer || "");
   if (c) {
@@ -620,7 +618,7 @@ function openDrawer(c = null) {
   syncNoCopy();
   if (!drawer.open) drawer.showModal();
   // 一番上（終了・削除ボタン）から表示する。入力欄にフォーカスしても画面は動かさない
-  (c ? $("#note-form").body : form.case_no).focus({ preventScroll: true });
+  (c ? $("#note-form").body : form.case_no.previousElementSibling.querySelector(".ss-btn")).focus({ preventScroll: true });
   $("#drawer .drawer-body").scrollTop = 0;
 }
 
