@@ -24,7 +24,7 @@ Status = Literal[STATUSES]
 URL_FIELDS = ("box_url", "teams_url", "overview_url", "plan_url")
 FREE_LINK_COLS = ("link1_label", "link1_url", "link2_label", "link2_url")  # 自由リンク 2 つ（名前と URL）
 CASE_COLS = ("case_no", "customer", "name", "status", "pl", "assignees", "areas",
-             "start_date", "end_date", *URL_FIELDS, "detail", *FREE_LINK_COLS, "trial")
+             "start_date", "end_date", *URL_FIELDS, "detail", *FREE_LINK_COLS, "trial", "contact")
 
 
 # ---------------------------------------------------------------- DB
@@ -92,7 +92,7 @@ def init_db() -> None:
         if not has_progress:
             db.execute(LEGACY_NOTES_COPY)
         cols = {r["name"] for r in db.execute("PRAGMA table_info(cases)")}
-        for col in ("project", "detail", *FREE_LINK_COLS, "trial"):  # trial = 試験名（同じ案件番号の案件を区別）
+        for col in ("project", "detail", *FREE_LINK_COLS, "trial", "contact"):  # trial = 試験名 / contact = 顧客名（個人名）
             if col not in cols:
                 db.execute(f"ALTER TABLE cases ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
         if sample_data_enabled() and db.execute("SELECT COUNT(*) FROM cases").fetchone()[0] == 0:
@@ -221,8 +221,9 @@ class CaseIn(BaseModel):
     link2_label: str = ""  # 自由リンク 2 の名前
     link2_url: str = ""
     trial: str = ""        # 試験名（同じ案件番号で試験が複数あるときに区別する）
+    contact: str = ""      # 顧客名（個人名。自由記載）。customer は企業名
 
-    @field_validator("case_no", "customer", "name", "pl", "link1_label", "link2_label", "trial", mode="before")
+    @field_validator("case_no", "customer", "name", "pl", "link1_label", "link2_label", "trial", "contact", mode="before")
     @classmethod
     def strip(cls, v):
         return v.strip() if isinstance(v, str) else v
@@ -257,7 +258,7 @@ class CaseIn(BaseModel):
                 self.start_date.isoformat() if self.start_date else None,
                 self.end_date.isoformat() if self.end_date else None,
                 self.box_url, self.teams_url, self.overview_url, self.plan_url, self.detail.strip(),
-                self.link1_label, self.link1_url, self.link2_label, self.link2_url, self.trial)
+                self.link1_label, self.link1_url, self.link2_label, self.link2_url, self.trial, self.contact)
 
 
 class StatusIn(BaseModel):
@@ -360,7 +361,7 @@ def list_statuses() -> list[str]:
 
 
 # エクスポートの基本列（月報・進捗メモの列はこの後ろに日付ごとに並ぶ）
-EXPORT_HEADERS = ["案件番号", "試験名", "状況", "顧客名", "案件名", "PL", "担当者", "領域", "開始日", "終了予定日",
+EXPORT_HEADERS = ["案件番号", "試験名", "状況", "企業名", "顧客名（個人名）", "案件名", "PL", "担当者", "領域", "開始日", "終了予定日",
                   "BOXリンク", "Teamsリンク", "案件概要書リンク", "試験計画書リンク", "案件詳細",
                   "自由リンク1の名前", "自由リンク1", "自由リンク2の名前", "自由リンク2"]
 # 日付パターンの列名: 月報_YYYY-MM / 進捗_YYYY-MM-DD（旧形式の 週次_YYYY-MM-DD も読み込める）
@@ -402,7 +403,7 @@ def export_csv() -> Response:
     w = csv.writer(buf)
     w.writerow([*EXPORT_HEADERS, *(f"月報_{m}" for m in months), *(f"進捗_{wk}" for wk in weeks)])
     for c in cases:
-        w.writerow([c["case_no"], c["trial"], c["status"], c["customer"], c["name"], c["pl"], c["assignees"],
+        w.writerow([c["case_no"], c["trial"], c["status"], c["customer"], c["contact"], c["name"], c["pl"], c["assignees"],
                     " ".join(c["areas"]), c["start_date"] or "", c["end_date"] or "",
                     c["box_url"], c["teams_url"], c["overview_url"], c["plan_url"], c["detail"],
                     c["link1_label"], c["link1_url"], c["link2_label"], c["link2_url"],
@@ -424,7 +425,8 @@ def save_case_masters(db: sqlite3.Connection, c: CaseIn) -> None:
 IMPORT_ALIASES = {
     "案件番号": "case_no", "case_no": "case_no",
     "状況": "status", "status": "status",
-    "顧客名": "customer", "顧客": "customer", "customer": "customer",
+    "企業名": "customer", "顧客名": "customer", "顧客": "customer", "customer": "customer",  # 旧「顧客名」列は企業名として読む
+    "顧客名（個人名）": "contact", "顧客名(個人名)": "contact", "顧客担当者": "contact", "contact": "contact",
     "案件名": "name", "name": "name",
     "試験名": "trial", "試験": "trial", "trial": "trial",
     "PL": "pl", "pl": "pl",

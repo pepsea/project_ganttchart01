@@ -52,7 +52,7 @@ MASTERS = {
         ("SELECT COUNT(*) FROM services WHERE EXISTS (SELECT 1 FROM json_each(services.platforms) WHERE value = ?)", "サービス"),
         ("SELECT COUNT(*) FROM team_groups WHERE EXISTS (SELECT 1 FROM json_each(team_groups.platforms) WHERE value = ?)", "グループ目標"),
     ]),
-    "customers": ("customers", "顧客", [("SELECT COUNT(*) FROM cases WHERE customer = ?", "案件")]),
+    "customers": ("customers", "企業名", [("SELECT COUNT(*) FROM cases WHERE customer = ?", "案件")]),
     "case_nos": ("case_nos", "案件番号", [
         ("SELECT COUNT(*) FROM cases WHERE case_no = ?", "案件"),
         ("SELECT COUNT(*) FROM tasks WHERE project = ?", "タスク（PJ名）"),

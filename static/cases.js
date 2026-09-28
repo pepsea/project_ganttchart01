@@ -28,7 +28,7 @@ const state = {
   cases: [],
   statuses: [],
   areas: [],
-  masters: { case_nos: [], customers: [] }, // 登録済みの案件番号（= ガントチャートの PJ名）・顧客
+  masters: { case_nos: [], customers: [] }, // 登録済みの案件番号（= ガントチャートの PJ名）・企業名
   view: "board",
   q: "",
   area: "",
@@ -161,7 +161,7 @@ function filtered({ ignoreStatus = false } = {}) {
     if (!ignoreStatus && state.status && c.status !== state.status) return false;
     if (state.area && !c.areas.includes(state.area)) return false;
     if (state.person && c.pl !== state.person && !people(c).includes(state.person)) return false;
-    if (q && ![c.case_no, c.trial, c.customer, c.name].some((v) => (v || "").toLowerCase().includes(q))) return false;
+    if (q && ![c.case_no, c.trial, c.customer, c.contact, c.name].some((v) => (v || "").toLowerCase().includes(q))) return false;
     return true;
   });
 }
@@ -295,7 +295,8 @@ function renderCard(c) {
   const top = el("div", "card-top");
   top.append(caseNoTag(c));
   card.append(top, el("div", "title", c.name));
-  if (c.customer) card.append(el("div", "cust", c.customer));
+  const who = [c.customer, c.contact].filter(Boolean).join(" ／ ");
+  if (who) card.append(el("div", "cust", who));
 
   const ppl = el("div", "people");
   if (c.pl) ppl.append(el("span", "lbl", "PL "), c.pl);
@@ -334,7 +335,7 @@ async function changeStatus(c, status) {
 
 // ---- 一覧
 const COLUMNS = [
-  ["status", "状況"], ["case_no", "案件番号"], ["customer", "顧客名"], ["name", "案件名"], ["pl", "PL"],
+  ["status", "状況"], ["case_no", "案件番号"], ["customer", "企業名／顧客名"], ["name", "案件名"], ["pl", "PL"],
   ["assignees", "担当者"], ["areas", "領域"], ["start_date", "開始日"], ["end_date", "終了予定日"],
   ["links", "リンク"], ["last_note_date", "最新の進捗"],
 ];
@@ -376,7 +377,7 @@ function renderList() {
     };
     cell(st, "nowrap");
     cell(caseLabel(c), "nowrap");
-    cell(c.customer);
+    cell([c.customer, c.contact].filter(Boolean).join(" ／ "));
     cell(c.name);
     cell(c.pl, "nowrap");
     cell(people(c).join("、"));
@@ -593,7 +594,7 @@ function openDrawer(c = null) {
     $("#d-no").textContent = caseLabel(c);
     $("#d-title").textContent = c.name;
     for (const k of ["name", "detail", "status", "pl", "assignees", "start_date", "end_date",
-      "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url", "trial"]) form[k].value = c[k] || "";
+      "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url", "trial", "contact"]) form[k].value = c[k] || "";
     renderAreaChecks(c.areas);
     $("#btn-delete").hidden = false;
     $("#btn-add-trial").hidden = false;
@@ -629,13 +630,14 @@ $("#btn-finish").addEventListener("click", async () => {
   if (c.status === ARCHIVE) drawer.close();
 });
 
-// 同じ案件番号で試験を追加: 案件番号・顧客名・案件名・PL・担当者・領域を引き継いで新規入力
+// 同じ案件番号で試験を追加: 案件番号・企業名・顧客名（個人名）・案件名・PL・担当者・領域を引き継いで新規入力
 $("#btn-add-trial").addEventListener("click", () => {
   const c = state.current;
   if (!c) return;
   openDrawer(null);
   fillCaseNoSelect(c.case_no);
   fillCustomerSelect(c.customer || "");
+  form.contact.value = c.contact || "";
   form.name.value = c.name;
   form.pl.value = c.pl || "";
   form.assignees.value = c.assignees || "";
@@ -650,7 +652,7 @@ form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const body = {};
   for (const k of ["case_no", "customer", "name", "detail", "status", "pl", "assignees", "start_date", "end_date",
-    "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url", "trial"]) body[k] = form[k].value.trim();
+    "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url", "trial", "contact"]) body[k] = form[k].value.trim();
   body.start_date ||= null;
   body.end_date ||= null;
   body.areas = [...form.querySelectorAll('input[name="areas"]:checked')].map((i) => i.value);
@@ -957,7 +959,7 @@ delForm.addEventListener("submit", async (e) => {
 });
 $("#dlg-delete [data-close]").addEventListener("click", () => $("#dlg-delete").close());
 
-// ------------------------------------------------------------ 選択肢（案件番号・顧客は管理サイトで登録）
+// ------------------------------------------------------------ 選択肢（案件番号・企業名は管理サイトで登録）
 async function loadMasters() {
   const [case_nos, customers] = await Promise.all(["case_nos", "customers"].map((k) => api(`/api/masters/${k}`)));
   state.masters = { case_nos, customers };

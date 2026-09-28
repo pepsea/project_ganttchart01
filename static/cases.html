@@ -35,7 +35,7 @@
         <button data-view="timeline">タイムライン</button>
       </div>
       <span class="sep"></span>
-      <input id="q" type="search" placeholder="案件番号（PJ名）・顧客名・案件名で検索" class="search">
+      <input id="q" type="search" placeholder="案件番号（PJ名）・企業名・顧客名・案件名で検索" class="search">
       <label class="filter">領域 <select id="f-area"><option value="">すべて</option></select></label>
       <label class="filter">担当 <select id="f-person"><option value="">すべて</option></select></label>
       <label class="filter check"><input type="checkbox" id="f-cancel"> キャンセルも表示</label>
@@ -70,9 +70,10 @@
             <label><span>状況</span><select name="status"></select></label>
             <label class="full"><span>試験名（同じ案件番号で試験が複数あるときに区別。空欄なら自動で番号 2, 3, … を付ける）</span><input name="trial" placeholder="空欄で自動の番号（例: C-2026-001-2）／名前も可（例: 追加検体）"></label>
             <label class="full"><span>案件名 <span class="req">*</span></span><input name="name" required></label>
-            <label><span>顧客名</span>
+            <label><span>企業名</span>
               <span class="select-add"><select name="customer"></select></span></label>
-            <label><span>PL</span><input name="pl"></label>
+            <label><span>顧客名（個人名）</span><input name="contact" placeholder="例: 山田 太郎 様"></label>
+            <label class="full"><span>PL</span><input name="pl"></label>
             <label class="full"><span>担当者（複数はスペース区切り）</span><input name="assignees" placeholder="例: 鈴木 高橋"></label>
             <label><span>開始日</span><input type="date" name="start_date"></label>
             <label><span>終了予定日</span><input type="date" name="end_date"></label>
@@ -92,7 +93,7 @@
         <div class="form-actions">
           <button type="button" id="btn-delete" class="danger-outline">案件を削除</button>
           <button type="button" id="btn-finish" class="finish-btn" title="案件を終了してアーカイブ（カンバンの一番右）へ移す">✓ 案件を終了</button>
-          <button type="button" id="btn-add-trial" title="案件番号・顧客名・案件名を引き継いで、新しい試験を登録">＋ 同じ案件番号で試験を追加</button>
+          <button type="button" id="btn-add-trial" title="案件番号・企業名・顧客名・案件名を引き継いで、新しい試験を登録">＋ 同じ案件番号で試験を追加</button>
           <span class="spacer"></span>
           <button type="button" data-close>閉じる</button>
           <button type="submit" class="primary" id="btn-save">保存</button>
@@ -195,7 +196,7 @@
         <li>必須列: <b>案件番号</b>・<b>案件名</b>（列名は CSV エクスポートと同じ。UTF-8 / Shift_JIS）</li>
         <li>案件番号が一致する案件は<b>更新</b>、一致しない案件は<b>追加</b>されます</li>
         <li>更新時、空欄のセルや CSV に無い列は元の値のまま残ります</li>
-        <li>領域は「、」やスペース区切りで複数指定できます。未登録の顧客・PJ名・領域・案件番号は自動登録されます</li>
+        <li>領域は「、」やスペース区切りで複数指定できます。未登録の企業名・PJ名・領域・案件番号は自動登録されます（旧形式の「顧客名」列は企業名として読み込みます）</li>
         <li>「月報_2026-09」「進捗_2026-09-21」のような日付の列は、その月の月報・その日の進捗メモとして登録されます（同じ月・日は上書き、空欄は変更なし。旧形式の「週次_」列も読み込めます）</li>
         <li>エラーのある行が 1 行でもあれば、何も取り込まれません</li>
       </ul>

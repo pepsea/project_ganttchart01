@@ -5,7 +5,7 @@ const CARDS = [
   { kind: "areas", title: "領域", desc: "ガントチャートのタスクと案件で使う領域です。", placeholder: "例: リピドミクス", color: true },
   { kind: "case_nos", title: "案件番号", desc: "案件管理で案件に割り当てる番号です。ガントチャートの PJ名（案件）にもなります。", placeholder: "例: C-2026-009" },
   { kind: "platforms", title: "基盤番号", desc: "ガントチャートの PJ名（基盤）として使う番号です。基盤名・目標は「基盤技術」ページで設定します。", placeholder: "例: K-003" },
-  { kind: "customers", title: "顧客", desc: "案件管理の顧客名として選択する顧客です。", placeholder: "例: H製薬" },
+  { kind: "customers", title: "企業名", desc: "案件管理の企業名として選択する企業です。", placeholder: "例: H製薬" },
   { kind: "pj", title: "PJ名", desc: "ガントチャートで選べる PJ名の一覧です（案件番号＋基盤番号）。登録・削除は各カードで行います。", readonly: true },
 ];
 
