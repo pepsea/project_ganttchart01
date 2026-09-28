@@ -295,6 +295,12 @@ function renderCard(c) {
   const top = el("div", "card-top");
   top.append(caseNoTag(c));
   card.append(top, el("div", "title", c.name));
+  // アーカイブ（終了した案件）は最小限の表示: 案件番号と案件名だけ
+  if (c.status === ARCHIVE) {
+    card.classList.add("mini");
+    card.title = `${caseLabel(c)} ${c.name}（終了）— クリックで詳細`;
+    return card;
+  }
   const who = [c.customer, c.contact].filter(Boolean).join(" ／ ");
   if (who) card.append(el("div", "cust", who));
 

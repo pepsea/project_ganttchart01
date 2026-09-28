@@ -52,9 +52,19 @@ async function api(path, options = {}) {
 const areaColor = (i) => `hsl(${(210 + i * 67) % 360} 62% 50%)`;
 const usageText = (usage) => Object.entries(usage).map(([k, v]) => `${k} ${v} 件`).join("・");
 
+let closedNos = new Set(); // 終了（アーカイブ）・キャンセルの案件だけの番号
+let closedLabel = {};
+
 async function load() {
   const [masters, cases, platforms] = await Promise.all([api("/api/admin/masters"), api("/api/cases"), api("/api/platforms")]);
   data = masters;
+  // 終了した案件番号: その番号の案件がすべてアーカイブ（終了）かキャンセル
+  const byNo = {};
+  for (const c of cases) (byNo[c.case_no] ||= []).push(c.status);
+  closedNos = new Set(Object.entries(byNo)
+    .filter(([, sts]) => sts.every((s) => s === "アーカイブ" || s === "キャンセル")).map(([n]) => n));
+  closedLabel = Object.fromEntries(Object.entries(byNo).map(([n, sts]) =>
+    [n, sts.every((s) => s === "キャンセル") ? "キャンセル" : sts.every((s) => s === "アーカイブ") ? "終了" : "終了・キャンセル"]));
   // 番号の横に表示する名前（案件名・基盤名）
   caseNames = Object.fromEntries([
     ...cases.map((c) => [c.case_no, c.name]),
@@ -126,15 +136,33 @@ function renderCard(card) {
     fi.value = filters[card.kind] || "";
     fi.addEventListener("input", () => {
       filters[card.kind] = fi.value;
-      renderList(ul, card, items, err);
+      rerender();
     });
     fb.append(fi);
     box.append(fb);
   }
 
+  let rerender;
+  if (card.kind === "case_nos") {
+    const active = items.filter((x) => !closedNos.has(x.name));
+    const closed = items.filter((x) => closedNos.has(x.name));
+    const ul = el("ul");
+    box.append(ul);
+    const sub = el("div", "closed-area");
+    const sh = el("h3", "", "終了・キャンセルの案件番号");
+    sh.append(el("span", "count", `${closed.length} 件`));
+    sub.append(sh);
+    const ul2 = el("ul");
+    sub.append(ul2);
+    box.append(sub);
+    rerender = () => { renderList(ul, card, active, err); renderList(ul2, card, closed, err); };
+    rerender();
+    return box;
+  }
   const ul = el("ul");
-  renderList(ul, card, items, err);
   box.append(ul);
+  rerender = () => renderList(ul, card, items, err);
+  rerender();
   return box;
 }
 
@@ -156,6 +184,7 @@ function renderList(ul, card, items, err) {
     }
     if (card.kind === "pj") li.append(el("span", `type-badge ${item.type}`, item.type === "case" ? "案件" : "基盤"));
     const name = el("span", "name", item.name);
+    if (card.kind === "case_nos" && closedNos.has(item.name)) li.append(el("span", "closed-badge", closedLabel[item.name]));
     const sub = card.kind !== "areas" && card.kind !== "customers" && caseNames[item.name];
     if (sub) {
       name.append(" ", el("span", "sub", caseNames[item.name]));
