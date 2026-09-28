@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator, model_v
 
 from csvutil import decode_csv, parse_date
 
-from db import ensure_master, get_db, sample_data_enabled
+from db import DB_PATH, ensure_master, get_db, sample_data_enabled
 
 router = APIRouter(prefix="/api/cases", tags=["案件管理"])
 
@@ -22,7 +22,7 @@ Status = Literal[STATUSES]
 URL_FIELDS = ("box_url", "teams_url", "overview_url", "plan_url")
 FREE_LINK_COLS = ("link1_label", "link1_url", "link2_label", "link2_url")  # 自由リンク 2 つ（名前と URL）
 CASE_COLS = ("case_no", "customer", "name", "status", "pl", "assignees", "areas",
-             "start_date", "end_date", *URL_FIELDS, "detail", *FREE_LINK_COLS)
+             "start_date", "end_date", *URL_FIELDS, "detail", *FREE_LINK_COLS, "trial")
 
 
 # ---------------------------------------------------------------- DB
@@ -33,7 +33,7 @@ def init_db() -> None:
             """
             CREATE TABLE IF NOT EXISTS cases (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                case_no      TEXT NOT NULL UNIQUE,
+                case_no      TEXT NOT NULL,              -- 同じ案件番号で試験が複数ある場合は、試験名（trial）で区別
                 customer     TEXT NOT NULL DEFAULT '',
                 name         TEXT NOT NULL,
                 project      TEXT NOT NULL DEFAULT '',   -- 未使用（PJ名 = 案件番号）
@@ -90,7 +90,7 @@ def init_db() -> None:
         if not has_progress:
             db.execute(LEGACY_NOTES_COPY)
         cols = {r["name"] for r in db.execute("PRAGMA table_info(cases)")}
-        for col in ("project", "detail", *FREE_LINK_COLS):
+        for col in ("project", "detail", *FREE_LINK_COLS, "trial"):  # trial = 試験名（同じ案件番号の案件を区別）
             if col not in cols:
                 db.execute(f"ALTER TABLE cases ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
         if sample_data_enabled() and db.execute("SELECT COUNT(*) FROM cases").fetchone()[0] == 0:
@@ -102,11 +102,45 @@ def init_db() -> None:
         db.execute("""INSERT OR IGNORE INTO platforms(name)
                       SELECT DISTINCT project FROM tasks
                       WHERE project <> '' AND project NOT IN (SELECT name FROM case_nos)""")
+    allow_same_case_no()  # 同じ案件番号の案件を複数登録できるようにする（1 回だけ）
 
 
 # 旧・週次進捗メモ（case_notes）→ 進捗メモ（case_progress）の引き継ぎ（backup.py の復元でも使う）
 LEGACY_NOTES_COPY = """INSERT INTO case_progress(case_id, note_date, body, created_at, updated_at)
                        SELECT case_id, week, body, updated_at, updated_at FROM case_notes ORDER BY case_id, week"""
+
+
+def allow_same_case_no() -> None:
+    """同じ案件番号の案件を複数登録できるよう、case_no の UNIQUE 制約を外す（1 回だけ・冪等）。
+    列とデータはそのまま。SQLite は制約だけを外せないため、同じ列の表を作り直して全行を写す。
+    （関連する進捗メモ・月報が連鎖削除されないよう、外部キーを止めて 1 つのトランザクションで行う）"""
+    conn = sqlite3.connect(DB_PATH, isolation_level=None)
+    try:
+        unique = [r for r in conn.execute("PRAGMA index_list(cases)") if r[2] and r[3] == "u"]
+        if not any([c[2] for c in conn.execute(f"PRAGMA index_info('{r[1]}')")] == ["case_no"] for r in unique):
+            return
+        sql = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='cases'").fetchone()[0]
+        new_sql = re.sub(r"(case_no\s+TEXT\s+NOT\s+NULL)\s+UNIQUE", r"\1", sql, count=1)
+        new_sql = re.sub(r"^CREATE TABLE\s+\"?cases\"?", "CREATE TABLE cases_new", new_sql, count=1)
+        if new_sql == sql or "UNIQUE" in re.search(r"case_no[^,]*", new_sql).group(0):
+            raise RuntimeError("cases テーブルの定義を読み取れませんでした")
+        before = conn.execute("SELECT COUNT(*) FROM cases").fetchone()[0]
+        conn.execute("PRAGMA foreign_keys = OFF")
+        conn.execute("BEGIN")
+        try:
+            conn.execute(new_sql)
+            conn.execute("INSERT INTO cases_new SELECT * FROM cases")
+            conn.execute("DROP TABLE cases")
+            conn.execute("ALTER TABLE cases_new RENAME TO cases")
+            after = conn.execute("SELECT COUNT(*) FROM cases").fetchone()[0]
+            if after != before or conn.execute("PRAGMA foreign_key_check").fetchall():
+                raise RuntimeError("案件の件数・関連データの確認に失敗しました")
+            conn.execute("COMMIT")
+        except Exception:
+            conn.execute("ROLLBACK")
+            raise
+    finally:
+        conn.close()
 
 
 def monday_of(d: date) -> date:
@@ -184,8 +218,9 @@ class CaseIn(BaseModel):
     link1_url: str = ""
     link2_label: str = ""  # 自由リンク 2 の名前
     link2_url: str = ""
+    trial: str = ""        # 試験名（同じ案件番号で試験が複数あるときに区別する）
 
-    @field_validator("case_no", "customer", "name", "pl", "link1_label", "link2_label", mode="before")
+    @field_validator("case_no", "customer", "name", "pl", "link1_label", "link2_label", "trial", mode="before")
     @classmethod
     def strip(cls, v):
         return v.strip() if isinstance(v, str) else v
@@ -220,7 +255,7 @@ class CaseIn(BaseModel):
                 self.start_date.isoformat() if self.start_date else None,
                 self.end_date.isoformat() if self.end_date else None,
                 self.box_url, self.teams_url, self.overview_url, self.plan_url, self.detail.strip(),
-                self.link1_label, self.link1_url, self.link2_label, self.link2_url)
+                self.link1_label, self.link1_url, self.link2_label, self.link2_url, self.trial)
 
 
 class StatusIn(BaseModel):
@@ -270,6 +305,20 @@ def fetch_case(db: sqlite3.Connection, case_id: int) -> dict:
     return to_case(row)
 
 
+def case_label(case_no: str, trial: str) -> str:
+    return f"{case_no}（{trial}）" if trial else case_no
+
+
+def check_duplicate(db: sqlite3.Connection, c: "CaseIn", exclude_id: int | None = None) -> None:
+    """同じ案件番号は複数登録できるが、案件番号と試験名の組み合わせは重ならないようにする"""
+    row = db.execute("SELECT id FROM cases WHERE case_no = ? AND trial = ? AND id <> ?",
+                     (c.case_no, c.trial, exclude_id or 0)).fetchone()
+    if row:
+        if c.trial:
+            raise HTTPException(409, f"案件番号「{c.case_no}」の試験「{c.trial}」は既に登録されています")
+        raise HTTPException(409, f"案件番号「{c.case_no}」は既に登録されています。同じ番号で別の試験を登録するときは「試験名」を入力してください")
+
+
 def write_case(db: sqlite3.Connection, sql: str, params: tuple, case_no: str):
     try:
         return db.execute(sql, params)
@@ -292,7 +341,7 @@ def list_statuses() -> list[str]:
 
 
 # エクスポートの基本列（月報・進捗メモの列はこの後ろに日付ごとに並ぶ）
-EXPORT_HEADERS = ["案件番号", "状況", "顧客名", "案件名", "PL", "担当者", "領域", "開始日", "終了予定日",
+EXPORT_HEADERS = ["案件番号", "試験名", "状況", "顧客名", "案件名", "PL", "担当者", "領域", "開始日", "終了予定日",
                   "BOXリンク", "Teamsリンク", "案件概要書リンク", "試験計画書リンク", "案件詳細",
                   "自由リンク1の名前", "自由リンク1", "自由リンク2の名前", "自由リンク2"]
 # 日付パターンの列名: 月報_YYYY-MM / 進捗_YYYY-MM-DD（旧形式の 週次_YYYY-MM-DD も読み込める）
@@ -334,7 +383,7 @@ def export_csv() -> Response:
     w = csv.writer(buf)
     w.writerow([*EXPORT_HEADERS, *(f"月報_{m}" for m in months), *(f"進捗_{wk}" for wk in weeks)])
     for c in cases:
-        w.writerow([c["case_no"], c["status"], c["customer"], c["name"], c["pl"], c["assignees"],
+        w.writerow([c["case_no"], c["trial"], c["status"], c["customer"], c["name"], c["pl"], c["assignees"],
                     " ".join(c["areas"]), c["start_date"] or "", c["end_date"] or "",
                     c["box_url"], c["teams_url"], c["overview_url"], c["plan_url"], c["detail"],
                     c["link1_label"], c["link1_url"], c["link2_label"], c["link2_url"],
@@ -358,6 +407,7 @@ IMPORT_ALIASES = {
     "状況": "status", "status": "status",
     "顧客名": "customer", "顧客": "customer", "customer": "customer",
     "案件名": "name", "name": "name",
+    "試験名": "trial", "試験": "trial", "trial": "trial",
     "PL": "pl", "pl": "pl",
     "担当者": "assignees", "assignees": "assignees",
     "領域": "areas", "areas": "areas",
@@ -375,7 +425,7 @@ IMPORT_ALIASES = {
 
 @router.post("/import")
 async def import_csv(file: UploadFile = File(...)) -> dict:
-    """案件 CSV を取り込む（案件番号が一致すれば更新、なければ追加）。
+    """案件 CSV を取り込む（案件番号と試験名が一致すれば更新、なければ追加）。
 
     - 既存案件の更新時、CSV に無い列・空欄のセルは既存の値を保持する（誤って消さないため）
     - 「月報_YYYY-MM」「進捗_YYYY-MM-DD」列の内容を月報・進捗メモとして登録（同じ月・日は上書き、空欄は変更なし）
@@ -403,7 +453,7 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
 
     added = updated = notes = reports = 0
     with get_db() as db:
-        seen: set[str] = set()
+        seen: set[tuple[str, str]] = set()
         for line, raw in enumerate(reader, start=2):
             rec = {colmap[k]: (v or "").strip() for k, v in raw.items() if k in colmap and colmap[k]}
             if not any(rec.values()):
@@ -411,13 +461,14 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
             no = rec.get("case_no", "")
             if not no:
                 raise HTTPException(422, f"{line} 行目: 案件番号は必須です")
-            if no in seen:
-                raise HTTPException(422, f"{line} 行目: 案件番号「{no}」が CSV 内で重複しています")
-            seen.add(no)
+            trial = rec.get("trial", "")
+            if (no, trial) in seen:
+                raise HTTPException(422, f"{line} 行目: 案件「{case_label(no, trial)}」が CSV 内で重複しています")
+            seen.add((no, trial))
             if "status" in rec and rec["status"] and rec["status"] not in STATUSES:
                 raise HTTPException(422, f"{line} 行目: 状況「{rec['status']}」は次のいずれかにしてください: {'、'.join(STATUSES)}")
 
-            row = db.execute("SELECT * FROM cases WHERE case_no = ?", (no,)).fetchone()
+            row = db.execute("SELECT * FROM cases WHERE case_no = ? AND trial = ?", (no, trial)).fetchone()
             data = to_case(row) if row else {}
             data = {k: data.get(k) for k in CASE_COLS if k in data}
             for key in CASE_COLS:
@@ -477,6 +528,7 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
 @router.post("", status_code=201)
 def create_case(c: CaseIn) -> dict:
     with get_db() as db:
+        check_duplicate(db, c)
         save_case_masters(db, c)
         cur = write_case(
             db,
@@ -490,6 +542,7 @@ def create_case(c: CaseIn) -> dict:
 def update_case(case_id: int, c: CaseIn) -> dict:
     with get_db() as db:
         fetch_case(db, case_id)
+        check_duplicate(db, c, case_id)
         save_case_masters(db, c)
         write_case(
             db,

@@ -115,6 +115,9 @@ async function api(path, options = {}) {
 // 案件番号（= ガントチャートの PJ名）と、ガントチャートへのリンク
 const ganttUrl = (no) => `/?pj=${encodeURIComponent(no)}`;
 
+// 案件番号＋試験名（試験名があるときだけ）
+const caseLabel = (c) => (c.trial ? `${c.case_no}（${c.trial}）` : c.case_no);
+
 function caseNoTag(c) {
   const tag = el("span", "pj-tag");
   tag.title = `案件番号（PJ名）: ${c.case_no}`;
@@ -125,6 +128,11 @@ function caseNoTag(c) {
   link.title = `ガントチャートでこの案件のタスクを表示（${c.task_count ?? 0} 件）`;
   link.addEventListener("click", (e) => e.stopPropagation());
   tag.append(c.case_no, link);
+  if (c.trial) {
+    const wrap = el("span", "no-wrap");
+    wrap.append(tag, el("span", "trial-tag", c.trial));
+    return wrap;
+  }
   return tag;
 }
 
@@ -150,13 +158,13 @@ function filtered({ ignoreStatus = false } = {}) {
     if (!ignoreStatus && state.status && c.status !== state.status) return false;
     if (state.area && !c.areas.includes(state.area)) return false;
     if (state.person && c.pl !== state.person && !people(c).includes(state.person)) return false;
-    if (q && ![c.case_no, c.customer, c.name].some((v) => (v || "").toLowerCase().includes(q))) return false;
+    if (q && ![c.case_no, c.trial, c.customer, c.name].some((v) => (v || "").toLowerCase().includes(q))) return false;
     return true;
   });
 }
 
 const byEnd = (a, b) =>
-  (a.end_date || "9999").localeCompare(b.end_date || "9999") || a.case_no.localeCompare(b.case_no);
+  (a.end_date || "9999").localeCompare(b.end_date || "9999") || a.case_no.localeCompare(b.case_no) || (a.trial || "").localeCompare(b.trial || "");
 
 // ------------------------------------------------------------ 描画
 function render() {
@@ -312,7 +320,7 @@ async function changeStatus(c, status) {
   try {
     Object.assign(c, await api(`/api/cases/${c.id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }));
     render();
-    toast(`${c.case_no} を「${status}」に変更しました`);
+    toast(`${caseLabel(c)} を「${status}」に変更しました`);
   } catch (err) {
     c.status = prev;
     toast(err.message, true);
@@ -362,7 +370,7 @@ function renderList() {
       return td;
     };
     cell(st, "nowrap");
-    cell(c.case_no, "nowrap");
+    cell(caseLabel(c), "nowrap");
     cell(c.customer);
     cell(c.name);
     cell(c.pl, "nowrap");
@@ -447,8 +455,8 @@ function renderTimeline() {
   for (const c of dated) {
     const row = el("div", "tl-row");
     const left = el("div", "tl-left");
-    left.append(el("span", "no", c.case_no), el("span", "nm", `${c.customer ? c.customer + "｜" : ""}${c.name}`));
-    left.title = `${c.case_no} ${c.customer} ${c.name}`;
+    left.append(el("span", "no", caseLabel(c)), el("span", "nm", `${c.customer ? c.customer + "｜" : ""}${c.name}`));
+    left.title = `${caseLabel(c)} ${c.customer} ${c.name}`;
     left.addEventListener("click", () => openDrawer(c));
     const track = el("div", "tl-track");
     track.style.width = `${W}px`;
@@ -457,7 +465,7 @@ function renderTimeline() {
     const s = x(parseDate(c.start_date));
     bar.style.left = `${s}px`;
     bar.style.width = `${Math.max(x(parseDate(c.end_date) + DAY_MS) - s, 6)}px`;
-    bar.title = `${c.case_no} ${c.name}\n${c.status}\n${c.start_date} 〜 ${c.end_date}`;
+    bar.title = `${caseLabel(c)} ${c.name}\n${c.status}\n${c.start_date} 〜 ${c.end_date}`;
     const after = el("span", "after", [c.pl && `PL ${c.pl}`, shortDate(c.end_date)].filter(Boolean).join(" / "));
     bar.append(after);
     bar.addEventListener("click", () => openDrawer(c));
@@ -493,15 +501,15 @@ function renderAreaChecks(selected) {
   }
 }
 
-// 案件番号: 他の案件で使用中の番号は除外（自分の番号は残す）
+// 案件番号: 登録済みの番号をすべて選べる（同じ番号で試験が複数ある場合は「試験名」で区別）
 function fillCaseNoSelect(current = "") {
   const used = new Set(state.cases.filter((x) => x.id !== state.current?.id).map((x) => x.case_no));
-  const opts = state.masters.case_nos.filter((n) => !used.has(n));
+  const opts = [...state.masters.case_nos];
   if (current && !opts.includes(current)) opts.push(current);
   const sel = form.case_no;
   sel.innerHTML = "";
-  sel.append(new Option(opts.length ? "選択してください" : "未使用の案件番号がありません（管理サイトで登録）", ""));
-  for (const n of opts) sel.append(new Option(n, n));
+  sel.append(new Option(opts.length ? "選択してください" : "案件番号がありません（管理サイトで登録）", ""));
+  for (const n of opts) sel.append(new Option(used.has(n) ? `${n}（登録済み・試験を追加）` : n, n));
   sel.value = current;
 }
 
@@ -558,12 +566,13 @@ function openDrawer(c = null) {
   fillCaseNoSelect(c?.case_no || "");
   fillCustomerSelect(c?.customer || "");
   if (c) {
-    $("#d-no").textContent = c.case_no;
+    $("#d-no").textContent = caseLabel(c);
     $("#d-title").textContent = c.name;
     for (const k of ["name", "detail", "status", "pl", "assignees", "start_date", "end_date",
-      "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url"]) form[k].value = c[k] || "";
+      "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url", "trial"]) form[k].value = c[k] || "";
     renderAreaChecks(c.areas);
     $("#btn-delete").hidden = false;
+    $("#btn-add-trial").hidden = false;
     $("#logs").hidden = false;
     loadNotes(c);
     loadMonthly(c);
@@ -574,6 +583,7 @@ function openDrawer(c = null) {
     sel.value = state.status || "顧客開発";
     renderAreaChecks(state.area ? [state.area] : []);
     $("#btn-delete").hidden = true;
+    $("#btn-add-trial").hidden = true;
     $("#logs").hidden = true;
     $("#tasks-section").hidden = true;
   }
@@ -583,11 +593,28 @@ function openDrawer(c = null) {
   (c ? $("#note-form").body : form.case_no).focus();
 }
 
+// 同じ案件番号で試験を追加: 案件番号・顧客名・案件名・PL・担当者・領域を引き継いで新規入力
+$("#btn-add-trial").addEventListener("click", () => {
+  const c = state.current;
+  if (!c) return;
+  openDrawer(null);
+  fillCaseNoSelect(c.case_no);
+  fillCustomerSelect(c.customer || "");
+  form.name.value = c.name;
+  form.pl.value = c.pl || "";
+  form.assignees.value = c.assignees || "";
+  renderAreaChecks(c.areas);
+  $("#d-no").textContent = `${c.case_no}（新しい試験）`;
+  $("#d-title").textContent = "同じ案件番号で試験を追加";
+  syncNoCopy();
+  form.trial.focus();
+});
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const body = {};
   for (const k of ["case_no", "customer", "name", "detail", "status", "pl", "assignees", "start_date", "end_date",
-    "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url"]) body[k] = form[k].value.trim();
+    "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url", "trial"]) body[k] = form[k].value.trim();
   body.start_date ||= null;
   body.end_date ||= null;
   body.areas = [...form.querySelectorAll('input[name="areas"]:checked')].map((i) => i.value);
@@ -869,7 +896,7 @@ const delForm = $("#form-delete");
 $("#btn-delete").addEventListener("click", () => {
   const c = state.current;
   delForm.reset();
-  $("#delete-no").textContent = `「${c.case_no}」`;
+  $("#delete-no").textContent = `「${caseLabel(c)}」`;
   $("#delete-error").textContent = "";
   delForm.querySelector("button[type=submit]").disabled = true;
   $("#dlg-delete").showModal();
@@ -887,7 +914,7 @@ delForm.addEventListener("submit", async (e) => {
     drawer.close();
     await loadCases();
     render();
-    toast(`案件 ${c.case_no} を削除しました`);
+    toast(`案件 ${caseLabel(c)} を削除しました`);
   } catch (err) {
     $("#delete-error").textContent = err.message;
   }
@@ -952,8 +979,9 @@ $("#f-cancel").addEventListener("change", (e) => {
     await Promise.all([loadCases(), loadMasters()]);
     const saved = store.get("cases.view");
     const target = params.get("case") || params.get("pj");
-    const found = target && state.cases.find((c) => c.case_no === target);
-    if (target && !found) state.q = target; // 案件が無い場合は検索語として扱う
+    const hits = target ? state.cases.filter((c) => c.case_no === target) : [];
+    const found = hits.length === 1 ? hits[0] : null;
+    if (target && !found) state.q = target; // 案件が無い・同じ番号で試験が複数ある場合は検索語として扱う
     $("#q").value = state.q;
     setView(["board", "list", "timeline"].includes(saved) ? saved : "board");
     if (found) openDrawer(found);

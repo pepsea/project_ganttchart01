@@ -94,7 +94,7 @@ def person(name: str) -> dict:
             role = _role(name, r["pl"], r["assignees"])
             if role:
                 a = json.loads(r["areas"] or "[]")
-                cases.append({"case_no": r["case_no"], "name": r["name"], "customer": r["customer"],
+                cases.append({"case_no": r["case_no"], "trial": r["trial"], "name": r["name"], "customer": r["customer"],
                               "status": r["status"], "role": role, "end_date": r["end_date"], "areas": a})
                 add_areas(a)
 

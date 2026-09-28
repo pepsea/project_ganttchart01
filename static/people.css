@@ -105,3 +105,4 @@
   background: color-mix(in srgb, var(--c) 14%, white); color: color-mix(in srgb, var(--c) 75%, black);
   border: 1px solid color-mix(in srgb, var(--c) 40%, white); font-weight: 600; }
 .task-list .t-area { font-size: 11px; }
+.case-list .trial { font-size: 10.5px; font-weight: 700; margin-left: 4px; padding: 0 5px; border-radius: 4px; background: #fff1d6; color: #8a5a00; }
