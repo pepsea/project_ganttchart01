@@ -306,7 +306,24 @@ def fetch_case(db: sqlite3.Connection, case_id: int) -> dict:
 
 
 def case_label(case_no: str, trial: str) -> str:
-    return f"{case_no}（{trial}）" if trial else case_no
+    if not trial:
+        return case_no
+    return f"{case_no}-{trial}" if trial.isdigit() else f"{case_no}（{trial}）"
+
+
+def auto_trial(db: sqlite3.Connection, c: "CaseIn", exclude_id: int | None = None) -> None:
+    """同じ案件番号の案件があり、試験名が空欄なら、次の番号（2, 3, …）を試験名に自動で付ける。
+    最初の案件（試験名が空欄）は 1 番として数える"""
+    if c.trial:
+        return
+    rows = db.execute("SELECT trial FROM cases WHERE case_no = ? AND id <> ?", (c.case_no, exclude_id or 0)).fetchall()
+    if not rows:
+        return
+    used = {1 if not r["trial"] else int(r["trial"]) for r in rows if not r["trial"] or r["trial"].isdigit()}
+    n = 2
+    while n in used:
+        n += 1
+    c.trial = str(n)
 
 
 def check_duplicate(db: sqlite3.Connection, c: "CaseIn", exclude_id: int | None = None) -> None:
@@ -528,6 +545,7 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
 @router.post("", status_code=201)
 def create_case(c: CaseIn) -> dict:
     with get_db() as db:
+        auto_trial(db, c)
         check_duplicate(db, c)
         save_case_masters(db, c)
         cur = write_case(
@@ -542,6 +560,7 @@ def create_case(c: CaseIn) -> dict:
 def update_case(case_id: int, c: CaseIn) -> dict:
     with get_db() as db:
         fetch_case(db, case_id)
+        auto_trial(db, c, case_id)
         check_duplicate(db, c, case_id)
         save_case_masters(db, c)
         write_case(

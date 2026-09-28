@@ -193,7 +193,8 @@ function renderDetail(d) {
   const cl = el("ul", "case-list");
   for (const c of d.cases) {
     const li = el("li");
-    li.append(roleTag(c.role), extLink([el("b", "", c.case_no), c.trial ? el("span", "trial", c.trial) : "", ` ${c.name} ↗`], `/cases?case=${enc(c.case_no)}`, "c-link"),
+    li.append(roleTag(c.role), extLink([el("b", "", c.trial && /^\d+$/.test(c.trial) ? `${c.case_no}-${c.trial}` : c.case_no),
+      c.trial && !/^\d+$/.test(c.trial) ? el("span", "trial", c.trial) : "", ` ${c.name} ↗`], `/cases?case=${enc(c.case_no)}`, "c-link"),
       el("span", "c-cust", c.customer || ""), el("span", "c-status", c.status),
       el("span", "c-end", c.end_date ? `終了予定 ${slashDate(c.end_date)}` : "終了予定 未設定"));
     cl.append(li);

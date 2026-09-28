@@ -115,8 +115,9 @@ async function api(path, options = {}) {
 // 案件番号（= ガントチャートの PJ名）と、ガントチャートへのリンク
 const ganttUrl = (no) => `/?pj=${encodeURIComponent(no)}`;
 
-// 案件番号＋試験名（試験名があるときだけ）
-const caseLabel = (c) => (c.trial ? `${c.case_no}（${c.trial}）` : c.case_no);
+// 案件番号＋試験名。自動で付いた番号（2, 3, …）は「C-2026-001-2」、名前は「C-2026-001（追加検体）」
+const isAutoNo = (t) => /^\d+$/.test(t || "");
+const caseLabel = (c) => (!c.trial ? c.case_no : isAutoNo(c.trial) ? `${c.case_no}-${c.trial}` : `${c.case_no}（${c.trial}）`);
 
 function caseNoTag(c) {
   const tag = el("span", "pj-tag");
@@ -127,8 +128,8 @@ function caseNoTag(c) {
   link.rel = "noopener";
   link.title = `ガントチャートでこの案件のタスクを表示（${c.task_count ?? 0} 件）`;
   link.addEventListener("click", (e) => e.stopPropagation());
-  tag.append(c.case_no, link);
-  if (c.trial) {
+  tag.append(isAutoNo(c.trial) ? caseLabel(c) : c.case_no, link);
+  if (c.trial && !isAutoNo(c.trial)) {
     const wrap = el("span", "no-wrap");
     wrap.append(tag, el("span", "trial-tag", c.trial));
     return wrap;
