@@ -427,7 +427,10 @@ dialog textarea {
 
 .area-list li.group-head { border-bottom: 0; padding: 10px 4px 2px; font-size: 12px; font-weight: 600; color: var(--muted); }
 
-.logout { order: 99; margin-left: auto; color: var(--muted); font-size: 12px; text-decoration: none; white-space: nowrap; }
+/* ログアウトはメニュー（タブ）のすぐ隣。ほかのツールはその後ろ */
+.toolbar > * { order: 2; }
+.toolbar > .nav { order: 0; }
+.toolbar > .logout { order: 1; margin-left: -6px; color: var(--muted); font-size: 12px; text-decoration: none; white-space: nowrap; }
 .logout:hover { color: var(--text); text-decoration: underline; }
 
 /* 列幅の変更（PJ名・タスクの見出し右端をドラッグ） */
@@ -483,7 +486,4 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .g-row:not(.g-head):nth-child(even) .g-track { background: rgba(120, 130, 150, .035); }
 
 /* ガントチャート: 色の説明はツールバーの 2 行目 */
-.legend-row { flex-basis: 100%; padding-top: 2px; order: 100; } /* ログアウト（order: 99）より後ろ */
-/* ガントチャート: ログアウトは 1 行目（メニューの行）の右端に置き、ツールバーを 3 行に収める */
-.toolbar:has(.legend-row) .logout { order: 1; }
-.toolbar:has(.legend-row) .tools { order: 2; }
+.toolbar > .legend-row { flex-basis: 100%; padding-top: 2px; order: 100; } /* ツールバーの最後の行 */
