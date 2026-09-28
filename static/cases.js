@@ -660,6 +660,7 @@ function openDrawer(c = null) {
   fillCustomerSelect(c?.customer || "");
   if (c) {
     $("#d-no").textContent = caseLabel(c);
+    history.replaceState(null, "", `/cases?id=${c.id}`);
     // 登録日・終了日（自動で記録。右上に薄く表示）
     const day = (v) => (v ? v.slice(0, 10).replaceAll("-", "/") : "");
     $("#d-dates").textContent = [c.created_at && `登録 ${day(c.created_at)}`, c.finished_at && `終了 ${day(c.finished_at)}`]
@@ -741,6 +742,22 @@ form.addEventListener("submit", async (e) => {
 });
 
 drawer.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => drawer.close()));
+// 個々の案件へのリンク: 開いている間はアドレス欄をその案件のリンク（/cases?id=）にする
+const caseUrl = (c) => `${location.origin}/cases?id=${c.id}`;
+drawer.addEventListener("close", () => {
+  if (new URLSearchParams(location.search).has("id")) history.replaceState(null, "", "/cases");
+});
+$("#btn-copy-link").addEventListener("click", async () => {
+  const c = state.current;
+  if (!c) return;
+  const url = caseUrl(c);
+  try {
+    await navigator.clipboard.writeText(url);
+    toast(`リンクをコピーしました: ${url}`);
+  } catch (_) {
+    prompt("このリンクをコピーしてください", url); // クリップボードが使えないとき
+  }
+});
 drawer.addEventListener("click", (e) => { if (e.target === drawer) drawer.close(); }); // 背景クリックで閉じる
 
 // ---- 進捗メモ（日付ごと。同じ日に複数可。日付は今日が初期値）
@@ -1079,7 +1096,8 @@ $("#f-cancel").addEventListener("change", (e) => {
     const saved = store.get("cases.view");
     const target = params.get("case") || params.get("pj");
     const hits = target ? state.cases.filter((c) => c.case_no === target) : [];
-    const found = hits.length === 1 ? hits[0] : null;
+    const byId = state.cases.find((c) => String(c.id) === params.get("id")); // 個々の案件へのリンク（?id=）
+    const found = byId || (hits.length === 1 ? hits[0] : null);
     if (target && !found) state.q = target; // 案件が無い・同じ番号で試験が複数ある場合は検索語として扱う
     $("#q").value = state.q;
     setView(["board", "list", "timeline"].includes(saved) ? saved : "board");

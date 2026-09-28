@@ -544,3 +544,4 @@ a.link-ic.free { background: #2fa36b; border-color: #2fa36b; max-width: 9em; ove
 .tl-bar.no-start { border-left-width: 0; border-radius: 0 5px 5px 0; }
 .tl-sep { height: 26px; background: #f3f4f7; }
 .tl-sep .tl-left { font-size: 11.5px; font-weight: 700; color: var(--muted); background: #f3f4f7; cursor: default; }
+.case-top-actions .spacer { flex: 1; }
