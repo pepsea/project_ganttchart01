@@ -194,7 +194,7 @@ if not dbmod.FRESH_DB:
 
 # テーブルの作成・更新（列の追加など。既存データは消さない）
 MIGRATIONS = [init_db, cases.init_db, platforms.init_db, services.init_db, documents.init_db, links.init_db,
-              groups.init_db]
+              groups.init_db, people.init_db]
 for migrate in MIGRATIONS:
     migrate()
 dbmod.finish_startup()

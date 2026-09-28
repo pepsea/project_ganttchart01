@@ -28,8 +28,8 @@ function areaPill(a, cls = "area-pill") {
   return s;
 }
 
-async function api(path) {
-  const res = await fetch(path);
+async function api(path, options = {}) {
+  const res = await fetch(path, { headers: options.body ? { "Content-Type": "application/json" } : {}, ...options });
   if (res.status === 401) {
     location.href = `/login?next=${enc(location.pathname + location.search)}`;
     throw new Error("ログインが必要です");
@@ -38,12 +38,13 @@ async function api(path) {
   return res.json();
 }
 
-function toast(msg) {
+function toast(msg, isErr = true) {
   const t = $("#toast");
   t.textContent = msg;
-  t.classList.add("show", "err");
+  t.classList.toggle("err", isErr);
+  t.classList.add("show");
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => t.classList.remove("show"), 4000);
+  toast._t = setTimeout(() => t.classList.remove("show"), isErr ? 4000 : 2200);
 }
 
 // 別タブで開くリンク
@@ -93,7 +94,13 @@ function renderList() {
   }
 }
 
+// 保存していないメモがあるか
+let memoDirty = false;
+window.addEventListener("beforeunload", (e) => { if (memoDirty) { e.preventDefault(); e.returnValue = ""; } });
+
 async function select(name) {
+  if (memoDirty && name !== state.current && !confirm("保存していないメモがあります。破棄して切り替えますか？")) return;
+  memoDirty = false;
   state.current = name;
   history.replaceState(null, "", `/people?name=${enc(name)}`);
   renderList();
@@ -132,6 +139,40 @@ function renderDetail(d) {
   }
   head.append(stats);
   root.append(head);
+
+  // メモ（人ごとに 1 件。タスクの上）
+  const ms = el("section", "pp-section pp-memo");
+  const mh = el("h3", "", "メモ");
+  const upd = el("span", "hint memo-upd", d.memo_updated_at ? `最終更新 ${d.memo_updated_at.slice(0, 16)}` : "");
+  const save = el("button", "primary memo-save", "保存");
+  save.type = "button";
+  save.disabled = true;
+  mh.append(upd, save);
+  const ta = el("textarea", "memo-text");
+  ta.rows = 4;
+  ta.placeholder = `${d.name} さんについてのメモ（予定、注意事項、引き継ぎなど）`;
+  ta.value = d.memo || "";
+  ta.addEventListener("input", () => {
+    memoDirty = ta.value !== (d.memo || "");
+    save.disabled = !memoDirty;
+    save.textContent = memoDirty ? "保存（未保存）" : "保存";
+  });
+  save.addEventListener("click", async () => {
+    try {
+      const r = await api(`/api/people/${enc(d.name)}/memo`, { method: "PUT", body: JSON.stringify({ body: ta.value }) });
+      d.memo = r.memo;
+      d.memo_updated_at = r.memo_updated_at;
+      memoDirty = false;
+      save.disabled = true;
+      save.textContent = "保存";
+      upd.textContent = `最終更新 ${r.memo_updated_at.slice(0, 16)}`;
+      toast("メモを保存しました", false);
+    } catch (err) {
+      toast(`保存できませんでした: ${err.message}`);
+    }
+  });
+  ms.append(mh, ta);
+  root.append(ms);
 
   // タスク（ガントチャートで担当者がこの人のもの。終了日順）
   const ts = el("section", "pp-section");

@@ -1,7 +1,8 @@
 """個人ごとの担当（表示のみ）
 
 個人の画面（/people）で、人ごとに担当領域・担当基盤技術・担当案件・担当グループ・担当サービス・
-ガントチャートのタスクを表示するための集計 API。データは各画面のテーブルから読むだけで、新しいテーブルは持たない。
+ガントチャートのタスクを表示するための集計 API。担当などは各画面のテーブルから読むだけ。
+個人のメモ（person_notes）だけはこの画面で書き、人ごとに 1 件保存する。
 人の一覧は、タスクの担当者・案件の PL / 担当者・基盤の PL / メンバー・サービスの PL / 担当者・グループの PL / メンバーから集める。
 """
 
@@ -10,12 +11,38 @@ import re
 from datetime import date, timedelta
 
 from fastapi import APIRouter
+from pydantic import BaseModel
 
 from db import get_db
 
 router = APIRouter(prefix="/api/people", tags=["個人の担当"])
 
 SOON_DAYS = 3  # ガントチャートと同じ: 終了日の 3 日前からオレンジ
+
+
+def init_db() -> None:
+    with get_db() as db:
+        db.execute("""CREATE TABLE IF NOT EXISTS person_notes (
+                          name       TEXT PRIMARY KEY,   -- 名前（担当者・PL・メンバーの名前）
+                          body       TEXT NOT NULL DEFAULT '',  -- メモ
+                          updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+                      )""")
+
+
+class MemoIn(BaseModel):
+    body: str = ""
+
+
+@router.put("/{name}/memo")
+def save_memo(name: str, m: MemoIn) -> dict:
+    """個人のメモを保存（人ごとに 1 件。上書き）"""
+    name = name.strip()
+    with get_db() as db:
+        db.execute("""INSERT INTO person_notes(name, body) VALUES (?, ?)
+                      ON CONFLICT(name) DO UPDATE SET body = excluded.body, updated_at = datetime('now', 'localtime')""",
+                   (name, m.body.rstrip()))
+        r = db.execute("SELECT body, updated_at FROM person_notes WHERE name = ?", (name,)).fetchone()
+    return {"memo": r["body"], "memo_updated_at": r["updated_at"]}
 
 
 def _names(text: str) -> list[str]:
@@ -118,8 +145,11 @@ def person(name: str) -> dict:
                   for r in db.execute("SELECT id, name, pl, members FROM team_groups ORDER BY created_at DESC, id DESC")
                   if (role := _role(name, r["pl"], r["members"]))]
 
+        memo = db.execute("SELECT body, updated_at FROM person_notes WHERE name = ?", (name,)).fetchone()
+
     counts = {}
     for t in tasks:
         counts[t["state"]] = counts.get(t["state"], 0) + 1
     return {"name": name, "areas": list(areas), "tasks": tasks, "task_counts": counts, "cases": cases,
-            "platforms": platforms, "services": services, "groups": groups}
+            "platforms": platforms, "services": services, "groups": groups,
+            "memo": memo["body"] if memo else "", "memo_updated_at": memo["updated_at"] if memo else ""}

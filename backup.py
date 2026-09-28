@@ -57,6 +57,7 @@ TABLE_LABELS = {
     "team_kpis": "グループの今年度の達成指標（画面では非表示）",
     "team_achievements": "グループの達成したこと（年度ごと）",
     "team_years": "グループ目標の年度（選択肢）",
+    "person_notes": "個人のメモ",
     "areas": "領域",
     "case_nos": "案件番号",
     "customers": "顧客",
