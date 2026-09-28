@@ -56,7 +56,7 @@ function extLink(parts, href, cls = "chip") {
   a.append(...(Array.isArray(parts) ? parts : [parts]));
   return a;
 }
-const roleTag = (role) => el("span", `role-tag${role === "PL" ? " pl" : ""}`, role);
+const roleTag = (role) => el("span", `role-tag${role === "PL" || role === "リーダー" ? " pl" : ""}`, role);
 
 // タスクの状態ごとの件数（小さな色付きの数字）
 function stateCounts(counts, withZero = false) {

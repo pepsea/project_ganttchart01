@@ -1,6 +1,6 @@
 "use strict";
 
-// グループ目標: 左にグループ一覧、右に選んだグループ（グループ名・PL・メンバー・全体目標・目標）
+// グループ目標: 左にグループ一覧、右に選んだグループ（グループ名・リーダー・メンバー・全体目標・目標）。リーダーはデータ上は pl 列
 const DAY_MS = 86400000;
 const $ = (sel, root = document) => root.querySelector(sel);
 const state = { groups: [], goals: [], achievements: [], statuses: [], current: null, services: [], platforms: [],
@@ -81,9 +81,9 @@ function goalDue(g) {
 
 function teamLine(g) {
   const line = el("div", "team-line");
-  if (g.pl) line.append(el("span", "role", "PL"), el("b", "", g.pl));
+  if (g.pl) line.append(el("span", "role", "リーダー"), el("b", "", g.pl));
   if (g.members) line.append(el("span", "role", "メンバー"), el("span", "", people(g).join("・")));
-  if (!g.pl && !g.members) line.append(el("span", "hint", "PL・メンバー未設定"));
+  if (!g.pl && !g.members) line.append(el("span", "hint", "リーダー・メンバー未設定"));
   return line;
 }
 
@@ -111,7 +111,7 @@ function renderList() {
     // next_due = 未達成（達成・保留以外）の目標で一番早い期限
     if (g.next_due && daysLeft(g.next_due) < 0) meta.append(el("span", "over-badge", "期限超過あり"));
     li.append(meter, meta);
-    const team = [g.pl && `PL ${g.pl}`, g.members && `メンバー ${people(g).join("・")}`].filter(Boolean).join(" ／ ");
+    const team = [g.pl && `リーダー ${g.pl}`, g.members && `メンバー ${people(g).join("・")}`].filter(Boolean).join(" ／ ");
     if (team) li.append(el("div", "team", team));
     li.addEventListener("click", () => select(g.id));
     ul.append(li);
@@ -138,13 +138,13 @@ function renderDetail() {
     root.append(el("p", "hint gp-empty", "左の一覧からグループを選択してください。"));
     return;
   }
-  // 見出し: グループ名・PL・メンバー・サマリー
+  // 見出し: グループ名・リーダー・メンバー・サマリー
   root.style.setProperty("--gc", groupColor(g));
   const head = el("div", "gp-head");
   const box = el("div");
   box.append(el("h2", "", g.name), teamLine(g));
   const edit = el("button", "", "✎ 編集");
-  edit.title = "グループ名・PL・メンバー・大目標・関連サービス / 基盤技術を編集";
+  edit.title = "グループ名・リーダー・メンバー・大目標・関連サービス / 基盤技術を編集";
   edit.addEventListener("click", () => openGroupDialog(g));
   const editRow = el("div");
   editRow.style.marginTop = "8px";

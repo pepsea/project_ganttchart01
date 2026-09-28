@@ -141,7 +141,8 @@ def person(name: str) -> dict:
                 services.append({"service_no": r["service_no"], "name": r["name"], "role": role, "areas": a})
                 add_areas(a)
 
-        groups = [{"id": r["id"], "name": r["name"], "role": role}
+        # グループでは PL を「リーダー」と表示する
+        groups = [{"id": r["id"], "name": r["name"], "role": "リーダー" if role == "PL" else role}
                   for r in db.execute("SELECT id, name, pl, members FROM team_groups ORDER BY created_at DESC, id DESC")
                   if (role := _role(name, r["pl"], r["members"]))]
 

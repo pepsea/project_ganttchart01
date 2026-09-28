@@ -510,7 +510,7 @@ async def delete_achievement(gid: int, aid: int, body: PasswordIn) -> Response:
 # 1 ファイルに「種別」列（グループ / 目標 / 達成したこと / 指標 / 年度）の行を並べる。
 # このファイルをインポートすれば、データが空の状態からでも元に戻せる。
 
-EXPORT_HEADERS = ["種別", "グループ名", "PL", "メンバー", "大目標", "関連サービス", "関連基盤技術",
+EXPORT_HEADERS = ["種別", "グループ名", "リーダー", "メンバー", "大目標", "関連サービス", "関連基盤技術",
                   "年度", "状態", "目標", "達成基準", "時期", "期限",
                   "達成したこと", "担当者", "達成日", "指標", "進捗", "メモ", "リンク"]
 
@@ -531,7 +531,7 @@ def export_csv() -> Response:
     with get_db() as db:
         groups = [_to_group(r) for r in db.execute(f"{GROUP_SELECT} ORDER BY g.created_at, g.id", {"y": None})]
         for g in groups:
-            add(種別="グループ", グループ名=g["name"], PL=g["pl"], メンバー=g["members"], 大目標=g["vision"],
+            add(種別="グループ", グループ名=g["name"], リーダー=g["pl"], メンバー=g["members"], 大目標=g["vision"],
                 関連サービス="、".join(g["services"]), 関連基盤技術="、".join(g["platforms"]))
         for g in groups:
             for t in db.execute(f"SELECT * FROM team_goals WHERE group_id = ? ORDER BY fiscal_year, id", (g["id"],)):
@@ -577,7 +577,7 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
             row = db.execute("SELECT * FROM team_groups WHERE name = ?", (name,)).fetchone()
             if kind == "グループ":
                 cur = _to_group(row) if row else {}
-                data = {"name": name, "pl": r.get("PL") or cur.get("pl", ""), "members": r.get("メンバー") or cur.get("members", ""),
+                data = {"name": name, "pl": r.get("リーダー") or r.get("PL") or cur.get("pl", ""), "members": r.get("メンバー") or cur.get("members", ""),
                         "vision": r.get("大目標") or cur.get("vision", ""), "kpi": cur.get("kpi", ""),
                         "services": split_list(r["関連サービス"]) if r.get("関連サービス") else cur.get("services", []),
                         "platforms": split_list(r["関連基盤技術"]) if r.get("関連基盤技術") else cur.get("platforms", [])}
