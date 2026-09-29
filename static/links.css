@@ -90,3 +90,13 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .link-list li:last-child { border-bottom: 0; }
 .link-list li:nth-child(even):not(.empty-li) { background: #fafbfd; }
 .link-list li:hover { background: #f3f7ff; }
+
+/* ドラッグ＆ドロップで順番を入れ替え（つまみ ⠿） */
+.drag-handle { cursor: grab; color: #8a90a3; font-size: 15px; line-height: 1; padding: 2px 4px; border-radius: 4px; user-select: none; flex: 0 0 auto; }
+.drag-handle:hover { background: #eef0f4; color: var(--text); }
+.drag-handle.off { cursor: default; opacity: .25; }
+.drag-handle.off:hover { background: none; }
+li.dragging { opacity: .45; }
+li.drop-before { box-shadow: inset 0 3px 0 var(--accent); }
+li.drop-after { box-shadow: inset 0 -3px 0 var(--accent); }
+.link-list li { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }

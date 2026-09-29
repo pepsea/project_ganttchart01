@@ -67,11 +67,31 @@ function render() {
       ul.append(el("li", "empty-li", all.length ? "条件に合う資料はありません" : "まだ資料がありません。「＋ 追加」から登録してください。"));
       continue;
     }
-    for (const d of list) ul.append(renderDoc(d));
+    // 順番はドラッグ＆ドロップで入れ替え（検索・絞り込み中は不可）
+    const filtering = !!(q || state.area);
+    for (const d of list) {
+      const li = renderDoc(d);
+      const handle = dragHandle(!filtering);
+      li.prepend(handle);
+      if (!filtering) {
+        enableDragSort(li, handle, {
+          group: `doc-${cat}`, id: d.id, ids: () => all.map((x) => x.id),
+          onDrop: (ids) => reorder(cat, ids),
+        });
+      }
+      ul.append(li);
+    }
   }
 }
 
 // 1 件 = 1 行: 資料名・領域・資料リンク・作成日時・編集（目的は資料名にマウスを置くと表示）
+async function reorder(category, ids) {
+  try {
+    state.docs = await api("/api/documents/reorder", { method: "POST", body: JSON.stringify({ category, ids }) });
+    render();
+  } catch (err) { toast(err.message, true); }
+}
+
 function renderDoc(d) {
   const li = el("li", "doc-row");
   const name = el("span", "doc-name", d.title);

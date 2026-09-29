@@ -50,6 +50,8 @@ def init_db() -> None:
                 db.execute(f"ALTER TABLE documents ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
         if "category" not in cols:  # 欄（既存の資料はグループ資料）
             db.execute("ALTER TABLE documents ADD COLUMN category TEXT NOT NULL DEFAULT 'group'")
+        if "sort_order" not in cols:  # 手で入れ替えた順番（0 = 未設定。未設定の資料は上に、作成日時の新しい順で並ぶ）
+            db.execute("ALTER TABLE documents ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
 
 
 def _url(v):
@@ -129,7 +131,7 @@ def _fetch(db: sqlite3.Connection, did: int) -> dict:
 @router.get("")
 def list_documents() -> list[dict]:
     with get_db() as db:
-        return [_to_doc(r) for r in db.execute("SELECT * FROM documents ORDER BY created_date DESC, id DESC")]
+        return [_to_doc(r) for r in db.execute("SELECT * FROM documents ORDER BY (sort_order <> 0), sort_order, created_date DESC, id DESC")]
 
 
 # ---------------------------------------------------------------- CSV（エクスポート・インポート）
@@ -188,6 +190,23 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                 db.execute(f"INSERT INTO documents({', '.join(COLS)}) VALUES ({', '.join('?' * len(COLS))})", d.values())
                 added += 1
     return {"added": added, "updated": updated}
+
+
+class ReorderIn(BaseModel):
+    category: Category
+    ids: list[int]
+
+
+@router.post("/reorder")
+def reorder_documents(r: ReorderIn) -> list[dict]:
+    """欄（グループ資料 / その他参考資料）の中の順番をまとめて保存（ドラッグ＆ドロップ）"""
+    with get_db() as db:
+        current = {row["id"] for row in db.execute("SELECT id FROM documents WHERE category = ?", (r.category,))}
+        if set(r.ids) != current or len(r.ids) != len(current):
+            raise HTTPException(409, "資料の一覧が変わっています。画面を読み込み直してから並べ替えてください")
+        for n, did in enumerate(r.ids, start=1):
+            db.execute("UPDATE documents SET sort_order = ? WHERE id = ?", (n, did))
+    return list_documents()
 
 
 @router.post("", status_code=201)

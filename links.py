@@ -181,6 +181,23 @@ def update_link(lid: int, l: LinkIn) -> dict:
         return _fetch(db, lid)
 
 
+class ReorderIn(BaseModel):
+    category: Category
+    ids: list[int]
+
+
+@router.post("/reorder")
+def reorder_links(r: ReorderIn) -> list[dict]:
+    """欄の中の順番をまとめて保存（ドラッグ＆ドロップ）。ids はその欄の全リンクを新しい順番で"""
+    with get_db() as db:
+        current = {row["id"] for row in db.execute("SELECT id FROM ref_links WHERE category = ?", (r.category,))}
+        if set(r.ids) != current or len(r.ids) != len(current):
+            raise HTTPException(409, "リンクの一覧が変わっています。画面を読み込み直してから並べ替えてください")
+        for n, rid in enumerate(r.ids, start=1):
+            db.execute("UPDATE ref_links SET sort_order = ? WHERE id = ?", (n, rid))
+    return list_links()
+
+
 @router.post("/{lid}/move")
 def move_link(lid: int, m: MoveIn) -> list[dict]:
     """同じ欄の中で 1 つ上／下と入れ替える"""

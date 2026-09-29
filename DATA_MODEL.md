@@ -120,6 +120,7 @@
 |---|---|---|
 | `documents` | id | |
 | | category | 欄: `group` = グループ資料（左） / `other` = その他参考資料（右） |
+| | sort_order | 手で入れ替えた順番（ドラッグ＆ドロップ。0 = 未設定。未設定の資料は上に、作成日時の新しい順で並ぶ） |
 | | title / purpose | 資料名 / 目的 |
 | | created_date | 作成日時（`YYYY-MM-DD HH:MM`。未入力なら登録時刻） |
 | | link1_label / link1_url | 資料リンク 1 の表示名 / URL |

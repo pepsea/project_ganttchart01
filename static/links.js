@@ -86,28 +86,27 @@ function render() {
         main.append(tags);
       }
       const ops = el("div", "l-ops");
-      const i = all.indexOf(l);
-      const up = el("button", "", "↑");
-      up.title = "上へ";
-      up.disabled = i === 0 || filtering;
-      up.addEventListener("click", () => move(l, "up"));
-      const down = el("button", "", "↓");
-      down.title = "下へ";
-      down.disabled = i === all.length - 1 || filtering;
-      down.addEventListener("click", () => move(l, "down"));
       const edit = el("button", "", "✎");
       edit.title = "編集";
       edit.addEventListener("click", () => openDialog(l));
-      ops.append(up, down, edit);
-      li.append(main, ops);
+      ops.append(edit);
+      // 順番はドラッグ＆ドロップで入れ替え（検索・絞り込み中は不可）
+      const handle = dragHandle(!filtering);
+      li.append(handle, main, ops);
+      if (!filtering) {
+        enableDragSort(li, handle, {
+          group: `link-${cat}`, id: l.id, ids: () => all.map((x) => x.id),
+          onDrop: (ids) => reorder(cat, ids),
+        });
+      }
       ul.append(li);
     });
   }
 }
 
-async function move(l, direction) {
+async function reorder(category, ids) {
   try {
-    state.links = await api(`/api/links/${l.id}/move`, { method: "POST", body: JSON.stringify({ direction }) });
+    state.links = await api("/api/links/reorder", { method: "POST", body: JSON.stringify({ category, ids }) });
     render();
   } catch (err) { toast(err.message, true); }
 }
