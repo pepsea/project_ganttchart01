@@ -21,18 +21,30 @@
 [hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", sans-serif;
+  /* Mac: ヒラギノ / Windows: 游ゴシック UI → メイリオ UI → メイリオ / Linux: Noto Sans JP。
+     日本語の書体を先に指定し、Windows で古い書体（MS ゴシックなど）に落ちないようにする */
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic UI", "Meiryo UI", Meiryo, "Noto Sans JP", "Segoe UI", sans-serif;
   font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   color: var(--text);
   background: var(--bg);
   display: flex;
   flex-direction: column;
 }
 
-button, .button, select, input {
+button, .button, select, input, textarea {
   font: inherit;
   color: inherit;
 }
+/* スクロールバーを細く（Windows は標準で太く常に表示されるため、Mac と見た目・幅をそろえる） */
+* { scrollbar-width: thin; scrollbar-color: #c3c8d1 transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c3c8d1; border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: #a7adb8; background-clip: padding-box; border: 2px solid transparent; }
 button, .button {
   border: 1px solid var(--line-strong);
   background: var(--panel);
