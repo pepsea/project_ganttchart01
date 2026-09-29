@@ -86,7 +86,7 @@ button.primary:hover { filter: brightness(1.08); }
   width: var(--left-w);
   flex: 0 0 var(--left-w);
   display: grid;
-  grid-template-columns: 190px var(--w-pj, 240px) var(--w-task, 200px) 80px 56px 40px 96px 34px;
+  grid-template-columns: var(--w-area, 190px) var(--w-pj, 240px) var(--w-task, 200px) var(--w-assignee, 80px) 56px 40px 96px 34px;
   align-items: center;
   background: var(--panel);
   border-right: 1px solid var(--line-strong);
@@ -306,7 +306,7 @@ dialog label.radio { flex-direction: row; align-items: flex-start; gap: 6px; col
 .toast.err { background: var(--today); }
 
 /* 列を折りたたむ */
-.gantt.compact .g-left { grid-template-columns: 190px var(--w-pj, 240px) var(--w-task, 200px) 34px; }
+.gantt.compact .g-left { grid-template-columns: var(--w-area, 190px) var(--w-pj, 240px) var(--w-task, 200px) 34px; }
 .gantt.compact .g-left > .col-detail { display: none; }
 .proj-cell { height: 100%; }
 .proj-cell select { border-right: 1px solid var(--line); }
