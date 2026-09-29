@@ -124,3 +124,7 @@
   border: 1px solid color-mix(in srgb, var(--c) 55%, white); font-weight: 700; }
 .auto-areas { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 11.5px; }
 .area-pill.sm { font-size: 10.5px; padding: 0 8px; opacity: .8; }
+.pp-areas > h3 .memo-save[hidden] { display: none; }
+.pp-areas > h3 .count { margin-right: auto; }
+.pp-areas > h3 .memo-save { margin-left: 0; }
+.pp-areas > h3 button + button { margin-left: 6px; }

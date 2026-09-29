@@ -118,58 +118,81 @@ async function select(name) {
 }
 
 // ------------------------------------------------------------ 詳細
-// 担当領域: 領域の札を押して選び、「保存」で確定（自分で設定する）
+// 担当領域: 設定済みなら選んだ領域だけを表示（関係ない領域は出さない）。「変更」で全領域の札を出して選び直す。
+// 未設定のときは全領域の札を出して選んでもらう
 function areasSection(d) {
   const sec = el("section", "pp-section pp-areas");
   const h = el("h3", "", "担当領域");
   const count = el("span", "count", "");
-  const save = el("button", "primary memo-save", "保存");
-  save.type = "button";
-  save.disabled = true;
-  h.append(count, save);
+  const btn = el("button", "primary memo-save", "保存");
+  btn.type = "button";
+  const cancel = el("button", "memo-save", "キャンセル");
+  cancel.type = "button";
+  h.append(count, cancel, btn);
   sec.append(h);
+  const body = el("div", "area-body");
+  sec.append(body);
+  let editing = d.areas.length === 0;
   let chosen = [...d.areas];
-  const chips = el("div", "area-choose");
+  const dirty = () => JSON.stringify([...chosen].sort()) !== JSON.stringify([...d.areas].sort());
+
   const paint = () => {
-    chips.innerHTML = "";
-    const all = [...state.areas, ...chosen.filter((a) => !state.areas.includes(a))];
-    for (const a of all) {
-      const b = el("button", `area-chip${chosen.includes(a) ? " on" : ""}`, a);
-      b.type = "button";
-      b.style.setProperty("--c", areaColor(a));
-      b.addEventListener("click", () => {
-        chosen = chosen.includes(a) ? chosen.filter((x) => x !== a) : [...chosen, a];
-        areasDirty = JSON.stringify([...chosen].sort()) !== JSON.stringify([...d.areas].sort());
-        save.disabled = !areasDirty;
-        save.textContent = areasDirty ? "保存（未保存）" : "保存";
-        paint();
-      });
-      chips.append(b);
+    body.innerHTML = "";
+    count.textContent = `${d.areas.length ? (editing ? chosen.length : d.areas.length) : chosen.length} 件${editing ? "選択中" : ""}`;
+    cancel.hidden = !(editing && d.areas.length);
+    if (editing) {
+      btn.textContent = dirty() ? "保存（未保存）" : "保存";
+      btn.disabled = !dirty();
+      const chips = el("div", "area-choose");
+      const all = [...state.areas, ...chosen.filter((a) => !state.areas.includes(a))];
+      for (const a of all) {
+        const b = el("button", `area-chip${chosen.includes(a) ? " on" : ""}`, a);
+        b.type = "button";
+        b.style.setProperty("--c", areaColor(a));
+        b.addEventListener("click", () => {
+          chosen = chosen.includes(a) ? chosen.filter((x) => x !== a) : [...chosen, a];
+          areasDirty = dirty();
+          paint();
+        });
+        chips.append(b);
+      }
+      body.append(chips);
+      if (!state.areas.length) body.append(el("p", "hint", "領域が登録されていません（管理サイトで登録）"));
+    } else {
+      btn.textContent = "変更";
+      btn.disabled = false;
+      const list = el("div", "chips");
+      for (const a of d.areas) list.append(areaPill(a));
+      body.append(list);
     }
-    count.textContent = `${chosen.length} 件選択中`;
+    if (d.auto_areas.length && (editing || !d.areas.length)) {
+      const hint = el("div", "hint auto-areas", "参考: 担当の案件・タスクなどに出てくる領域 → ");
+      for (const a of d.auto_areas) hint.append(areaPill(a, "area-pill sm"));
+      body.append(hint);
+    }
   };
   paint();
-  save.addEventListener("click", async () => {
+
+  cancel.addEventListener("click", () => {
+    chosen = [...d.areas];
+    editing = false;
+    areasDirty = false;
+    paint();
+  });
+  btn.addEventListener("click", async () => {
+    if (!editing) { editing = true; paint(); return; } // 「変更」: 全領域の札を出して選び直す
     try {
       const r = await api(`/api/people/${enc(d.name)}/areas`, { method: "PUT", body: JSON.stringify({ areas: chosen }) });
       d.areas = r.areas;
       chosen = [...r.areas];
       areasDirty = false;
-      save.disabled = true;
-      save.textContent = "保存";
+      editing = d.areas.length === 0; // 選んだ領域だけを表示（何も選ばなければ全領域の札のまま）
       paint();
       toast("担当領域を保存しました", false);
     } catch (err) {
       toast(`保存できませんでした: ${err.message}`);
     }
   });
-  sec.append(chips);
-  if (d.auto_areas.length) {
-    const hint = el("div", "hint auto-areas", "参考: 担当の案件・タスクなどに出てくる領域 → ");
-    for (const a of d.auto_areas) hint.append(areaPill(a, "area-pill sm"));
-    sec.append(hint);
-  }
-  if (!state.areas.length) sec.append(el("p", "hint", "領域が登録されていません（管理サイトで登録）"));
   return sec;
 }
 
