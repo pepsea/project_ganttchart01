@@ -57,7 +57,7 @@
 | | areas | 領域（JSON 配列。1 つ目が一覧のグループ） |
 | | vision | 全体目標 |
 | | plan_url / box_url / teams_url | 研究計画 / BOX / Teams のリンク |
-| | sort_order | 基盤一覧の並び順（↑↓ で入れ替え。0 = 未設定 → 起動時に基盤番号順で最後に並べる） |
+| | sort_order | 基盤一覧の並び順（ドラッグ＆ドロップで入れ替え。0 = 未設定 → 起動時に基盤番号順で最後に並べる） |
 | | link_label / link_url | （未使用）旧・自由リンク 1 つ。`platform_links` 作成時に 1 回だけ引き継ぎ済み |
 | `platform_links` | id, platform, label, url, sort_order, created_at | 基盤の自由リンク（何個でも。platform = 基盤番号）。`platform_links` を含まない古いバックアップを復元したときは、復元した platforms の旧列から作り直す |
 | | updated_at | 基本情報の更新日時 |

@@ -587,3 +587,13 @@ table.pf-table td.order { width: 64px; white-space: nowrap; }
 table.pf-table .mv { display: inline-flex; gap: 3px; }
 table.pf-table .mv-btn { padding: 0 7px; font-size: 12px; line-height: 22px; }
 table.pf-table .mv-btn:disabled { opacity: .25; cursor: default; }
+
+/* ドラッグ＆ドロップで順番を入れ替え */
+table.pf-table .drag-handle { display: inline-block; cursor: grab; color: #8a90a3; font-size: 16px; line-height: 1; padding: 2px 6px; border-radius: 4px; user-select: none; }
+table.pf-table .drag-handle:hover { background: #eef0f4; color: var(--text); }
+table.pf-table .drag-handle.off { cursor: default; opacity: .25; }
+table.pf-table .drag-handle.off:hover { background: none; }
+table.pf-table tr.dragging { opacity: .45; }
+table.pf-table tr.drop-before td { box-shadow: inset 0 3px 0 var(--accent); }
+table.pf-table tr.drop-after td { box-shadow: inset 0 -3px 0 var(--accent); }
+table.pf-table td.order { width: 40px; text-align: center; }

@@ -160,6 +160,53 @@ function sortPlatforms(list) {
   });
 }
 
+// ドラッグ＆ドロップで順番を入れ替え（つまみを押したときだけ行をドラッグ可能にする）
+let dragName = null;
+function setupRowDrag(tr, p, handle) {
+  handle.addEventListener("mousedown", () => { tr.draggable = true; });
+  handle.addEventListener("click", (e) => e.stopPropagation());
+  tr.addEventListener("dragstart", (e) => {
+    dragName = p.name;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", p.name);
+    tr.classList.add("dragging");
+  });
+  tr.addEventListener("dragend", () => {
+    tr.draggable = false;
+    dragName = null;
+    tr.classList.remove("dragging");
+    document.querySelectorAll("#pf-table tr.drop-before, #pf-table tr.drop-after")
+      .forEach((x) => x.classList.remove("drop-before", "drop-after"));
+  });
+  tr.addEventListener("dragover", (e) => {
+    if (!dragName || dragName === p.name) return;
+    e.preventDefault();
+    const r = tr.getBoundingClientRect();
+    const after = e.clientY > r.top + r.height / 2;
+    tr.classList.toggle("drop-after", after);
+    tr.classList.toggle("drop-before", !after);
+  });
+  tr.addEventListener("dragleave", () => tr.classList.remove("drop-before", "drop-after"));
+  tr.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    const from = dragName;
+    const after = tr.classList.contains("drop-after");
+    tr.classList.remove("drop-before", "drop-after");
+    if (!from || from === p.name) return;
+    // 手動の順番（全基盤）で並べ直してから、置いた位置に入れる
+    const names = sortByOrder(state.platforms).map((x) => x.name).filter((n) => n !== from);
+    names.splice(names.indexOf(p.name) + (after ? 1 : 0), 0, from);
+    try {
+      state.platforms = await api("/api/platforms/reorder", { method: "POST", body: JSON.stringify({ names }) });
+      renderList();
+      toast(`${from} を移動しました`);
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+}
+const sortByOrder = (list) => [...list].sort((a, b) => (a.sort_order || 99999) - (b.sort_order || 99999) || a.name.localeCompare(b.name, "ja", { numeric: true }));
+
 // 基盤一覧（表）: 1 基盤 1 行。行をクリックすると詳細を表示
 function renderList() {
   refreshPersonFilter();
@@ -209,28 +256,11 @@ function renderList() {
       tr.append(c);
       return c;
     };
-    // 順番: ↑↓ で 1 つ上／下と入れ替え（手動の順番で、絞り込みなしのときだけ）
+    // 順番: 行のつまみ（⠿）をドラッグして好きな位置へ（手動の順番で、絞り込みなしのときだけ）
     const canMove = pfSort.key === "order" && !state.filterArea && !state.filterPerson;
-    const mv = el("span", "mv");
-    const i = list.indexOf(p);
-    for (const [dir, label, disabled] of [["up", "↑", i === 0], ["down", "↓", i === list.length - 1]]) {
-      const b = el("button", "mv-btn", label);
-      b.type = "button";
-      b.disabled = !canMove || disabled;
-      b.title = canMove ? (dir === "up" ? "1 つ上へ" : "1 つ下へ")
-        : "「順番」で並べ、絞り込みを解除すると入れ替えられます";
-      b.addEventListener("click", async (e) => {
-        e.stopPropagation(); // 行クリック（詳細を開く）にしない
-        try {
-          state.platforms = await api(`/api/platforms/${enc(p.name)}/move`, { method: "POST", body: JSON.stringify({ direction: dir }) });
-          renderList();
-          $(`#pf-table tr[data-name="${CSS.escape(p.name)}"] .mv-btn:not(:disabled)`)?.focus();
-        } catch (err) {
-          toast(err.message, true);
-        }
-      });
-      mv.append(b);
-    }
+    const mv = el("span", `drag-handle${canMove ? "" : " off"}`, "⠿");
+    mv.title = canMove ? "ドラッグして順番を入れ替え" : "「順番」で並べ、絞り込みを解除するとドラッグで入れ替えられます";
+    if (canMove) setupRowDrag(tr, p, mv);
     tr.dataset.name = p.name;
     td(mv, "order");
     td(p.name, "no");

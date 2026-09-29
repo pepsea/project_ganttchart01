@@ -650,6 +650,22 @@ def move_platform(name: str, m: MoveIn) -> list[dict]:
     return list_platforms()
 
 
+class ReorderIn(BaseModel):
+    names: list[str]
+
+
+@router.post("/reorder")
+def reorder_platforms(r: ReorderIn) -> list[dict]:
+    """基盤一覧の順番をまとめて保存（ドラッグ＆ドロップ）。names は全基盤番号を新しい順番で"""
+    with get_db() as db:
+        current = {row["name"] for row in db.execute("SELECT name FROM platforms")}
+        if set(r.names) != current or len(r.names) != len(current):
+            raise HTTPException(409, "基盤の一覧が変わっています。画面を読み込み直してから並べ替えてください")
+        for k, n in enumerate(r.names, start=1):
+            db.execute("UPDATE platforms SET sort_order = ? WHERE name = ?", (k, n))
+    return list_platforms()
+
+
 @router.put("/{name}")
 def update_platform(name: str, p: PlatformIn) -> dict:
     with get_db() as db:
