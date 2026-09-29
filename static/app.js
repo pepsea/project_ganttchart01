@@ -718,6 +718,7 @@ function openTaskDialog(task = null) {
     const ol = $("#task-outlook");
     ol.href = `/api/tasks/${task.id}/outlook.ics`;
     ol.hidden = false;
+    $("#task-teams").hidden = false;
     $("#task-title").textContent = "タスク詳細";
     $("#task-submit").textContent = "保存";
     for (const k of ["area", "project", "task", "assignee", "priority", "start_date", "end_date", "detail"]) {
@@ -733,6 +734,7 @@ function openTaskDialog(task = null) {
     meta.hidden = false;
   } else {
     $("#task-outlook").hidden = true;
+    $("#task-teams").hidden = true;
     $("#task-title").textContent = "タスク追加";
     $("#task-submit").textContent = "追加";
     meta.hidden = true;
@@ -859,6 +861,18 @@ $("#q").addEventListener("input", (e) => {
 
 let backCase = null; // 案件管理から来たときの戻り先 { pj, id }
 
+// タスク詳細: Teams で共有（保存済みの内容。リンクはこのタスクを開くガントチャート）
+$("#task-teams").addEventListener("click", () => {
+  const t = editing;
+  if (!t) return;
+  const who = assigneeText(t);
+  const pj = pjText(t.project);
+  const md = `${Number(t.end_date.slice(5, 7))}/${Number(t.end_date.slice(8, 10))}`;
+  const text = `【締切 ${md}】${t.task}（${[pj, who && `担当：${who}`].filter(Boolean).join("・")}）`;
+  const url = `${location.origin}/?${new URLSearchParams({ ...(t.project ? { pj: t.project } : {}), task: t.id })}`;
+  shareToTeams(url, text);
+});
+
 // ツールバー: PJ を選んだら「← 案件に戻る」（青）/「← 基盤に戻る」（緑）を出す
 function syncPjActions() {
   const pj = state.filter.projects;
@@ -920,6 +934,7 @@ $("#btn-compact").addEventListener("click", (e) => {
   try {
     // URL パラメータ: ?pj=PJ名 で絞り込み、?q=キーワードで検索（案件管理からの移動用）
     const params = new URLSearchParams(location.search);
+    const openTaskId = params.get("task"); // 共有リンク（?task=番号）: そのタスクの詳細を開く
     state.filter.projects = params.get("pj") || "";
     if (params.get("back") && params.get("pj")) backCase = { pj: params.get("pj"), id: params.get("back") };
     state.q = params.get("q") || "";
@@ -933,6 +948,11 @@ $("#btn-compact").addEventListener("click", (e) => {
     syncPjActions();
     render();
     scrollToDate(todayMs());
+    const shared = openTaskId && state.tasks.find((t) => String(t.id) === openTaskId);
+    if (shared) {
+      scrollToDate(parseDate(shared.end_date));
+      openTaskDialog(shared);
+    }
   } catch (err) {
     toast(`読み込みに失敗しました: ${err.message}`, true);
   }

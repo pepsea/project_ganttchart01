@@ -517,3 +517,7 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 #dlg-task .actions .spacer { flex: 1; }
 a.outlook-btn { color: #0f6cbd; border-color: #b4d2f0; background: #eef5fc; text-decoration: none; font-weight: 600; }
 a.outlook-btn:hover { background: #dfeefb; }
+
+/* Teams で共有 */
+.teams-btn { color: #fff; background: #5b5fc7; border-color: #5b5fc7; font-weight: 600; }
+.teams-btn:hover { filter: brightness(1.1); }

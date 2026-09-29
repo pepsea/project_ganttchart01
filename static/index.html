@@ -93,6 +93,8 @@
       <div class="actions">
         <a class="button outlook-btn" id="task-outlook" download hidden
           title="終了日（締切）を Outlook の予定に追加（予定ファイル .ics を開く。1 日前に通知）">📅 Outlook に追加</a>
+        <button type="button" class="teams-btn" id="task-teams" hidden
+          title="このタスクを Teams のチャット・チャネルに共有（送り先を選んで投稿）">Teams で共有</button>
         <span class="spacer"></span>
         <button type="button" data-close>キャンセル</button>
         <button type="submit" class="primary" id="task-submit">追加</button>
@@ -139,6 +141,7 @@
     </form>
   </dialog>
 
+  <script src="/static/teams.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>
