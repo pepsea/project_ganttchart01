@@ -814,13 +814,6 @@ const caseUrl = (c) => `${location.origin}/cases?id=${c.id}`;
 drawer.addEventListener("close", () => {
   if (new URLSearchParams(location.search).has("id")) history.replaceState(null, "", "/cases");
 });
-// Teams で共有: 案件へのリンク（/cases?id=）とメッセージを投稿
-$("#btn-teams").addEventListener("click", () => {
-  const c = state.current;
-  if (!c) return;
-  const who = [c.customer, c.pl && `PL ${c.pl}`].filter(Boolean).join("・");
-  shareToTeams(caseUrl(c), `案件 ${caseLabel(c)} ${c.name}（${c.status}${who ? `・${who}` : ""}）`);
-});
 $("#btn-copy-link").addEventListener("click", async () => {
   const c = state.current;
   if (!c) return;

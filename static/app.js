@@ -714,11 +714,7 @@ function openTaskDialog(task = null) {
   fillPjOptions(form.project, task?.project || "", "（なし）");
   const meta = $("#task-meta");
   if (task) {
-    // Outlook に追加: 保存済みのタスクの締切（終了日）を予定ファイルでダウンロード
-    const ol = $("#task-outlook");
-    ol.href = `/api/tasks/${task.id}/outlook.ics`;
-    ol.hidden = false;
-    $("#task-teams").hidden = false;
+    $("#task-copy").hidden = false;
     $("#task-title").textContent = "タスク詳細";
     $("#task-submit").textContent = "保存";
     for (const k of ["area", "project", "task", "assignee", "priority", "start_date", "end_date", "detail"]) {
@@ -733,8 +729,7 @@ function openTaskDialog(task = null) {
     meta.append(s);
     meta.hidden = false;
   } else {
-    $("#task-outlook").hidden = true;
-    $("#task-teams").hidden = true;
+    $("#task-copy").hidden = true;
     $("#task-title").textContent = "タスク追加";
     $("#task-submit").textContent = "追加";
     meta.hidden = true;
@@ -861,16 +856,27 @@ $("#q").addEventListener("input", (e) => {
 
 let backCase = null; // 案件管理から来たときの戻り先 { pj, id }
 
-// タスク詳細: Teams で共有（保存済みの内容。リンクはこのタスクを開くガントチャート）
-$("#task-teams").addEventListener("click", () => {
+// タスク詳細: 内容とリンクをコピー（保存済みの内容。リンクはこのタスクを開くガントチャート /?task=番号）
+$("#task-copy").addEventListener("click", async () => {
   const t = editing;
   if (!t) return;
-  const who = assigneeText(t);
-  const pj = pjText(t.project);
-  const md = `${Number(t.end_date.slice(5, 7))}/${Number(t.end_date.slice(8, 10))}`;
-  const text = `【締切 ${md}】${t.task}（${[pj, who && `担当：${who}`].filter(Boolean).join("・")}）`;
+  const left = Math.round((parseDate(t.end_date) - todayMs()) / DAY_MS);
+  const rest = left < 0 ? `${-left} 日超過` : left === 0 ? "今日まで" : `あと ${left} 日`;
   const url = `${location.origin}/?${new URLSearchParams({ ...(t.project ? { pj: t.project } : {}), task: t.id })}`;
-  shareToTeams(url, text);
+  const text = [
+    `【タスク】${t.task}`,
+    t.project ? `PJ名：${pjText(t.project)}` : "",
+    `担当：${assigneeText(t) || "未設定"}　優先度：${t.priority}　領域：${t.area}`,
+    `期間：${t.start_date.replaceAll("-", "/")} 〜 ${t.end_date.replaceAll("-", "/")}（${rest}）`,
+    t.detail ? `詳細：${t.detail}` : "",
+    `リンク：${url}`,
+  ].filter(Boolean).join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    toast("タスクの内容とリンクをコピーしました");
+  } catch (_) {
+    prompt("この内容をコピーしてください", text); // クリップボードが使えないとき（http でのアクセスなど）
+  }
 });
 
 // ツールバー: PJ を選んだら「← 案件に戻る」（青）/「← 基盤に戻る」（緑）を出す
