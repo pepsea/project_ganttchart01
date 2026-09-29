@@ -1009,7 +1009,7 @@ function renderTasks(p, tasks) {
     name.title = `${t.task}${t.detail ? "\n\n" + t.detail : ""}`;
     const rest = left < 0 ? `${-left} 日超過` : left === 0 ? "今日まで" : `あと ${left} 日`;
     const rc = el("span", `days-left${left < 0 ? " over" : left <= 7 ? " near" : ""}`, rest);
-    lc.append(name, el("span", "who", t.assignee || "—"), el("span", "dt", slashDate(t.start_date)),
+    lc.append(name, el("span", "who", (t.assignee || "").split(" ").filter(Boolean).join("・") || "—"), el("span", "dt", slashDate(t.start_date)),
       el("span", "dt", slashDate(t.end_date)), rc);
     const track = el("div", "pg-track");
     const bar = el("div", "pg-bar");
@@ -1018,7 +1018,7 @@ function renderTasks(p, tasks) {
     bar.style.width = `${Math.max(x(parseDate(t.end_date) + DAY_MS) - s0, 6)}px`;
     bar.style.setProperty("--c", areaColor(t.area));
     bar.append(el("span", `prio p-${t.priority}`), el("span", "lbl", t.task));
-    bar.title = `${t.task}\n領域: ${t.area} / 担当: ${t.assignee || "-"} / 優先度: ${t.priority}\n${t.start_date} 〜 ${t.end_date}（${rest}）`;
+    bar.title = `${t.task}\n領域: ${t.area} / 担当: ${(t.assignee || "").split(" ").filter(Boolean).join("・") || "-"} / 優先度: ${t.priority}\n${t.start_date} 〜 ${t.end_date}（${rest}）`;
     track.append(bar);
     // クリックでガントチャート（この基盤のタスク）へ移って編集（同じ画面のまま）
     const openGantt = () => { location.href = `/?pj=${enc(p.name)}`; };

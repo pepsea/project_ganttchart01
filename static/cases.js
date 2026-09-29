@@ -881,7 +881,7 @@ async function loadCaseTasks(c) {
     const name = td(t.task, due ? `t-name ${due}` : "t-name");
     if (t.detail) name.title = t.detail;
     td(t.area, "nowrap");
-    td(t.assignee || "—", "nowrap");
+    td((t.assignee || "").split(" ").filter(Boolean).join("・") || "—", "nowrap");
     const pr = td(t.priority, "nowrap prio");
     pr.dataset.v = t.priority;
     td(`${md(t.start_date)} 〜 ${md(t.end_date)}`, "nowrap");

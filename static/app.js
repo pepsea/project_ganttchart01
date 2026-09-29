@@ -173,6 +173,10 @@ function inRange(task) {
 const NO_ASSIGNEE = "\u0000none"; // 担当者フィルターの「（未設定）」
 
 // 表示対象: 領域・PJ・担当者で絞り込み、担当者の名前順 → 締切（終了日）の早い順に並べる
+// 担当者（複数はスペース区切り）
+const assigneesOf = (t) => (t.assignee ? t.assignee.split(" ") : []);
+const assigneeText = (t) => assigneesOf(t).join("・");
+
 // 担当者が未設定のタスクは最後
 const nameCollator = new Intl.Collator("ja");
 const byAssigneeThenDue = (a, b) =>
@@ -192,13 +196,13 @@ const visibleTasks = () => state.tasks.filter((t) =>
   (!state.filter.areas || t.area === state.filter.areas) &&
   (!state.filter.projects || t.project === state.filter.projects) &&
   (!state.filter.assignees ||
-    (state.filter.assignees === NO_ASSIGNEE ? !t.assignee : t.assignee === state.filter.assignees))
+    (state.filter.assignees === NO_ASSIGNEE ? !t.assignee : assigneesOf(t).includes(state.filter.assignees)))
 ).sort(byAssigneeThenDue);
 
 // 担当者の選択肢はタスクから集計する
 function refreshAssigneeFilter() {
   const sel = $("#filter-assignees");
-  const names = [...new Set(state.tasks.map((t) => t.assignee).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ja"));
+  const names = [...new Set(state.tasks.flatMap(assigneesOf))].sort((a, b) => a.localeCompare(b, "ja"));
   const hasNone = state.tasks.some((t) => !t.assignee);
   const cur = state.filter.assignees;
   sel.innerHTML = "";
@@ -427,9 +431,9 @@ function deadlineStatus(task) {
 
 // 表のセル（表示のみ）: 領域・PJ名・担当者
 function syncReadonlyCells(row, task, areaCell, projCell, assigneeCell) {
-  assigneeCell.textContent = task.assignee || "—";
+  assigneeCell.textContent = assigneeText(task) || "—";
   assigneeCell.classList.toggle("empty", !task.assignee);
-  assigneeCell.title = `担当者: ${task.assignee || "未設定"}（修正はクリックしてタスク詳細で）`;
+  assigneeCell.title = `担当者: ${assigneeText(task) || "未設定"}（修正はクリックしてタスク詳細で）`;
   areaCell.textContent = task.area;
   areaCell.title = `領域: ${task.area}（修正はクリックしてタスク詳細で）`;
   projCell.textContent = pjText(task.project) || "—";
@@ -471,10 +475,10 @@ function updateBarText(bar, task) {
   const dot = el("span", "prio-dot");
   dot.style.background = PRIO_COLOR[task.priority];
   label.append(dot, document.createTextNode(task.task));
-  $(".bar-tip", bar).textContent = [pjText(task.project), task.assignee].filter(Boolean).join(" / ");
+  $(".bar-tip", bar).textContent = [pjText(task.project), assigneeText(task)].filter(Boolean).join(" / ");
   const status = deadlineStatus(task);
   const note = status === "overdue" ? "【期限超過】\n" : status === "soon" ? "【期限まで3日以内】\n" : "";
-  bar.title = `${note}${task.task}\n領域: ${task.area} / PJ: ${pjText(task.project) || "-"}\n担当: ${task.assignee || "-"} / 優先度: ${task.priority}\n${task.start_date} 〜 ${task.end_date}${task.detail ? "\n\n" + snippet(task.detail) : ""}`;
+  bar.title = `${note}${task.task}\n領域: ${task.area} / PJ: ${pjText(task.project) || "-"}\n担当: ${assigneeText(task) || "-"} / 優先度: ${task.priority}\n${task.start_date} 〜 ${task.end_date}${task.detail ? "\n\n" + snippet(task.detail) : ""}`;
 }
 
 function placeBar(bar, startStr, endStr) {
@@ -533,7 +537,8 @@ function refreshRow(task, row) {
   const list = visibleTasks();
   const rows = gantt.querySelectorAll(".g-row[data-id]");
   const orderChanged = rows.length !== list.length || rows[list.indexOf(task)] !== row;
-  const newAssignee = !!task.assignee && ![...$("#filter-assignees").options].some((o) => o.value === task.assignee);
+  const opts = new Set([...$("#filter-assignees").options].map((o) => o.value));
+  const newAssignee = assigneesOf(task).some((n) => !opts.has(n));
   if (!inRange(task) || !list.includes(task) || orderChanged || newAssignee) return rerenderKeepScroll();
   row.style.setProperty("--area-color", areaColor(task.area));
   for (const name of ["start_date", "end_date"]) {

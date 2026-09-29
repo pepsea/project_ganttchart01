@@ -21,7 +21,7 @@
 | `tasks` | id | |
 | | area | 領域（`areas.name`） |
 | | project | PJ名 = 案件番号（`case_nos.name`）または基盤番号（`platforms.name`）。空欄可 |
-| | task / assignee / priority | タスク名 / 担当者 / 優先度（高・中・低） |
+| | task / assignee / priority | タスク名 / 担当者（複数は半角スペース区切り。1 人ならこれまで通り名前だけ） / 優先度（高・中・低） |
 | | start_date / end_date | 開始日 / 終了日 |
 | | detail | 詳細 |
 

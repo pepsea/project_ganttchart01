@@ -3,6 +3,7 @@
 import csv
 import io
 import json
+import re
 import sqlite3
 from datetime import date, datetime, timedelta
 from typing import Literal
@@ -10,7 +11,7 @@ from typing import Literal
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 import asyncio
 from contextlib import asynccontextmanager
@@ -161,11 +162,17 @@ class TaskIn(BaseModel):
     area: str = Field(min_length=1)
     project: str = ""
     task: str = Field(min_length=1)
-    assignee: str = ""
+    assignee: str = ""  # 担当者（複数はスペース区切り）
     priority: Priority = "中"
     start_date: date
     end_date: date
     detail: str = ""
+
+    @field_validator("assignee", mode="before")
+    @classmethod
+    def people(cls, v):
+        """担当者はスペース区切りで複数（全角スペースも可。重複はまとめる）"""
+        return " ".join(dict.fromkeys(n for n in re.split(r"[\s\u3000]+", v or "") if n)) if isinstance(v, str) else v
 
     @model_validator(mode="after")
     def check_dates(self):
