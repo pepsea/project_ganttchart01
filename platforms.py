@@ -51,6 +51,8 @@ def init_db() -> None:
                              ("link_label", "''"), ("link_url", "''")]:  # 自由リンク（名前と URL）
             if col not in cols:
                 db.execute(f"ALTER TABLE platforms ADD COLUMN {col} TEXT NOT NULL DEFAULT {default}")
+        if "sort_order" not in cols:  # 基盤一覧の並び順（手で入れ替える。0 = 未設定 → 最後に並べる）
+            db.execute("ALTER TABLE platforms ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
         # 一時期の単一領域（area 列）を複数領域（areas）へ引き継ぐ
         for r in db.execute("SELECT id, area FROM platforms WHERE area <> '' AND areas IN ('', '[]')").fetchall():
             db.execute("UPDATE platforms SET areas = ? WHERE id = ?", (json.dumps([r["area"]], ensure_ascii=False), r["id"]))
@@ -95,6 +97,7 @@ def init_db() -> None:
             seed_samples(db)
         if not has_links:
             db.execute(LEGACY_LINKS_COPY)
+        fill_sort_order(db)
 
 
 def seed_samples(db: sqlite3.Connection) -> None:
@@ -222,6 +225,22 @@ LEGACY_LINKS_COPY = """INSERT INTO platform_links(platform, label, url, sort_ord
                        SELECT name, link_label, link_url, 1 FROM platforms WHERE link_url <> ''"""
 
 
+def _natural(name: str) -> list:
+    """K-2 < K-10 となる並べ方"""
+    return [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", name)]
+
+
+def fill_sort_order(db: sqlite3.Connection) -> None:
+    """並び順が未設定（0）の基盤を、基盤番号の順で最後に並べる（起動時・並べ替えの前）"""
+    rows = db.execute("SELECT id, name FROM platforms WHERE sort_order = 0").fetchall()
+    if not rows:
+        return
+    n = db.execute("SELECT COALESCE(MAX(sort_order), 0) FROM platforms").fetchone()[0]
+    for r in sorted(rows, key=lambda r: _natural(r["name"])):
+        n += 1
+        db.execute("UPDATE platforms SET sort_order = ? WHERE id = ?", (n, r["id"]))
+
+
 def links_of(db: sqlite3.Connection, names: list[str] | None = None) -> dict[str, list[dict]]:
     """基盤番号ごとの自由リンク（並び順）"""
     out: dict[str, list[dict]] = {}
@@ -268,7 +287,7 @@ def fetch_platform(db: sqlite3.Connection, name: str) -> dict:
 
 
 PLATFORM_SELECT = """
-    SELECT p.name, p.title, p.owner, p.members, p.areas, p.vision, p.plan_url, p.box_url, p.teams_url, p.link_label, p.link_url, p.updated_at,
+    SELECT p.name, p.sort_order, p.title, p.owner, p.members, p.areas, p.vision, p.plan_url, p.box_url, p.teams_url, p.link_label, p.link_url, p.updated_at,
            (SELECT COUNT(*) FROM platform_topics d WHERE d.platform = p.name) AS topic_count,
            (SELECT MAX(meeting_date) FROM platform_topics d WHERE d.platform = p.name) AS last_topic_date,
            (SELECT MAX(month) FROM platform_monthly m WHERE m.platform = p.name) AS last_month,
@@ -287,7 +306,7 @@ PLATFORM_SELECT = """
 def list_platforms() -> list[dict]:
     with get_db() as db:
         links = links_of(db)
-        return [{**to_platform(r), "links": links.get(r["name"], [])} for r in db.execute(f"{PLATFORM_SELECT} ORDER BY p.id")]
+        return [{**to_platform(r), "links": links.get(r["name"], [])} for r in db.execute(f"{PLATFORM_SELECT} ORDER BY (p.sort_order = 0), p.sort_order, p.id")]
 
 
 # ---------------------------------------------------------------- エクスポート（CSV）
@@ -609,6 +628,26 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
 @router.get("/goal-statuses")
 def goal_statuses() -> list[str]:
     return list(GOAL_STATUSES)
+
+
+class MoveIn(BaseModel):
+    direction: Literal["up", "down"]
+
+
+@router.post("/{name}/move")
+def move_platform(name: str, m: MoveIn) -> list[dict]:
+    """基盤一覧で 1 つ上／下と入れ替える"""
+    with get_db() as db:
+        fetch_platform(db, name)
+        fill_sort_order(db)
+        names = [r["name"] for r in db.execute("SELECT name FROM platforms ORDER BY sort_order, id")]
+        i = names.index(name)
+        j = i - 1 if m.direction == "up" else i + 1
+        if 0 <= j < len(names):
+            names[i], names[j] = names[j], names[i]
+        for k, n in enumerate(names, start=1):
+            db.execute("UPDATE platforms SET sort_order = ? WHERE name = ?", (k, n))
+    return list_platforms()
 
 
 @router.put("/{name}")

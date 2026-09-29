@@ -131,8 +131,9 @@ function refreshPersonFilter() {
   sel.value = state.filterPerson;
 }
 
-// 基盤一覧の並び替え: 見出しをクリックでその列、もう一度で逆順（ブラウザに記憶）
+// 基盤一覧の並び: 最初は手で決めた順番（↑↓ で入れ替え）。見出しをクリックでその列、もう一度で逆順（ブラウザに記憶）
 const PF_COLS = [
+  ["order", "順番", (p) => p.sort_order || 99999],
   ["name", "基盤番号", (p) => p.name],
   ["title", "基盤名", (p) => p.title],
   ["areas", "領域", (p) => p.areas[0] ? String(state.areas.indexOf(p.areas[0])).padStart(3, "0") + p.areas.join(" ") : ""],
@@ -143,8 +144,8 @@ const PF_COLS = [
   ["last_month", "最新の月報", (p) => p.last_month],
 ];
 const pfSort = (() => {
-  try { return JSON.parse(localStorage.getItem("platforms.sort")) || { key: "name", desc: false }; }
-  catch (_) { return { key: "name", desc: false }; }
+  try { return JSON.parse(localStorage.getItem("platforms.sort2")) || { key: "order", desc: false }; }
+  catch (_) { return { key: "order", desc: false }; }
 })();
 function sortPlatforms(list) {
   const col = PF_COLS.find(([k]) => k === pfSort.key) || PF_COLS[0];
@@ -182,13 +183,14 @@ function renderList() {
   for (const [key, label] of PF_COLS) {
     const th = el("th", `sortable${pfSort.key === key ? " sorted" : ""}`);
     th.append(label, el("span", "sort-mark", pfSort.key === key ? (pfSort.desc ? " ▼" : " ▲") : ""));
-    th.title = "クリックで並び替え（もう一度で逆順）";
+    th.title = key === "order" ? "手で決めた順番で並べる（↑↓ で入れ替え）" : "クリックで並び替え（もう一度で逆順）";
     th.addEventListener("click", () => {
       // 日付・件数は最初に押したとき新しい順・多い順
       const firstDesc = ["task_count", "last_topic_date", "last_month"].includes(key);
-      if (pfSort.key === key) pfSort.desc = !pfSort.desc;
+      if (key === "order") { pfSort.key = "order"; pfSort.desc = false; } // 手動の順番は常に上から
+      else if (pfSort.key === key) pfSort.desc = !pfSort.desc;
       else { pfSort.key = key; pfSort.desc = firstDesc; }
-      try { localStorage.setItem("platforms.sort", JSON.stringify(pfSort)); } catch (_) { /* 保存できなくても並び替えは行う */ }
+      try { localStorage.setItem("platforms.sort2", JSON.stringify(pfSort)); } catch (_) { /* 保存できなくても並び替えは行う */ }
       renderList();
     });
     hr.append(th);
@@ -207,6 +209,30 @@ function renderList() {
       tr.append(c);
       return c;
     };
+    // 順番: ↑↓ で 1 つ上／下と入れ替え（手動の順番で、絞り込みなしのときだけ）
+    const canMove = pfSort.key === "order" && !state.filterArea && !state.filterPerson;
+    const mv = el("span", "mv");
+    const i = list.indexOf(p);
+    for (const [dir, label, disabled] of [["up", "↑", i === 0], ["down", "↓", i === list.length - 1]]) {
+      const b = el("button", "mv-btn", label);
+      b.type = "button";
+      b.disabled = !canMove || disabled;
+      b.title = canMove ? (dir === "up" ? "1 つ上へ" : "1 つ下へ")
+        : "「順番」で並べ、絞り込みを解除すると入れ替えられます";
+      b.addEventListener("click", async (e) => {
+        e.stopPropagation(); // 行クリック（詳細を開く）にしない
+        try {
+          state.platforms = await api(`/api/platforms/${enc(p.name)}/move`, { method: "POST", body: JSON.stringify({ direction: dir }) });
+          renderList();
+          $(`#pf-table tr[data-name="${CSS.escape(p.name)}"] .mv-btn:not(:disabled)`)?.focus();
+        } catch (err) {
+          toast(err.message, true);
+        }
+      });
+      mv.append(b);
+    }
+    tr.dataset.name = p.name;
+    td(mv, "order");
     td(p.name, "no");
     td(p.title || "（基盤名未設定）", `ttl${p.title ? "" : " untitled"}`);
     td(areaTags(p.areas), "areas");

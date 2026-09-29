@@ -498,7 +498,8 @@ table.pf-table tbody tr { cursor: pointer; }
 table.pf-table tbody tr:nth-child(even) { background: #fafbfd; }
 table.pf-table tbody tr:hover, table.pf-table tbody tr:focus { background: #eef3ff; outline: none; }
 table.pf-table tbody tr:last-child td { border-bottom: 0; }
-table.pf-table td.no { font-weight: 700; white-space: nowrap; border-left: 4px solid var(--c); font-variant-numeric: tabular-nums; }
+table.pf-table td.no { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.pf-table td.order { border-left: 4px solid var(--c); }
 table.pf-table td.ttl { font-weight: 600; min-width: 12em; }
 table.pf-table td.ttl.untitled { color: var(--muted); font-weight: 400; }
 table.pf-table td.members { font-size: 12.5px; }
@@ -580,3 +581,9 @@ table.pf-table th .sort-mark { font-size: 10px; color: var(--accent); }
 .fl-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; gap: 8px; align-items: center; }
 .fl-row input { width: 100%; min-width: 0; }
 .fl-row .fl-del { padding: 3px 10px; font-size: 12px; color: var(--today); }
+
+/* 順番の入れ替え（↑↓） */
+table.pf-table td.order { width: 64px; white-space: nowrap; }
+table.pf-table .mv { display: inline-flex; gap: 3px; }
+table.pf-table .mv-btn { padding: 0 7px; font-size: 12px; line-height: 22px; }
+table.pf-table .mv-btn:disabled { opacity: .25; cursor: default; }
