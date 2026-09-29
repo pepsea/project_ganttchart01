@@ -13,3 +13,19 @@
 #dlg-import .import-notes { margin: 8px 0; padding-left: 18px; font-size: 12.5px; line-height: 1.7; color: #3b4252; }
 #dlg-import .filename { font-weight: 600; margin: 4px 0; }
 #dlg-import .radio { display: flex; gap: 6px; align-items: baseline; margin: 6px 0; }
+
+/* 選択式のエクスポートメニュー */
+.export-menu { position: relative; }
+.export-menu summary { list-style: none; cursor: pointer; user-select: none; }
+.export-menu summary::-webkit-details-marker { display: none; }
+.export-panel { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; width: min(440px, calc(100vw - 32px));
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(20, 24, 33, .16); padding: 8px; text-align: left; }
+.export-item { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; color: var(--text); text-decoration: none; }
+a.export-item:hover { background: #eef3ff; }
+.export-item span { color: var(--muted); font-size: 12px; }
+.export-item.monthly { background: #f6f8fb; margin: 2px 0; }
+.export-item .row { display: flex; gap: 6px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+.export-item .row input { padding: 4px 6px; border: 1px solid var(--line-strong); border-radius: 6px; }
+.export-item .row .button { font-size: 12px; padding: 4px 10px; }
+.primary-link { background: var(--accent); border-color: var(--accent) !important; color: #fff !important; }
+.csv-card { overflow: visible; }

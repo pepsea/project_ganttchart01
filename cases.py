@@ -11,7 +11,7 @@ from typing import Literal
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
-from csvutil import decode_csv, parse_date
+from csvutil import csv_response, decode_csv, parse_date, read_csv
 
 from db import DB_PATH, ensure_master, get_db, sample_data_enabled
 
@@ -419,9 +419,17 @@ def _import_note(db: sqlite3.Connection, case_id: int, day: str, body: str) -> b
     return True
 
 
+def _case_row(c: dict) -> list:
+    return [c["case_no"], c["trial"], c["status"], c["customer"], c["contact"], c["name"], c["pl"], c["assignees"],
+            " ".join(c["areas"]), c["start_date"] or "", c["end_date"] or "",
+            c["box_url"], c["teams_url"], c["overview_url"], c["plan_url"], c["detail"],
+            c["link1_label"], c["link1_url"], c["link2_label"], c["link2_url"],
+            (c["created_at"] or "")[:16], (c["finished_at"] or "")[:16]]
+
+
 @router.get("/export.csv")
 def export_csv() -> Response:
-    """全案件を 1 案件 1 行で出力。月報・進捗メモはすべて日付ごとの列に展開する（新しい順）。"""
+    """全データ: 全案件を 1 案件 1 行で出力。月報・進捗メモはすべて日付ごとの列に展開する（新しい順）。"""
     cases = list_cases()
     with get_db() as db:
         notes = _notes_by_day(db)
@@ -429,21 +437,54 @@ def export_csv() -> Response:
                    for r in db.execute("SELECT case_id, month, body FROM case_monthly")}
     months = sorted({m for _, m in monthly}, reverse=True)
     weeks = sorted({w for _, w in notes}, reverse=True)
-
-    buf = io.StringIO()
-    w = csv.writer(buf)
-    w.writerow([*EXPORT_HEADERS, *(f"月報_{m}" for m in months), *(f"進捗_{wk}" for wk in weeks)])
+    rows = [[*EXPORT_HEADERS, *(f"月報_{m}" for m in months), *(f"進捗_{wk}" for wk in weeks)]]
     for c in cases:
-        w.writerow([c["case_no"], c["trial"], c["status"], c["customer"], c["contact"], c["name"], c["pl"], c["assignees"],
-                    " ".join(c["areas"]), c["start_date"] or "", c["end_date"] or "",
-                    c["box_url"], c["teams_url"], c["overview_url"], c["plan_url"], c["detail"],
-                    c["link1_label"], c["link1_url"], c["link2_label"], c["link2_url"],
-                    (c["created_at"] or "")[:16], (c["finished_at"] or "")[:16],
-                    *(monthly.get((c["id"], m), "") for m in months),
-                    *(notes.get((c["id"], wk), "") for wk in weeks)])
-    filename = f"cases_{datetime.now():%Y%m%d_%H%M%S}.csv"
-    return Response(buf.getvalue().encode("utf-8-sig"), media_type="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+        rows.append([*_case_row(c),
+                     *(monthly.get((c["id"], m), "") for m in months),
+                     *(notes.get((c["id"], wk), "") for wk in weeks)])
+    return csv_response(rows, "cases")
+
+
+@router.get("/export-list.csv")
+def export_list_csv() -> Response:
+    """案件一覧のみ（月報・進捗メモは含めない）"""
+    return csv_response([EXPORT_HEADERS, *(_case_row(c) for c in list_cases())], "cases_list")
+
+
+LOG_HEADERS_MONTHLY = ["案件番号", "試験名", "企業名", "案件名", "月", "月報"]
+LOG_HEADERS_NOTES = ["案件番号", "試験名", "企業名", "案件名", "日付", "進捗メモ"]
+
+
+@router.get("/export-monthly.csv")
+def export_monthly_csv(month: str = "") -> Response:
+    """月報一覧: 案件 × 月で 1 行。month=YYYY-MM を指定するとその月だけ"""
+    if month and not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
+        raise HTTPException(422, "月は YYYY-MM の形式で指定してください")
+    cases = {c["id"]: c for c in list_cases()}
+    with get_db() as db:
+        rows = [r for r in db.execute("SELECT case_id, month, body FROM case_monthly ORDER BY month DESC, case_id")
+                if r["case_id"] in cases and (not month or r["month"] == month)]
+    out = [LOG_HEADERS_MONTHLY]
+    for r in sorted(rows, key=lambda r: (r["month"], ), reverse=True):
+        c = cases[r["case_id"]]
+        out.append([c["case_no"], c["trial"], c["customer"], c["name"], r["month"], r["body"]])
+    return csv_response(out, f"cases_monthly{'_' + month if month else ''}")
+
+
+@router.get("/export-notes.csv")
+def export_notes_csv(month: str = "") -> Response:
+    """進捗メモ一覧: 案件 × 日付で 1 行（同じ日に複数あるときは空行でつなぐ）。month=YYYY-MM でその月だけ"""
+    if month and not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
+        raise HTTPException(422, "月は YYYY-MM の形式で指定してください")
+    cases = {c["id"]: c for c in list_cases()}
+    with get_db() as db:
+        notes = _notes_by_day(db)
+    out = [LOG_HEADERS_NOTES]
+    for (cid, day), body in sorted(notes.items(), key=lambda kv: (kv[0][1], kv[0][0]), reverse=True):
+        if cid in cases and (not month or day.startswith(month)):
+            c = cases[cid]
+            out.append([c["case_no"], c["trial"], c["customer"], c["name"], day, body])
+    return csv_response(out, f"cases_notes{'_' + month if month else ''}")
 
 
 def save_case_masters(db: sqlite3.Connection, c: CaseIn) -> None:
@@ -477,6 +518,37 @@ IMPORT_ALIASES = {
 }
 
 
+def _import_log_list(raw: bytes, kind: str) -> dict:
+    """月報一覧・進捗メモ一覧の CSV を取り込む（案件番号＋試験名で案件を探す。空欄の行は飛ばす）"""
+    col = "月報" if kind == "monthly" else "進捗メモ"
+    key = "月" if kind == "monthly" else "日付"
+    rows = read_csv(raw, ["案件番号", key, col])
+    monthly = notes = 0
+    with get_db() as db:
+        for line, r in rows:
+            no, trial = r.get("案件番号", ""), r.get("試験名", "")
+            row = db.execute("SELECT id FROM cases WHERE case_no = ? AND trial = ?", (no, trial)).fetchone()
+            if not row:
+                raise HTTPException(422, f"{line} 行目: 案件「{case_label(no, trial)}」が見つかりません（先に案件を登録してください）")
+            body = r.get(col, "")
+            if not body:
+                continue  # 空欄は今の値のまま
+            if kind == "monthly":
+                m = re.fullmatch(r"(\d{4})[-/](\d{1,2})", r[key])
+                if not m or not 1 <= int(m.group(2)) <= 12:
+                    raise HTTPException(422, f"{line} 行目: 月「{r[key]}」が正しくありません（YYYY-MM）")
+                month = f"{int(m.group(1)):04d}-{int(m.group(2)):02d}"
+                db.execute("""INSERT INTO case_monthly(case_id, month, body) VALUES (?,?,?)
+                              ON CONFLICT(case_id, month) DO UPDATE
+                              SET body = excluded.body, updated_at = datetime('now', 'localtime')
+                              WHERE body <> excluded.body""", (row["id"], month, body))
+                monthly += 1
+            else:
+                _import_note(db, row["id"], parse_date(r[key], line, "日付").isoformat(), body)
+                notes += 1
+    return {"added": 0, "updated": 0, "monthly": monthly, "notes": notes}
+
+
 @router.post("/import")
 async def import_csv(file: UploadFile = File(...)) -> dict:
     """案件 CSV を取り込む（案件番号と試験名が一致すれば更新、なければ追加）。
@@ -487,9 +559,15 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
     - 旧形式の「最新進捗週」「最新進捗メモ」列にも対応
     - 1 行でもエラーがあれば全体を取り込まない
     """
-    reader = csv.DictReader(io.StringIO(decode_csv(await file.read())))
+    raw = await file.read()
+    reader = csv.DictReader(io.StringIO(decode_csv(raw)))
     if not reader.fieldnames:
         raise HTTPException(422, "CSV にヘッダー行がありません")
+    heads = {h.strip() for h in reader.fieldnames}
+    if {"月", "月報"} <= heads:
+        return _import_log_list(raw, "monthly")
+    if {"日付", "進捗メモ"} <= heads:
+        return _import_log_list(raw, "notes")
     colmap = {h: IMPORT_ALIASES.get(h.strip()) for h in reader.fieldnames}
     # 日付パターンの列（月報・進捗）
     log_cols: dict[str, tuple[str, str]] = {}
@@ -559,12 +637,13 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                 added += 1
 
             # 登録日・終了日（CSV に書いてあれば、その日時で記録。無ければ自動）
-            if rec.get("created_at"):
-                db.execute("UPDATE cases SET created_at = ? WHERE id = ?",
-                           (parse_datetime(rec["created_at"], line, "登録日"), case_id))
-            if rec.get("finished_at"):
-                db.execute("UPDATE cases SET finished_at = ? WHERE id = ?",
-                           (parse_datetime(rec["finished_at"], line, "終了日"), case_id))
+            # （CSV は分までなので、今の値と分まで同じなら秒を含む元の値のままにする）
+            for col, field, label in (("created_at", "created_at", "登録日"), ("finished_at", "finished_at", "終了日")):
+                if rec.get(col):
+                    new = parse_datetime(rec[col], line, label)
+                    cur = db.execute(f"SELECT {field} FROM cases WHERE id = ?", (case_id,)).fetchone()[0] or ""
+                    if cur[:16] != new[:16]:
+                        db.execute(f"UPDATE cases SET {field} = ? WHERE id = ?", (new, case_id))
             sync_finished(db, case_id)
 
             if rec.get("note_week") and rec.get("note_body"):

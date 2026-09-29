@@ -212,27 +212,32 @@ const DATASETS = [
   },
   {
     name: "案件管理", desc: "案件（企業名・顧客名・PL・担当者・領域・日付・リンクなど）と、月報・進捗メモ（日付ごとの列）",
-    exports: [{ label: "CSV エクスポート", url: "/api/cases/export.csv" }],
+    exports: [
+      { title: "全データ（案件一覧＋月報・進捗メモ）", url: "/api/cases/export.csv", desc: "1 案件 1 行。月報・進捗メモをすべて日付ごとの列に展開。インポートすると元に戻せます" },
+      { title: "案件一覧のみ", url: "/api/cases/export-list.csv", desc: "案件の情報だけ（月報・進捗メモは含めない）" },
+      { title: "月報一覧", url: "/api/cases/export-monthly.csv", period: "月報", desc: "案件 × 月で 1 行。月を指定するとその月の全案件の月報のみ" },
+      { title: "進捗メモ一覧", url: "/api/cases/export-notes.csv", period: "進捗メモ", desc: "案件 × 日付で 1 行。月を指定するとその月の進捗メモのみ" },
+    ],
     importUrl: "/api/cases/import",
     notes: ["必須列: 案件番号・案件名（列名は CSV エクスポートと同じ）",
       "案件番号（と試験名）が一致する案件は更新、一致しない案件は追加されます",
       "領域は「、」やスペース区切りで複数指定できます。未登録の企業名・PJ名・領域・案件番号は自動登録されます（旧形式の「顧客名」列は企業名として読み込みます）",
       "「月報_2026-09」「進捗_2026-09-21」のような日付の列は、その月の月報・その日の進捗メモとして登録されます（同じ月・日は上書き。旧形式の「週次_」列も読み込めます）",
+      "月報一覧（列: 案件番号・試験名・月・月報）と進捗メモ一覧（列: 案件番号・試験名・日付・進捗メモ）も取り込めます（案件番号＋試験名で案件を探し、その月・その日の内容を上書き。案件が無いとエラー）",
       "「状況」の旧い名前（QC・アフターフォロー）は「アフターフォロー・その他」として取り込みます"],
     summary: (d) => `追加 ${d.added} 件 / 更新 ${d.updated} 件 / 月報 ${d.monthly} 件 / 進捗メモ ${d.notes} 件`,
   },
   {
     name: "基盤技術", desc: "基盤（基本情報・自由リンク・全体目標）・目標・ディスカッション・月報",
     exports: [
-      { label: "CSV エクスポート（全データ）", url: "/api/platforms/export-backup.csv", hint: "基盤・目標・ディスカッション・月報をすべて 1 ファイルに。空の状態からでも元に戻せます" },
-      { label: "CSV エクスポート（基盤一覧＋月報）", url: "/api/platforms/export.csv" },
-      { label: "CSV エクスポート（月報一覧・全期間）", url: "/api/platforms/export-monthly.csv" },
-      { label: "CSV エクスポート（月報一覧・この月）", url: "/api/platforms/export-monthly.csv", month: true },
-      { label: "CSV エクスポート（目標一覧）", url: "/api/platforms/export-goals.csv" },
-      { label: "CSV エクスポート（ディスカッション一覧）", url: "/api/platforms/export-topics.csv" },
+      { title: "全データ（バックアップ用）", url: "/api/platforms/export-backup.csv", desc: "基盤・目標・ディスカッション・月報をすべて 1 ファイルに。インポートすると、データが空の状態からでも元に戻せます" },
+      { title: "基盤一覧＋月報", url: "/api/platforms/export.csv", desc: "1 基盤 1 行。全体目標・目標の達成状況に加え、月報をすべて月ごとの列に展開" },
+      { title: "月報一覧", url: "/api/platforms/export-monthly.csv", period: "月報", desc: "基盤 × 月で 1 行。月を指定するとその月の全基盤の月報のみ" },
+      { title: "目標一覧", url: "/api/platforms/export-goals.csv", desc: "基盤ごとの目標（状態・期限・メモ）" },
+      { title: "ディスカッション一覧", url: "/api/platforms/export-topics.csv", desc: "日付・トピック・内容（決定事項・宿題）" },
     ],
     importUrl: "/api/platforms/import",
-    notes: ["エクスポートした 6 種類の CSV を取り込めます（種類は列名から自動で判別します）",
+    notes: ["エクスポートした 5 種類の CSV を取り込めます（種類は列名から自動で判別します）",
       "全データ: 基盤・目標・ディスカッション・月報をすべて復元します（取り込み直しても重複しません）",
       "基盤一覧＋月報: 基盤番号で照合して基盤の情報を更新し、「月報_YYYY-MM」列はその月の月報として登録・上書きします。未登録の基盤番号は新規登録されます",
       "月報一覧: 月＋基盤番号で登録・上書き / 目標一覧: 基盤番号＋目標で照合（なければ追加） / ディスカッション一覧: 基盤番号＋日付＋トピックで照合（なければ追加）"],
@@ -280,6 +285,43 @@ const DATASETS = [
   },
 ];
 
+// 選択式のエクスポートメニュー（項目ごとに説明つき。「月報一覧」などは月を指定できる）
+function exportMenu(ds) {
+  const menu = el("details", "export-menu");
+  menu.append(el("summary", "button", "CSV エクスポート ▾"));
+  const panel = el("div", "export-panel");
+  for (const ex of ds.exports) {
+    if (ex.period) {
+      const item = el("div", "export-item monthly");
+      item.append(el("b", "", ex.title), el("span", "", ex.desc));
+      const row = el("div", "row");
+      const m = document.createElement("input");
+      m.type = "month";
+      m.title = `${ex.period}を出力する月`;
+      m.value = new Date().toISOString().slice(0, 7);
+      const one = el("a", "button primary-link", "この月を出力");
+      const all = el("a", "button", "全期間を出力");
+      all.href = ex.url;
+      const sync = () => { one.href = `${ex.url}?month=${m.value}`; };
+      m.addEventListener("input", sync);
+      sync();
+      row.append(m, one, all);
+      item.append(row);
+      panel.append(item);
+    } else {
+      const a = el("a", "export-item");
+      a.href = ex.url;
+      a.append(el("b", "", ex.title), el("span", "", ex.desc));
+      panel.append(a);
+    }
+  }
+  menu.append(panel);
+  // 項目を選んだらメニューを閉じる。外をクリックしても閉じる
+  panel.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => setTimeout(() => { menu.open = false; }, 100)));
+  document.addEventListener("click", (e) => { if (!menu.contains(e.target)) menu.open = false; });
+  return menu;
+}
+
 function renderCsvList() {
   const box = $("#csv-list");
   box.innerHTML = "";
@@ -288,24 +330,12 @@ function renderCsvList() {
     const info = el("div", "csv-info");
     info.append(el("b", "", ds.name), el("span", "hint", ds.desc));
     const ops = el("div", "csv-ops");
-    // エクスポート（全データ。選択肢は複数ある場合は名前を分けて全部表示）
-    for (const ex of ds.exports) {
-      const wrap = el("span", "csv-op");
-      const a = el("a", "button", ex.label);
-      a.href = ex.url;
-      if (ex.hint) a.title = ex.hint;
-      if (ex.month) {
-        const m = document.createElement("input");
-        m.type = "month";
-        m.title = "月報を出力する月";
-        m.value = new Date().toISOString().slice(0, 7);
-        const sync = () => { a.href = `${ex.url}?month=${m.value}`; };
-        m.addEventListener("input", sync);
-        sync();
-        wrap.append(m);
-      }
-      wrap.append(a);
-      ops.append(wrap);
+    // エクスポート: 種類が複数あるデータは選択式のメニュー、1 種類だけならボタン
+    if (ds.exports.length > 1) ops.append(exportMenu(ds));
+    else {
+      const a = el("a", "button", "CSV エクスポート");
+      a.href = ds.exports[0].url;
+      ops.append(a);
     }
     const imp = el("button", "primary", "CSV インポート");
     imp.type = "button";
