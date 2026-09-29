@@ -517,3 +517,9 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 #dlg-task .actions .spacer { flex: 1; }
 .copy-btn { color: #1d6b43; border-color: #a8dcc0; background: #eefaf3; font-weight: 600; }
 .copy-btn:hover { background: #dff3e8; }
+
+/* ガントチャートの見出しクリックで並び替え */
+.g-head .g-left > div.sortable { cursor: pointer; user-select: none; }
+.g-head .g-left > div.sortable:hover { color: var(--accent); }
+.g-head .g-left > div.sorted { color: var(--text); font-weight: 700; }
+.g-head .sort-mark { font-size: 10px; color: var(--accent); }

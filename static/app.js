@@ -185,6 +185,45 @@ const byAssigneeThenDue = (a, b) =>
   nameCollator.compare(a.assignee, b.assignee) ||
   a.end_date.localeCompare(b.end_date) || a.start_date.localeCompare(b.start_date) || a.id - b.id;
 
+// 見出しクリックの並び替え: 1 回目 昇順 → 2 回目 降順 → 3 回目 初期の並び（担当者順 → 締切順）に戻る（ブラウザに記憶）
+const SORT_COLS = {
+  area: (t) => t.area,
+  pj: (t) => t.project,
+  task: (t) => t.task,
+  assignee: (t) => assigneeText(t),
+  priority: (t) => ({ 高: 1, 中: 2, 低: 3 })[t.priority] || 9,
+  start: (t) => t.start_date,
+  end: (t) => t.end_date,
+};
+const savedSort = (() => {
+  try {
+    const v = JSON.parse(localStorage.getItem("gantt.sort") || "null");
+    return v && SORT_COLS[v.key] ? v : null;
+  } catch (_) { return null; }
+})();
+let taskSortState = savedSort; // 現在の並び { key, desc } または null（初期の並び）
+const sortTasks = (list) => {
+  if (!taskSortState) return list.sort(byAssigneeThenDue);
+  const taskSort = taskSortState;
+  const get = SORT_COLS[taskSort.key];
+  const empty = (v) => v === "" || v === null || v === undefined;
+  return list.sort((a, b) => {
+    const va = get(a), vb = get(b);
+    if (empty(va) !== empty(vb)) return empty(va) ? 1 : -1; // 空欄は常に最後
+    const c = typeof va === "number" ? va - vb : nameCollator.compare(String(va), String(vb), "ja");
+    return (taskSort.desc ? -c : c) || byAssigneeThenDue(a, b);
+  });
+};
+const setTaskSort = (key) => {
+  if (!taskSortState || taskSortState.key !== key) taskSortState = { key, desc: false };
+  else if (!taskSortState.desc) taskSortState = { key, desc: true };
+  else taskSortState = null;
+  try {
+    if (taskSortState) localStorage.setItem("gantt.sort", JSON.stringify(taskSortState));
+    else localStorage.removeItem("gantt.sort");
+  } catch (_) { /* 記憶できなくても並び替えは行う */ }
+};
+
 // キーワード検索（PJ名・案件名/基盤名・タスク名・担当者・領域）
 const matchesQuery = (t) => {
   const q = state.q.trim().toLowerCase();
@@ -192,13 +231,13 @@ const matchesQuery = (t) => {
     .some((v) => (v || "").toLowerCase().includes(q));
 };
 
-const visibleTasks = () => state.tasks.filter((t) =>
+const visibleTasks = () => sortTasks(state.tasks.filter((t) =>
   matchesQuery(t) &&
   (!state.filter.areas || t.area === state.filter.areas) &&
   (!state.filter.projects || t.project === state.filter.projects) &&
   (!state.filter.assignees ||
     (state.filter.assignees === NO_ASSIGNEE ? !t.assignee : assigneesOf(t).includes(state.filter.assignees)))
-).sort(byAssigneeThenDue);
+));
 
 // 担当者の選択肢はタスクから集計する
 function refreshAssigneeFilter() {
@@ -245,11 +284,23 @@ function renderHeader(trackW) {
   heads.forEach(([h, detail], i) => {
     const cell = el("div", detail ? "col-detail" : "", h);
     const key = ["area", "pj", "task", "assignee", null, null, "end"][i] || null;
+    // 見出しをクリックで並び替え（▲昇順 ▼降順。3 回目で初期の並びに戻る）
+    const sortKey = ["area", "pj", "task", "assignee", "priority", "start", "end"][i] || null;
+    if (sortKey) {
+      cell.classList.add("sortable");
+      cell.title = "クリックで並び替え（もう一度で逆順、3 回目で元の並び）";
+      if (taskSortState && taskSortState.key === sortKey) {
+        cell.classList.add("sorted");
+        cell.append(el("span", "sort-mark", taskSortState.desc ? " ▼" : " ▲"));
+      }
+      cell.addEventListener("click", () => { setTaskSort(sortKey); render(); });
+    }
     if (key) {
       cell.classList.add("resizable");
       const handle = el("span", "col-resizer");
       handle.title = "ドラッグで列幅を変更（ダブルクリックで元の幅）";
       handle.addEventListener("pointerdown", (e) => startColResize(e, key));
+      handle.addEventListener("click", (e) => e.stopPropagation()); // 並び替えにしない
       handle.addEventListener("dblclick", () => {
         colW[key] = COL_W_DEFAULT[key];
         applyColWidths();
