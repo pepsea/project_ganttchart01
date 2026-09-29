@@ -31,12 +31,12 @@
     <section class="admin-card backup-card">
       <header>
         <h2>バックアップ <span class="count">全データ（ガントチャート・案件管理・基盤技術・グループ目標・サービス・共有資料・参考リンク・選択肢・設定）</span></h2>
-        <p class="desc">すべての記録を 1 つのファイル（JSON）に保存し、そのファイルから元に戻せます。サーバーにも毎週日曜日と、アプリの起動（アップデート）のたびに自動で保存しています（3 か月を過ぎたものは自動で削除）。サーバーのバックアップはダウンロードでき、手元のファイルをサーバーにアップロードすることもできます。</p>
+        <p class="desc">すべての記録を 1 つのファイル（JSON）に保存し、そのファイルから元に戻せます。サーバーにも毎週日曜日と、アプリの起動（アップデート）のたびに自動で保存しています（作成から約 1 か月で自動削除）。サーバーのバックアップはダウンロードでき、手元のファイルをサーバーにアップロードすることもできます。</p>
       </header>
       <div class="backup-body">
         <div class="backup-actions">
           <a class="button primary-link" href="/api/admin/backup" id="btn-download">⬇ 今すぐバックアップをダウンロード</a>
-          <button id="btn-server-save">サーバーに保存</button>
+          <button id="btn-server-save" class="primary" title="いつでも作れます。作った時点の全データを保存し、下の一覧の「復元」で戻せます（約 1 か月で自動削除）">💾 今すぐバックアップを作る</button>
           <button id="btn-upload" title="手元のバックアップファイルをサーバーの一覧に保存（データは変わりません）">⬆ ファイルをサーバーにアップロード</button>
           <input type="file" id="upload-file" accept=".json,application/json" hidden>
           <button id="btn-restore-file">ファイルから復元…</button>

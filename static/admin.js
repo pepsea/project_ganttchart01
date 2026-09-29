@@ -265,7 +265,7 @@ async function loadBackups() {
     s.append(`${t.label} `, el("b", "", String(t.rows)));
     sum.append(s);
   }
-  $("#auto-keep").textContent = `（毎週日曜日と起動時に自動保存。作成から ${d.keep_days} 日（約 3 か月）を過ぎたものは自動で削除）`;
+  $("#auto-keep").textContent = `（毎週日曜日と起動時に自動保存。作成から約 1 か月（${d.keep_days} 日）で自動削除。最新の 1 つは残す）`;
   const ul = $("#server-backups");
   ul.innerHTML = "";
   if (!d.server_backups.length) ul.append(el("li", "empty", "まだありません"));
@@ -273,6 +273,9 @@ async function loadBackups() {
     const li = el("li");
     li.append(el("span", "when", fmtTime(b.created_at)), el("span", `kind ${b.kind}`, KIND_LABEL[b.kind] || b.kind),
       el("span", "size", fmtSize(b.size)));
+    const exp = el("span", "expires", `〜 ${b.expires_at.slice(0, 10).replaceAll("-", "/")} に自動削除`);
+    exp.title = "作成から約 1 か月で自動的に削除されます（残したいときはダウンロードして手元に保存）";
+    li.append(exp);
     const dl = el("a", "button", "ダウンロード");
     dl.href = `/api/admin/backups/${encodeURIComponent(b.name)}`;
     const rs = el("button", "", "復元");

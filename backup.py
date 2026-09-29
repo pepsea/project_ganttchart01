@@ -3,7 +3,8 @@
 - バックアップは JSON（全テーブルの全行）。テーブル・列はデータベースから自動で読み取るので、今後項目が増えても対象になる
 - 復元は全データの置き換え。パスワードが必要で、直前の状態を自動でサーバーに保存してから実行する
 - サーバーには毎週日曜日に自動でバックアップを保存する（日曜に止まっていたときは、次に動いたときに保存）
-- サーバー上のバックアップは、作成から KEEP_DAYS 日（約 3 か月）を過ぎたら自動で削除する（最新の 1 つは残す）
+- サーバー上のバックアップは、作成から KEEP_DAYS 日（約 1 か月）を過ぎたら自動で削除する（最新の 1 つは残す）
+- バックアップは管理サイトからいつでも作れる（「今すぐバックアップを作る」）。一覧の「復元」でいつでも戻せる
 - バックアップファイルはダウンロードでき、手元のファイルをサーバーにアップロード（保存のみ。復元は別操作）もできる
 - アプリの起動のたび（アップデートでテーブルを更新する前）にもバックアップを保存し、直近 STARTUP_KEEP 回分を残す
 - 復元のあとには MIGRATIONS（テーブルの作成・列の追加）を実行し、古い形式のバックアップも新しいアプリで使えるようにする
@@ -28,7 +29,7 @@ BACKUP_DIR = DATA_DIR / "backups"
 FORMAT = "gantt-pm-backup"
 VERSION = 1
 AUTO_KEEP = 14  # 自動バックアップ（毎週日曜日）を残す数の上限 = 14 週分
-KEEP_DAYS = 92  # サーバー上のバックアップを残す日数（約 3 か月）。これより古いものは自動で削除
+KEEP_DAYS = 31  # サーバー上のバックアップを残す日数（約 1 か月）。これより古いものは自動で削除
 STARTUP_KEEP = 10
 NAME_RE = re.compile(r"^(auto|manual|pre-restore|startup|upload)-\d{8}-\d{6}\.json$")
 MIGRATIONS: list = []  # main.py が登録する（テーブルの作成・列の追加）
@@ -148,6 +149,7 @@ def list_server_backups() -> list[dict]:
             st = f.stat()
             items.append({"name": f.name, "kind": f.name.split("-")[0] if not f.name.startswith("pre-restore")
                           else "pre-restore", "size": st.st_size,
+                          "expires_at": ((_created(f.name) or datetime.fromtimestamp(st.st_mtime)) + timedelta(days=KEEP_DAYS)).isoformat(timespec="seconds"),
                           "created_at": datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds")})
     return sorted(items, key=lambda x: x["name"].split("-", 1)[-1] if not x["name"].startswith("pre-restore")
                   else x["name"][len("pre-restore-"):], reverse=True)
