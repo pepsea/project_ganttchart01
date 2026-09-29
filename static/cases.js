@@ -374,13 +374,72 @@ const COLUMNS = [
   ["links", "リンク"], ["last_note_date", "最新の進捗"],
 ];
 
+// 一覧の列幅: 見出しの右端をドラッグで変更（ブラウザに記憶。ダブルクリックで元の幅）
+const LIST_W_DEFAULT = { status: 104, case_no: 130, customer: 170, name: 240, pl: 72, assignees: 120, areas: 180,
+  start_date: 96, end_date: 150, links: 200, last_note_date: 280 };
+const listW = (() => {
+  try { return { ...LIST_W_DEFAULT, ...JSON.parse(localStorage.getItem("cases.listW") || "{}") }; }
+  catch (_) { return { ...LIST_W_DEFAULT }; }
+})();
+const saveListW = () => { try { localStorage.setItem("cases.listW", JSON.stringify(listW)); } catch (_) { /* 記憶できなくても幅は変わる */ } };
+const listTableW = () => COLUMNS.reduce((n, [k]) => n + listW[k], 0);
+
+function startListResize(e, key, col, table) {
+  e.preventDefault();
+  e.stopPropagation(); // 並び替えにしない
+  const handle = e.currentTarget;
+  const x0 = e.clientX;
+  const w0 = listW[key];
+  handle.setPointerCapture(e.pointerId);
+  handle.classList.add("active");
+  document.body.classList.add("resizing");
+  const move = (ev) => {
+    listW[key] = Math.min(800, Math.max(48, Math.round(w0 + ev.clientX - x0)));
+    col.style.width = `${listW[key]}px`;
+    table.style.width = `${listTableW()}px`;
+  };
+  const up = () => {
+    handle.removeEventListener("pointermove", move);
+    handle.removeEventListener("pointerup", up);
+    handle.removeEventListener("pointercancel", up);
+    handle.classList.remove("active");
+    document.body.classList.remove("resizing");
+    saveListW();
+  };
+  handle.addEventListener("pointermove", move);
+  handle.addEventListener("pointerup", up);
+  handle.addEventListener("pointercancel", up);
+}
+
 function renderList() {
   const wrap = el("div", "table-wrap");
-  const table = el("table", "cases");
+  const table = el("table", "cases resizable-cols");
+  table.style.width = `${listTableW()}px`;
+  const colgroup = el("colgroup");
+  const cols = {};
+  for (const [key] of COLUMNS) {
+    const col = el("col");
+    col.style.width = `${listW[key]}px`;
+    cols[key] = col;
+    colgroup.append(col);
+  }
+  table.append(colgroup);
   const thead = el("thead");
   const hr = el("tr");
   for (const [key, label] of COLUMNS) {
     const th = el("th", "", label);
+    const handle = el("span", "col-resizer");
+    handle.title = "ドラッグで列幅を変更（ダブルクリックで元の幅）";
+    handle.addEventListener("pointerdown", (e) => startListResize(e, key, cols[key], table));
+    handle.addEventListener("click", (e) => e.stopPropagation());
+    handle.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      listW[key] = LIST_W_DEFAULT[key];
+      cols[key].style.width = `${listW[key]}px`;
+      table.style.width = `${listTableW()}px`;
+      saveListW();
+    });
+    th.append(handle);
     if (key !== "links") {
       if (state.sort.key === key) th.classList.add("sorted", ...(state.sort.desc ? ["desc"] : []));
       th.addEventListener("click", () => {
@@ -425,7 +484,12 @@ function renderList() {
     endTd.append(d);
     cell(linkIcons(c), "nowrap");
     const memo = cell("", "memo-cell");
-    if (c.last_note_date) memo.append(el("span", "wk", `${shortDate(c.last_note_date)}（全 ${c.note_count} 件）`), c.last_note);
+    // 最新の進捗: 最大 3 行まで表示（続きはマウスを重ねると全文）
+    if (c.last_note_date) {
+      const body = el("div", "memo-body", c.last_note);
+      memo.title = c.last_note;
+      memo.append(el("span", "wk", `${shortDate(c.last_note_date)}（全 ${c.note_count} 件）`), body);
+    }
     tbody.append(tr);
   }
   table.append(thead, tbody);
