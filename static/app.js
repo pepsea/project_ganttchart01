@@ -843,7 +843,7 @@ $("#q").addEventListener("input", (e) => {
 
 let backCase = null; // 案件管理から来たときの戻り先 { pj, id }
 
-// ツールバー: PJ を選んだら「案件管理で開く」を出す
+// ツールバー: PJ を選んだら「← 案件に戻る」（青）/「← 基盤に戻る」（緑）を出す
 function syncPjActions() {
   const pj = state.filter.projects;
   // 案件なら案件管理、基盤なら基盤技術ページへ
@@ -854,10 +854,14 @@ function syncPjActions() {
   if (isCase) {
     // 案件管理から来たとき（?back=案件の id）は、その案件に戻る。PJ名を変えたら番号で開く
     a.href = backCase && backCase.pj === pj ? `/cases?id=${backCase.id}` : casesUrl(pj);
-    a.textContent = "← 案件管理で開く";
+    a.textContent = "← 案件に戻る";
+    a.title = `案件管理の ${pj} に戻る（同じ画面のまま）`;
+    a.className = "button back-btn to-case";
   } else if (isPlatform) {
     a.href = `/platforms?id=${encodeURIComponent(pj)}`;
-    a.textContent = "← 基盤技術で開く";
+    a.textContent = "← 基盤に戻る";
+    a.title = `基盤技術の ${pj} に戻る（同じ画面のまま）`;
+    a.className = "button back-btn to-platform";
   }
 }
 

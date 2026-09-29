@@ -804,7 +804,7 @@ function renderTasks(p, tasks) {
     legend.append(x);
   }
   h.append(legend);
-  // ガントチャートへは同じ画面のまま移る（新しいタブを開かない）。ガントチャートの「基盤技術で開く」で戻れる
+  // ガントチャートへは同じ画面のまま移る（新しいタブを開かない）。ガントチャートの「← 基盤に戻る」で戻れる
   const link = el("a", "button right", "ガントチャートで編集 →");
   link.href = `/?pj=${enc(p.name)}`;
   h.append(link);

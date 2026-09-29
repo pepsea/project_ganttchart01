@@ -493,3 +493,9 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .toolbar > .csv-tools .export-menu { margin-left: 0; }
 .toolbar > .csv-tools #btn-import { margin-left: 0; }
 .toolbar > .csv-tools .export-panel { right: auto; left: 0; }  /* 左寄りに置いたので、メニューは右へ開く */
+
+/* ガントチャートの戻るボタン: 案件 = 青、基盤 = 緑 */
+a.back-btn { font-weight: 700; color: #fff; text-decoration: none; }
+a.back-btn.to-case { background: #3563d6; border-color: #3563d6; }
+a.back-btn.to-platform { background: #2fa36b; border-color: #2fa36b; }
+a.back-btn:hover { filter: brightness(1.1); color: #fff; }
