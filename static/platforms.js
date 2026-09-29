@@ -131,6 +131,34 @@ function refreshPersonFilter() {
   sel.value = state.filterPerson;
 }
 
+// 基盤一覧の並び替え: 見出しをクリックでその列、もう一度で逆順（ブラウザに記憶）
+const PF_COLS = [
+  ["name", "基盤番号", (p) => p.name],
+  ["title", "基盤名", (p) => p.title],
+  ["areas", "領域", (p) => p.areas[0] ? String(state.areas.indexOf(p.areas[0])).padStart(3, "0") + p.areas.join(" ") : ""],
+  ["owner", "PL", (p) => p.owner],
+  ["members", "メンバー", (p) => p.members],
+  ["task_count", "タスク", (p) => p.task_count],
+  ["last_topic_date", "最新ディスカッション", (p) => p.last_topic_date],
+  ["last_month", "最新の月報", (p) => p.last_month],
+];
+const pfSort = (() => {
+  try { return JSON.parse(localStorage.getItem("platforms.sort")) || { key: "name", desc: false }; }
+  catch (_) { return { key: "name", desc: false }; }
+})();
+function sortPlatforms(list) {
+  const col = PF_COLS.find(([k]) => k === pfSort.key) || PF_COLS[0];
+  const get = col[2];
+  const empty = (v) => v === null || v === undefined || v === "";
+  return list.sort((a, b) => {
+    const va = get(a), vb = get(b);
+    if (empty(va) !== empty(vb)) return empty(va) ? 1 : -1; // 空欄は常に最後
+    const c = typeof va === "number" && typeof vb === "number" ? va - vb
+      : String(va ?? "").localeCompare(String(vb ?? ""), "ja", { numeric: true });
+    return (pfSort.desc ? -c : c) || a.name.localeCompare(b.name, "ja", { numeric: true });
+  });
+}
+
 // 基盤一覧（表）: 1 基盤 1 行。行をクリックすると詳細を表示
 function renderList() {
   refreshPersonFilter();
@@ -141,9 +169,8 @@ function renderList() {
     $("#pf-count").textContent = "";
     return;
   }
-  const list = state.platforms
-    .filter((p) => (!state.filterArea || p.areas.includes(state.filterArea)) && matchesPerson(p))
-    .sort((a, b) => a.name.localeCompare(b.name, "ja", { numeric: true }));
+  const list = sortPlatforms(state.platforms
+    .filter((p) => (!state.filterArea || p.areas.includes(state.filterArea)) && matchesPerson(p)));
   $("#pf-count").textContent = `${list.length} 件${list.length !== state.platforms.length ? `（全 ${state.platforms.length} 件）` : ""}`;
   if (!list.length) {
     box.append(el("p", "hint pf-empty", "条件に合う基盤はありません。"));
@@ -152,8 +179,19 @@ function renderList() {
   const table = el("table", "pf-table");
   const thead = el("thead");
   const hr = el("tr");
-  for (const h of ["基盤番号", "基盤名", "領域", "PL", "メンバー", "タスク", "最新ディスカッション", "最新の月報"]) {
-    hr.append(el("th", "", h));
+  for (const [key, label] of PF_COLS) {
+    const th = el("th", `sortable${pfSort.key === key ? " sorted" : ""}`);
+    th.append(label, el("span", "sort-mark", pfSort.key === key ? (pfSort.desc ? " ▼" : " ▲") : ""));
+    th.title = "クリックで並び替え（もう一度で逆順）";
+    th.addEventListener("click", () => {
+      // 日付・件数は最初に押したとき新しい順・多い順
+      const firstDesc = ["task_count", "last_topic_date", "last_month"].includes(key);
+      if (pfSort.key === key) pfSort.desc = !pfSort.desc;
+      else { pfSort.key = key; pfSort.desc = firstDesc; }
+      try { localStorage.setItem("platforms.sort", JSON.stringify(pfSort)); } catch (_) { /* 保存できなくても並び替えは行う */ }
+      renderList();
+    });
+    hr.append(th);
   }
   thead.append(hr);
   const tbody = el("tbody");

@@ -565,3 +565,9 @@ table.tasks td.t-name.active { background: #dbe8ff; color: #1f4fbf; font-weight:
 .pg-bar .lbl { overflow: hidden; text-overflow: ellipsis; }
 .pg-body .pg-left .t-name, .pg-bar { cursor: pointer; }
 .pg-body .pg-left .t-name:hover { text-decoration: underline; }
+
+/* 基盤一覧の並び替え（見出しをクリック） */
+table.pf-table th.sortable { cursor: pointer; user-select: none; }
+table.pf-table th.sortable:hover { color: var(--accent); }
+table.pf-table th.sorted { color: var(--text); }
+table.pf-table th .sort-mark { font-size: 10px; color: var(--accent); }
