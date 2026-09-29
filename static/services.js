@@ -401,9 +401,9 @@ function renderPackages() {
     links.append(miniLink("パッケージ資料（日）", pkg.intro_ja_url, "パッケージ資料（日本語）"),
       miniLink("パッケージ資料（英）", pkg.intro_en_url, "パッケージ資料（英語）"), miniLink("BOX", pkg.box_url, "BOX"));
     card.append(links);
+    // 関連サービスは登録したときだけ表示（未登録なら行ごと出さない）
     const svcs = el("div", "pkg-svcs");
     svcs.append(el("span", "lbl", `関連サービス（${pkg.services.length}）`));
-    if (!pkg.services.length) svcs.append(el("span", "pkg-empty", "なし"));
     for (const no of pkg.services) {
       const svc = state.services.find((x) => x.service_no === no);
       const b = el("button", svc ? "pkg-svc" : "pkg-svc missing");
@@ -415,7 +415,7 @@ function renderPackages() {
       }
       svcs.append(b);
     }
-    card.append(svcs);
+    if (pkg.services.length) card.append(svcs);
     box.append(card);
   }
 }

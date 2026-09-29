@@ -22,9 +22,9 @@ const state = {
 const $ = (sel, root = document) => root.querySelector(sel);
 const scroller = $("#scroller");
 const gantt = $("#gantt");
-// 左側の列幅。領域・PJ名・タスク・担当者は見出しの右端をドラッグして変更でき、ブラウザに記憶する
-const COL_W_DEFAULT = { area: 190, pj: 240, task: 200, assignee: 80 };
-const COL_W_MIN_OF = { area: 60, pj: 80, task: 80, assignee: 44 };
+// 左側の列幅。領域・PJ名・タスク・担当者・終了日は見出しの右端をドラッグして変更でき、ブラウザに記憶する
+const COL_W_DEFAULT = { area: 190, pj: 240, task: 200, assignee: 80, end: 96 };
+const COL_W_MIN_OF = { area: 60, pj: 80, task: 80, assignee: 44, end: 56 };
 const COL_W_MAX = 640;
 const colW = (() => {
   try {
@@ -34,8 +34,8 @@ const colW = (() => {
     return { ...COL_W_DEFAULT };
   }
 })();
-// 列: 領域 + PJ名 + タスク + (担当者 + 優先度 56 + 開始 40 + 終了日 96) + 削除 34
-const leftW = () => colW.area + colW.pj + colW.task + 34 + (state.compact ? 0 : colW.assignee + 56 + 40 + 96);
+// 列: 領域 + PJ名 + タスク + (担当者 + 優先度 56 + 開始 40 + 終了日) + 削除 34
+const leftW = () => colW.area + colW.pj + colW.task + 34 + (state.compact ? 0 : colW.assignee + 56 + 40 + colW.end);
 const saveColW = () => {
   try { localStorage.setItem("gantt.colW", JSON.stringify(colW)); } catch (_) { /* 記憶できなくても幅は変わる */ }
 };
@@ -45,6 +45,7 @@ function applyColWidths() {
   gantt.style.setProperty("--w-pj", `${colW.pj}px`);
   gantt.style.setProperty("--w-task", `${colW.task}px`);
   gantt.style.setProperty("--w-assignee", `${colW.assignee}px`);
+  gantt.style.setProperty("--w-end", `${colW.end}px`);
   gantt.style.setProperty("--left-w", `${leftW()}px`);
   gantt.style.width = `${leftW() + state.days * state.dayW}px`;
   const layer = $(".bg-layer", gantt);
@@ -243,7 +244,7 @@ function renderHeader(trackW) {
   const heads = [["領域"], ["PJ名"], ["タスク"], ["担当者", 1], ["優先度", 1], ["開始", 1], ["終了日", 1], [""]];
   heads.forEach(([h, detail], i) => {
     const cell = el("div", detail ? "col-detail" : "", h);
-    const key = ["area", "pj", "task", "assignee"][i] || null;
+    const key = ["area", "pj", "task", "assignee", null, null, "end"][i] || null;
     if (key) {
       cell.classList.add("resizable");
       const handle = el("span", "col-resizer");
