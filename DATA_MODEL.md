@@ -149,7 +149,7 @@
 
 | テーブル | 列 | 内容 |
 |---|---|---|
-| `person_notes` | name (主キー), body, updated_at | 個人の画面のメモ（人ごとに 1 件。name は担当者・PL・メンバーの名前） |
+| `person_notes` | name (主キー), body, areas, updated_at | 個人の画面のメモ（body）と、自分で設定する担当領域（areas = JSON 配列。管理サイトの領域から選ぶ）。人ごとに 1 件。name は担当者・PL・メンバーの名前 |
 
 ## 変更のルール（アップデートでデータを失わないために）
 

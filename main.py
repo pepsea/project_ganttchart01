@@ -43,6 +43,7 @@ MASTERS = {
         ("SELECT COUNT(*) FROM services WHERE EXISTS (SELECT 1 FROM json_each(services.areas) WHERE value = ?)", "サービス"),
         ("SELECT COUNT(*) FROM documents WHERE EXISTS (SELECT 1 FROM json_each(documents.areas) WHERE value = ?)", "共有資料"),
         ("SELECT COUNT(*) FROM ref_links WHERE EXISTS (SELECT 1 FROM json_each(ref_links.areas) WHERE value = ?)", "参考リンク"),
+        ("SELECT COUNT(*) FROM person_notes WHERE EXISTS (SELECT 1 FROM json_each(person_notes.areas) WHERE value = ?)", "個人の担当領域"),
     ]),
     # ガントチャートの PJ名 = 案件番号（case_nos）または 基盤番号（platforms）
     "platforms": ("platforms", "基盤番号", [
@@ -331,7 +332,7 @@ def add_item(kind: MasterKind, item: MasterIn) -> list[str]:
 # 名称変更時に書き換える参照先: (テーブル, 列, JSON 配列かどうか)
 RENAME_TARGETS = {
     "areas": [("tasks", "area", False), ("cases", "areas", True), ("platforms", "areas", True), ("services", "areas", True),
-              ("documents", "areas", True), ("ref_links", "areas", True)],
+              ("documents", "areas", True), ("ref_links", "areas", True), ("person_notes", "areas", True)],
     "case_nos": [("cases", "case_no", False), ("tasks", "project", False)],
     "platforms": [("tasks", "project", False), ("platform_goals", "platform", False),
                   ("platform_topics", "platform", False), ("platform_monthly", "platform", False),

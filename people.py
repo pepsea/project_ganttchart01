@@ -10,7 +10,7 @@ import json
 import re
 from datetime import date, timedelta
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from db import get_db
@@ -27,10 +27,33 @@ def init_db() -> None:
                           body       TEXT NOT NULL DEFAULT '',  -- メモ
                           updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
                       )""")
+        if "areas" not in {r["name"] for r in db.execute("PRAGMA table_info(person_notes)")}:
+            # 担当領域（自分で設定。JSON 配列。領域は管理サイトの領域から選ぶ）
+            db.execute("ALTER TABLE person_notes ADD COLUMN areas TEXT NOT NULL DEFAULT '[]'")
 
 
 class MemoIn(BaseModel):
     body: str = ""
+
+
+class AreasIn(BaseModel):
+    areas: list[str] = []
+
+
+@router.put("/{name}/areas")
+def save_areas(name: str, a: AreasIn) -> dict:
+    """個人の担当領域を保存（自分で設定。管理サイトに登録済みの領域から選ぶ）"""
+    name = name.strip()
+    areas = list(dict.fromkeys(x.strip() for x in a.areas if x and x.strip()))
+    with get_db() as db:
+        known = {r["name"] for r in db.execute("SELECT name FROM areas")}
+        bad = [x for x in areas if x not in known]
+        if bad:
+            raise HTTPException(422, f"領域「{'、'.join(bad)}」は登録されていません（管理サイトで登録）")
+        db.execute("""INSERT INTO person_notes(name, areas) VALUES (?, ?)
+                      ON CONFLICT(name) DO UPDATE SET areas = excluded.areas, updated_at = datetime('now', 'localtime')""",
+                   (name, json.dumps(areas, ensure_ascii=False)))
+    return {"areas": areas}
 
 
 @router.put("/{name}/memo")
@@ -146,11 +169,12 @@ def person(name: str) -> dict:
                   for r in db.execute("SELECT id, name, pl, members FROM team_groups ORDER BY created_at DESC, id DESC")
                   if (role := _role(name, r["pl"], r["members"]))]
 
-        memo = db.execute("SELECT body, updated_at FROM person_notes WHERE name = ?", (name,)).fetchone()
+        memo = db.execute("SELECT body, areas, updated_at FROM person_notes WHERE name = ?", (name,)).fetchone()
 
     counts = {}
     for t in tasks:
         counts[t["state"]] = counts.get(t["state"], 0) + 1
-    return {"name": name, "areas": list(areas), "tasks": tasks, "task_counts": counts, "cases": cases,
+    # areas = 自分で設定した担当領域、auto_areas = 担当の案件・タスクなどに出てくる領域（参考）
+    return {"name": name, "areas": json.loads(memo["areas"] or "[]") if memo else [], "auto_areas": list(areas), "tasks": tasks, "task_counts": counts, "cases": cases,
             "platforms": platforms, "services": services, "groups": groups,
             "memo": memo["body"] if memo else "", "memo_updated_at": memo["updated_at"] if memo else ""}

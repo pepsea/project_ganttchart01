@@ -113,3 +113,14 @@
 .pp-memo .memo-text { width: 100%; min-height: 84px; line-height: 1.6; resize: vertical; font: inherit; padding: 8px 10px;
   border: 1px solid var(--line-strong); border-radius: 6px; }
 .pp-memo .memo-text:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* 担当領域（自分で設定） */
+.pp-areas > h3 .memo-save { margin-left: auto; padding: 3px 12px; font-size: 12px; }
+.area-choose { display: flex; flex-wrap: wrap; gap: 6px; }
+.area-chip { padding: 2px 11px; font-size: 12px; border-radius: 999px; cursor: pointer; background: #fff; color: #6b7280;
+  border: 1px dashed color-mix(in srgb, var(--c) 45%, white); }
+.area-chip:hover { border-style: solid; }
+.area-chip.on { background: color-mix(in srgb, var(--c) 14%, white); color: color-mix(in srgb, var(--c) 75%, black);
+  border: 1px solid color-mix(in srgb, var(--c) 55%, white); font-weight: 700; }
+.auto-areas { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 11.5px; }
+.area-pill.sm { font-size: 10.5px; padding: 0 8px; opacity: .8; }

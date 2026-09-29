@@ -96,11 +96,13 @@ function renderList() {
 
 // 保存していないメモがあるか
 let memoDirty = false;
-window.addEventListener("beforeunload", (e) => { if (memoDirty) { e.preventDefault(); e.returnValue = ""; } });
+let areasDirty = false; // 担当領域の設定が未保存
+window.addEventListener("beforeunload", (e) => { if (memoDirty || areasDirty) { e.preventDefault(); e.returnValue = ""; } });
 
 async function select(name) {
-  if (memoDirty && name !== state.current && !confirm("保存していないメモがあります。破棄して切り替えますか？")) return;
+  if ((memoDirty || areasDirty) && name !== state.current && !confirm("保存していないメモ・担当領域があります。破棄して切り替えますか？")) return;
   memoDirty = false;
+  areasDirty = false;
   state.current = name;
   history.replaceState(null, "", `/people?name=${enc(name)}`);
   renderList();
@@ -116,6 +118,61 @@ async function select(name) {
 }
 
 // ------------------------------------------------------------ 詳細
+// 担当領域: 領域の札を押して選び、「保存」で確定（自分で設定する）
+function areasSection(d) {
+  const sec = el("section", "pp-section pp-areas");
+  const h = el("h3", "", "担当領域");
+  const count = el("span", "count", "");
+  const save = el("button", "primary memo-save", "保存");
+  save.type = "button";
+  save.disabled = true;
+  h.append(count, save);
+  sec.append(h);
+  let chosen = [...d.areas];
+  const chips = el("div", "area-choose");
+  const paint = () => {
+    chips.innerHTML = "";
+    const all = [...state.areas, ...chosen.filter((a) => !state.areas.includes(a))];
+    for (const a of all) {
+      const b = el("button", `area-chip${chosen.includes(a) ? " on" : ""}`, a);
+      b.type = "button";
+      b.style.setProperty("--c", areaColor(a));
+      b.addEventListener("click", () => {
+        chosen = chosen.includes(a) ? chosen.filter((x) => x !== a) : [...chosen, a];
+        areasDirty = JSON.stringify([...chosen].sort()) !== JSON.stringify([...d.areas].sort());
+        save.disabled = !areasDirty;
+        save.textContent = areasDirty ? "保存（未保存）" : "保存";
+        paint();
+      });
+      chips.append(b);
+    }
+    count.textContent = `${chosen.length} 件選択中`;
+  };
+  paint();
+  save.addEventListener("click", async () => {
+    try {
+      const r = await api(`/api/people/${enc(d.name)}/areas`, { method: "PUT", body: JSON.stringify({ areas: chosen }) });
+      d.areas = r.areas;
+      chosen = [...r.areas];
+      areasDirty = false;
+      save.disabled = true;
+      save.textContent = "保存";
+      paint();
+      toast("担当領域を保存しました", false);
+    } catch (err) {
+      toast(`保存できませんでした: ${err.message}`);
+    }
+  });
+  sec.append(chips);
+  if (d.auto_areas.length) {
+    const hint = el("div", "hint auto-areas", "参考: 担当の案件・タスクなどに出てくる領域 → ");
+    for (const a of d.auto_areas) hint.append(areaPill(a, "area-pill sm"));
+    sec.append(hint);
+  }
+  if (!state.areas.length) sec.append(el("p", "hint", "領域が登録されていません（管理サイトで登録）"));
+  return sec;
+}
+
 function renderDetail(d) {
   const root = $("#detail");
   root.innerHTML = "";
@@ -202,7 +259,7 @@ function renderDetail(d) {
   ts.append(ul);
   root.append(ts);
 
-  // 担当（領域・グループ・基盤技術・案件・サービス）
+  // 担当領域は自分で設定（領域の札を選んで保存）。ほかの担当は登録内容から自動で表示
   const grid = el("div", "pp-grid");
   const box = (title, items, empty = "なし") => {
     const sec = el("section", "pp-section");
@@ -216,7 +273,7 @@ function renderDetail(d) {
     return sec;
   };
   grid.append(
-    box("担当領域", d.areas.map((a) => areaPill(a))),
+    areasSection(d),
     box("担当グループ", d.groups.map((g) => extLink([roleTag(g.role), g.name, el("span", "arrow", "↗")], `/groups?id=${g.id}&year=all`))),
     box("担当基盤技術", d.platforms.map((p) => extLink([roleTag(p.role), el("b", "", p.name), p.title, el("span", "arrow", "↗")],
       `/platforms?id=${enc(p.name)}`))),
