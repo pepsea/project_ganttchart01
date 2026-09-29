@@ -664,7 +664,12 @@ function renderGoals(p) {
     titleRow.append(g.title);
     if (safeUrl(g.url)) titleRow.append(" ", linkButton("リンク", g.url, "目標のリンク"));
     main.append(titleRow);
-    if (g.note) main.append(el("div", "g-note", g.note));
+    // メモ: 一覧では改行を除いてつなげ、できるだけ全体を表示（保存したメモの改行はそのまま。マウスを重ねると改行ありで表示）
+    if (g.note) {
+      const n = el("div", "g-note", g.note.replace(/\s*\n\s*/g, "　").trim());
+      n.title = g.note;
+      main.append(n);
+    }
     const d = el("span", `g-due ${due}`, g.due_date ? slashDate(g.due_date) : "期限なし");
     if (due) d.title = due === "overdue" ? `期限超過（${-daysLeft(g.due_date)} 日経過）` : `期限まであと ${daysLeft(g.due_date)} 日`;
     li.append(st, main, d, el("span", "g-edit", "編集 ›"));
