@@ -5,10 +5,11 @@ import io
 import json
 import re
 import sqlite3
+from urllib.parse import quote
 from datetime import date, datetime, timedelta
 from typing import Literal
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -401,6 +402,65 @@ def list_tasks() -> list[dict]:
 
 def get_task(db: sqlite3.Connection, task_id: int) -> dict:
     return dict(db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone())
+
+
+# ---- Outlook などのカレンダーに追加する予定ファイル（iCalendar .ics）
+def _ics_text(v: str) -> str:
+    return v.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\r\n", "\n").replace("\n", "\\n")
+
+
+def _ics_fold(line: str) -> str:
+    """1 行 75 バイトまでで折り返す（iCalendar の決まり。日本語を途中で切らない）"""
+    out, cur = [], ""
+    for ch in line:
+        if len((cur + ch).encode("utf-8")) > (75 if not out else 74):
+            out.append(cur)
+            cur = ch
+        else:
+            cur += ch
+    out.append(cur)
+    return "\r\n ".join(out)
+
+
+@app.get("/api/tasks/{task_id}/outlook.ics")
+def task_ics(task_id: int, request: Request) -> Response:
+    """タスクの締切（終了日）を終日の予定にした .ics（開くと Outlook の予定に追加。1 日前に通知）"""
+    with get_db() as db:
+        row = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "タスクが見つかりません")
+        t = dict(row)
+        name = db.execute("SELECT name FROM cases WHERE case_no = ? LIMIT 1", (t["project"],)).fetchone() or \
+            db.execute("SELECT title AS name FROM platforms WHERE name = ?", (t["project"],)).fetchone()
+    end = date.fromisoformat(t["end_date"])
+    pj = f"{t['project']}｜{name['name']}" if t["project"] and name and name["name"] else t["project"]
+    base = str(request.base_url).rstrip("/")
+    desc = "\n".join(filter(None, [
+        f"PJ名: {pj}" if pj else "",
+        f"領域: {t['area']}",
+        f"担当者: {'・'.join(t['assignee'].split())}" if t["assignee"] else "",
+        f"優先度: {t['priority']}",
+        f"期間: {t['start_date']} 〜 {t['end_date']}",
+        f"\n{t['detail']}" if t["detail"] else "",
+        f"\nガントチャート: {base}/?pj={quote(t['project'])}" if t["project"] else f"\nガントチャート: {base}/",
+    ]))
+    lines = [
+        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//gantt-pm//タスク//JA", "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+        "BEGIN:VEVENT",
+        f"UID:task-{t['id']}@gantt-pm",  # 同じタスクをもう一度追加すると、同じ予定の更新になる
+        f"DTSTAMP:{datetime.utcnow():%Y%m%dT%H%M%SZ}",
+        f"DTSTART;VALUE=DATE:{end:%Y%m%d}",
+        f"DTEND;VALUE=DATE:{end + timedelta(days=1):%Y%m%d}",
+        f"SUMMARY:{_ics_text('【締切】' + t['task'])}",
+        f"DESCRIPTION:{_ics_text(desc)}",
+        "TRANSP:TRANSPARENT",  # 予定表では「空き時間」扱い（会議の予定を妨げない）
+        "BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{_ics_text('【締切】' + t['task'])}", "TRIGGER:-P1D", "END:VALARM",
+        "END:VEVENT", "END:VCALENDAR",
+    ]
+    body = "\r\n".join(_ics_fold(l) for l in lines) + "\r\n"
+    filename = f"task_{t['id']}.ics"
+    return Response(body.encode("utf-8"), media_type="text/calendar; charset=utf-8",
+                    headers={"Content-Disposition": f"attachment; filename=\"{filename}\""})
 
 
 INSERT_SQL = f"INSERT INTO tasks({', '.join(TASK_COLS)}) VALUES ({', '.join('?' * len(TASK_COLS))})"

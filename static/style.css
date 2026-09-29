@@ -511,3 +511,9 @@ a.back-btn { font-weight: 700; color: #fff; text-decoration: none; }
 a.back-btn.to-case { background: #3563d6; border-color: #3563d6; }
 a.back-btn.to-platform { background: #2fa36b; border-color: #2fa36b; }
 a.back-btn:hover { filter: brightness(1.1); color: #fff; }
+
+/* タスク詳細: Outlook に追加 */
+#dlg-task .actions { display: flex; align-items: center; gap: 8px; }
+#dlg-task .actions .spacer { flex: 1; }
+a.outlook-btn { color: #0f6cbd; border-color: #b4d2f0; background: #eef5fc; text-decoration: none; font-weight: 600; }
+a.outlook-btn:hover { background: #dfeefb; }

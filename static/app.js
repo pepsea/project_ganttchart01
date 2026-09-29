@@ -714,6 +714,10 @@ function openTaskDialog(task = null) {
   fillPjOptions(form.project, task?.project || "", "（なし）");
   const meta = $("#task-meta");
   if (task) {
+    // Outlook に追加: 保存済みのタスクの締切（終了日）を予定ファイルでダウンロード
+    const ol = $("#task-outlook");
+    ol.href = `/api/tasks/${task.id}/outlook.ics`;
+    ol.hidden = false;
     $("#task-title").textContent = "タスク詳細";
     $("#task-submit").textContent = "保存";
     for (const k of ["area", "project", "task", "assignee", "priority", "start_date", "end_date", "detail"]) {
@@ -728,6 +732,7 @@ function openTaskDialog(task = null) {
     meta.append(s);
     meta.hidden = false;
   } else {
+    $("#task-outlook").hidden = true;
     $("#task-title").textContent = "タスク追加";
     $("#task-submit").textContent = "追加";
     meta.hidden = true;
