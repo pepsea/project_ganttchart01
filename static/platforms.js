@@ -320,6 +320,17 @@ async function select(name) {
 }
 
 $("#btn-back").addEventListener("click", () => backToList());
+// 個々の基盤へのリンク（/platforms?id=基盤番号）をコピー
+$("#btn-copy-link").addEventListener("click", async () => {
+  if (!state.current) return;
+  const url = `${location.origin}/platforms?id=${enc(state.current)}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast(`リンクをコピーしました: ${url}`, false);
+  } catch (_) {
+    prompt("このリンクをコピーしてください", url); // クリップボードが使えないとき（http でのアクセスなど）
+  }
+});
 // ブラウザの「戻る」「進む」
 window.addEventListener("popstate", async () => {
   const id = new URLSearchParams(location.search).get("id");

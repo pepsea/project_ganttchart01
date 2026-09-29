@@ -600,3 +600,5 @@ table.pf-table td.order { width: 40px; text-align: center; }
 
 /* 目標のメモ: 改行を除いて 1 つの文章として折り返し、全体を表示 */
 .goal-list .g-note { white-space: normal; overflow-wrap: anywhere; }
+.pf-backbar .spacer { flex: 1; }
+.pf-backbar #btn-copy-link { font-weight: 400; }
