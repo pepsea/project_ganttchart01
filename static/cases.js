@@ -115,7 +115,8 @@ async function api(path, options = {}) {
 }
 
 // 案件番号（= ガントチャートの PJ名）と、ガントチャートへのリンク
-const ganttUrl = (no) => `/?pj=${encodeURIComponent(no)}`;
+// ガントチャートへは同じ画面のまま移る。back = 戻り先の案件（ガントチャートの「← 案件管理で開く」でこの案件に戻る）
+const ganttUrl = (no, id) => `/?pj=${encodeURIComponent(no)}${id ? `&back=${id}` : ""}`;
 
 // 案件番号＋試験名。自動で付いた番号（2, 3, …）は「C-2026-001-2」、名前は「C-2026-001（追加検体）」
 const isAutoNo = (t) => /^\d+$/.test(t || "");
@@ -124,10 +125,8 @@ const caseLabel = (c) => (!c.trial ? c.case_no : isAutoNo(c.trial) ? `${c.case_n
 function caseNoTag(c) {
   const tag = el("span", "pj-tag");
   tag.title = `案件番号（PJ名）: ${c.case_no}`;
-  const link = el("a", "mini-link", "ガント ↗");
-  link.href = ganttUrl(c.case_no);
-  link.target = "_blank";
-  link.rel = "noopener";
+  const link = el("a", "mini-link", "ガント →");
+  link.href = ganttUrl(c.case_no, c.id);
   link.title = `ガントチャートでこの案件のタスクを表示（${c.task_count ?? 0} 件）`;
   link.addEventListener("click", (e) => e.stopPropagation());
   tag.append(isAutoNo(c.trial) ? caseLabel(c) : c.case_no, link);
@@ -608,7 +607,7 @@ function syncNoCopy() {
   const a = $("#d-no-link");
   a.hidden = !no;
   if (no) {
-    a.href = ganttUrl(no);
+    a.href = ganttUrl(no, state.current && state.current.case_no === no ? state.current.id : null);
     const n = state.current && state.current.case_no === no ? state.current.task_count : null;
     a.title = `ガントチャートでこの案件のタスクを表示${n !== null ? `（${n} 件）` : ""}`;
   }
@@ -857,7 +856,7 @@ noteForm.addEventListener("submit", async (e) => {
 async function loadCaseTasks(c) {
   const sec = $("#tasks-section");
   sec.hidden = false;
-  $("#case-task-link").href = ganttUrl(c.case_no);
+  $("#case-task-link").href = ganttUrl(c.case_no, c.id);
   const box = $("#case-task-list");
   box.innerHTML = "";
   box.append(el("p", "hint", "読み込み中…"));

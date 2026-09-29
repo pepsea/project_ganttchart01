@@ -841,6 +841,8 @@ $("#q").addEventListener("input", (e) => {
   rerenderKeepScroll();
 });
 
+let backCase = null; // 案件管理から来たときの戻り先 { pj, id }
+
 // ツールバー: PJ を選んだら「案件管理で開く」を出す
 function syncPjActions() {
   const pj = state.filter.projects;
@@ -850,7 +852,8 @@ function syncPjActions() {
   $("#pj-actions").hidden = !isCase && !isPlatform;
   const a = $("#pj-jump");
   if (isCase) {
-    a.href = casesUrl(pj);
+    // 案件管理から来たとき（?back=案件の id）は、その案件に戻る。PJ名を変えたら番号で開く
+    a.href = backCase && backCase.pj === pj ? `/cases?id=${backCase.id}` : casesUrl(pj);
     a.textContent = "← 案件管理で開く";
   } else if (isPlatform) {
     a.href = `/platforms?id=${encodeURIComponent(pj)}`;
@@ -898,6 +901,7 @@ $("#btn-compact").addEventListener("click", (e) => {
     // URL パラメータ: ?pj=PJ名 で絞り込み、?q=キーワードで検索（案件管理からの移動用）
     const params = new URLSearchParams(location.search);
     state.filter.projects = params.get("pj") || "";
+    if (params.get("back") && params.get("pj")) backCase = { pj: params.get("pj"), id: params.get("back") };
     state.q = params.get("q") || "";
     $("#q").value = state.q;
     await Promise.all([loadMasters(), loadTasks()]);
