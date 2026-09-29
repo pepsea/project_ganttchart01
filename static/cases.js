@@ -516,8 +516,9 @@ function renderTimeline() {
     }
     return null;
   };
+  // 締切（終了予定日）の早い順。終了予定日が無い案件（開始日だけ）は、日付のある案件の最後
   const dated = all.filter((c) => span(c))
-    .sort((a, b) => span(a).s - span(b).s || byEnd(a, b));
+    .sort((a, b) => byEnd(a, b) || span(a).s - span(b).s);
   const undated = all.filter((c) => !span(c)).sort(byEnd);
 
   let min = today - 60 * DAY_MS;
