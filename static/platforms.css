@@ -571,3 +571,12 @@ table.pf-table th.sortable { cursor: pointer; user-select: none; }
 table.pf-table th.sortable:hover { color: var(--accent); }
 table.pf-table th.sorted { color: var(--text); }
 table.pf-table th .sort-mark { font-size: 10px; color: var(--accent); }
+
+/* 自由リンクの編集（1 行に名前と URL。何個でも） */
+.free-links-edit { display: flex; flex-direction: column; gap: 6px; }
+.free-links-edit .fl-head { display: flex; align-items: center; gap: 10px; }
+.free-links-edit .fl-head button { padding: 2px 10px; font-size: 12px; }
+.fl-rows { display: flex; flex-direction: column; gap: 6px; }
+.fl-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; gap: 8px; align-items: center; }
+.fl-row input { width: 100%; min-width: 0; }
+.fl-row .fl-del { padding: 3px 10px; font-size: 12px; color: var(--today); }

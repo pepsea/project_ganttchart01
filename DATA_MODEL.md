@@ -57,7 +57,8 @@
 | | areas | 領域（JSON 配列。1 つ目が一覧のグループ） |
 | | vision | 全体目標 |
 | | plan_url / box_url / teams_url | 研究計画 / BOX / Teams のリンク |
-| | link_label / link_url | 自由リンク（名前と URL。任意） |
+| | link_label / link_url | （未使用）旧・自由リンク 1 つ。`platform_links` 作成時に 1 回だけ引き継ぎ済み |
+| `platform_links` | id, platform, label, url, sort_order, created_at | 基盤の自由リンク（何個でも。platform = 基盤番号）。`platform_links` を含まない古いバックアップを復元したときは、復元した platforms の旧列から作り直す |
 | | updated_at | 基本情報の更新日時 |
 | | area | （未使用。旧・単一領域。起動時に areas へ引き継ぎ） |
 | `platform_goals` | id, platform, title, due_date, status, note, url, created_at, updated_at | 目標（状態: 未着手・取組中・達成・保留。url は目標のリンク） |

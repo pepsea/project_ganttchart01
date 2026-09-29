@@ -345,7 +345,9 @@ function renderDetail() {
   links.append(el("span", "role", "リンク"), linkButton("研究計画", p.plan_url, "研究計画"),
     linkButton("BOX", p.box_url, "BOX"), linkButton("Teams", p.teams_url, "Teams"));
   // 自由リンク（任意）: 登録されているときだけ表示
-  if (safeUrl(p.link_url)) links.append(linkButton(p.link_label || "リンク", p.link_url, p.link_label || "自由リンク"));
+  for (const l of p.links || []) {
+    if (safeUrl(l.url)) links.append(linkButton(l.label || "リンク", l.url, l.label || "自由リンク"));
+  }
   team.append(links);
   titleBox.append(team);
   // この基盤に関連するサービス（サービス画面へのリンク）
@@ -418,8 +420,18 @@ function renderDetail() {
     // PL とメンバーは同じ行に並べる
     info.append(field("PL", "owner", p.owner, "例: 田中"), field("メンバー（複数はスペース区切り）", "members", p.members, "例: 佐藤 鈴木"),
       field("研究計画のリンク", "plan_url", p.plan_url, "https://"), field("BOX のリンク", "box_url", p.box_url, "https://"),
-      field("Teams のリンク", "teams_url", p.teams_url, "https://"),
-      field("自由リンクの名前", "link_label", p.link_label, "例: 解析マニュアル"), field("自由リンクの URL", "link_url", p.link_url, "https://"));
+      field("Teams のリンク", "teams_url", p.teams_url, "https://"));
+    // 自由リンク（何個でも）: 1 行に「名前」と「URL」
+    const linkBox = el("div", "full free-links-edit");
+    const lh = el("div", "fl-head");
+    lh.append(el("span", "hint", "自由リンク（名前と URL。何個でも追加できます）"));
+    const addBtn = el("button", "", "＋ リンクを追加");
+    addBtn.type = "button";
+    lh.append(addBtn);
+    const rowsBox = el("div", "fl-rows");
+    linkBox.append(lh, rowsBox);
+    addBtn.addEventListener("click", () => { addLinkRow(rowsBox); markDirty(); rowsBox.lastChild.querySelector("input").focus(); });
+    for (const l of p.links || []) addLinkRow(rowsBox, l);
     const areaBox = el("div", "full");
     areaBox.append(el("div", "hint", "領域（複数選択可）"));
     const chips = el("div", "chips-select");
@@ -437,7 +449,7 @@ function renderDetail() {
       chips.append(lab);
     }
     areaBox.append(chips);
-    info.append(areaBox);
+    info.append(linkBox, areaBox);
     infoSec.append(info);
     root.append(infoSec);
     root.querySelectorAll('.pf-head input[name="title"], textarea[name="vision"], .pf-info input:not([type="checkbox"])')
@@ -445,7 +457,10 @@ function renderDetail() {
 
     $("#btn-save").addEventListener("click", async () => {
       try {
-        await api(`/api/platforms/${enc(p.name)}`, { method: "PUT", body: JSON.stringify(collectUnsaved()) });
+        const body = collectUnsaved();
+        const bad = body.links.find((l) => !safeUrl(l.url));
+        if (bad) throw new Error(`自由リンク「${bad.label || bad.url || "（名前なし）"}」の URL は http:// または https:// で始めてください（不要な行は削除）`);
+        await api(`/api/platforms/${enc(p.name)}`, { method: "PUT", body: JSON.stringify(body) });
         state.dirty = false;
         state.editing = false;
         await reloadPlatforms();
@@ -492,6 +507,24 @@ function markDirty() {
   if (bar && !bar.querySelector(".dirty")) bar.firstChild.after(el("span", "dirty", "（未保存の変更あり）"));
 }
 
+// 自由リンクの 1 行（名前・URL・削除）
+function addLinkRow(box, l = { label: "", url: "" }) {
+  const row = el("div", "fl-row");
+  const name = el("input", "fl-label");
+  name.placeholder = "名前（例: 解析マニュアル）";
+  name.value = l.label || "";
+  const url = el("input", "fl-url");
+  url.placeholder = "https://";
+  url.value = l.url || "";
+  const del = el("button", "fl-del", "削除");
+  del.type = "button";
+  del.title = "このリンクを外す（保存で確定）";
+  del.addEventListener("click", () => { row.remove(); markDirty(); });
+  for (const i of [name, url]) i.addEventListener("input", markDirty);
+  row.append(name, url, del);
+  box.append(row);
+}
+
 function collectUnsaved() {
   const root = $("#detail");
   return {
@@ -503,8 +536,10 @@ function collectUnsaved() {
     plan_url: root.querySelector('input[name="plan_url"]').value.trim(),
     box_url: root.querySelector('input[name="box_url"]').value.trim(),
     teams_url: root.querySelector('input[name="teams_url"]').value.trim(),
-    link_label: root.querySelector('input[name="link_label"]').value.trim(),
-    link_url: root.querySelector('input[name="link_url"]').value.trim(),
+    // 名前も URL も空の行は無視
+    links: [...root.querySelectorAll(".fl-row")].map((r) => ({
+      label: r.querySelector(".fl-label").value.trim(), url: r.querySelector(".fl-url").value.trim(),
+    })).filter((l) => l.label || l.url),
   };
 }
 function restoreUnsaved(v) {
@@ -517,8 +552,11 @@ function restoreUnsaved(v) {
   root.querySelector('input[name="plan_url"]').value = v.plan_url;
   root.querySelector('input[name="box_url"]').value = v.box_url;
   root.querySelector('input[name="teams_url"]').value = v.teams_url;
-  root.querySelector('input[name="link_label"]').value = v.link_label || "";
-  root.querySelector('input[name="link_url"]').value = v.link_url || "";
+  const rowsBox = root.querySelector(".fl-rows");
+  if (rowsBox) {
+    rowsBox.innerHTML = "";
+    for (const l of v.links || []) addLinkRow(rowsBox, l);
+  }
   root.querySelectorAll('input[name="areas"]').forEach((i) => {
     i.checked = v.areas.includes(i.value);
     i.closest("label").classList.toggle("on", i.checked);

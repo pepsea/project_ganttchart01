@@ -48,6 +48,7 @@ MASTERS = {
         ("SELECT COUNT(*) FROM tasks WHERE project = ?", "タスク（PJ名）"),
         ("SELECT COUNT(*) FROM platform_goals WHERE platform = ?", "基盤の目標"),
         ("SELECT COUNT(*) FROM platform_topics WHERE platform = ?", "基盤のディスカッション"),
+        ("SELECT COUNT(*) FROM platform_links WHERE platform = ?", "基盤の自由リンク"),
         ("SELECT COUNT(*) FROM platform_monthly WHERE platform = ?", "基盤の月報"),
         ("SELECT COUNT(*) FROM services WHERE EXISTS (SELECT 1 FROM json_each(services.platforms) WHERE value = ?)", "サービス"),
         ("SELECT COUNT(*) FROM team_groups WHERE EXISTS (SELECT 1 FROM json_each(team_groups.platforms) WHERE value = ?)", "グループ目標"),
@@ -201,6 +202,7 @@ dbmod.finish_startup()
 # 復元のあとにも同じ更新処理を実行する（古いバックアップを新しいアプリに取り込めるように）
 backup.MIGRATIONS.extend(MIGRATIONS)
 backup.LEGACY_UPGRADES["case_progress"] = ("case_notes", cases.LEGACY_NOTES_COPY)
+backup.LEGACY_UPGRADES["platform_links"] = ("platforms", platforms.LEGACY_LINKS_COPY)
 
 
 @asynccontextmanager
@@ -326,6 +328,7 @@ RENAME_TARGETS = {
     "case_nos": [("cases", "case_no", False), ("tasks", "project", False)],
     "platforms": [("tasks", "project", False), ("platform_goals", "platform", False),
                   ("platform_topics", "platform", False), ("platform_monthly", "platform", False),
+                  ("platform_links", "platform", False),
                   ("services", "platforms", True), ("team_groups", "platforms", True)],
     "customers": [("cases", "customer", False)],
 }

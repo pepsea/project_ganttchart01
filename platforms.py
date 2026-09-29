@@ -34,6 +34,16 @@ INFO_COLS = ("title", "areas", "owner", "members", "vision")
 def init_db() -> None:
     with get_db() as db:
         db.execute("CREATE TABLE IF NOT EXISTS platforms (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)")
+        # 自由リンク（何個でも）。旧・自由リンク 1 つ（platforms.link_label / link_url）は初回だけ引き継ぎ、以後は未使用
+        has_links = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='platform_links'").fetchone()
+        db.execute("""CREATE TABLE IF NOT EXISTS platform_links (
+                          id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                          platform   TEXT NOT NULL,             -- 基盤番号（platforms.name）
+                          label      TEXT NOT NULL DEFAULT '',  -- リンクの名前
+                          url        TEXT NOT NULL,
+                          sort_order INTEGER NOT NULL DEFAULT 0,
+                          created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+                      )""")
         cols = {r["name"] for r in db.execute("PRAGMA table_info(platforms)")}
         for col, default in [("title", "''"), ("owner", "''"), ("members", "''"), ("areas", "'[]'"),
                              ("vision", "''"), ("updated_at", "''"), ("area", "''"),
@@ -83,6 +93,8 @@ def init_db() -> None:
         if sample_data_enabled() and db.execute("SELECT COUNT(*) FROM platform_goals").fetchone()[0] == 0 and \
                 db.execute("SELECT COUNT(*) FROM platforms WHERE title <> ''").fetchone()[0] == 0:
             seed_samples(db)
+        if not has_links:
+            db.execute(LEGACY_LINKS_COPY)
 
 
 def seed_samples(db: sqlite3.Connection) -> None:
@@ -127,6 +139,24 @@ def check_url(v):
     return v
 
 
+class LinkItem(BaseModel):
+    label: str = ""
+    url: str = ""
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def strip(cls, v):
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("url", mode="before")
+    @classmethod
+    def url_ok(cls, v):
+        v = check_url(v)
+        if not v:
+            raise ValueError("自由リンクの URL を入力してください（不要な行は削除）")
+        return v
+
+
 class PlatformIn(BaseModel):
     title: str = ""
     areas: list[str] = []   # 領域（複数可）
@@ -136,8 +166,9 @@ class PlatformIn(BaseModel):
     plan_url: str = ""      # 研究計画のリンク
     box_url: str = ""       # BOX のリンク
     teams_url: str = ""     # Teams のリンク
-    link_label: str = ""    # 自由リンクの名前
-    link_url: str = ""      # 自由リンクの URL
+    link_label: str = ""    # （未使用）旧・自由リンクの名前。自由リンクは links へ
+    link_url: str = ""      # （未使用）旧・自由リンクの URL
+    links: list["LinkItem"] | None = None  # 自由リンク（何個でも）。None なら変更しない
 
     _urls = field_validator("plan_url", "box_url", "teams_url", "link_url", mode="before")(classmethod(lambda cls, v: check_url(v)))
 
@@ -186,6 +217,41 @@ class GoalIn(BaseModel):
 
 # ---------------------------------------------------------------- helpers
 
+# 旧・自由リンク（platforms.link_label / link_url）→ platform_links の引き継ぎ（backup.py の復元でも使う）
+LEGACY_LINKS_COPY = """INSERT INTO platform_links(platform, label, url, sort_order)
+                       SELECT name, link_label, link_url, 1 FROM platforms WHERE link_url <> ''"""
+
+
+def links_of(db: sqlite3.Connection, names: list[str] | None = None) -> dict[str, list[dict]]:
+    """基盤番号ごとの自由リンク（並び順）"""
+    out: dict[str, list[dict]] = {}
+    for r in db.execute("SELECT platform, label, url FROM platform_links ORDER BY platform, sort_order, id"):
+        if names is None or r["platform"] in names:
+            out.setdefault(r["platform"], []).append({"label": r["label"], "url": r["url"]})
+    return out
+
+
+def save_links(db: sqlite3.Connection, name: str, links: list) -> None:
+    """基盤の自由リンクを置き換える"""
+    db.execute("DELETE FROM platform_links WHERE platform = ?", (name,))
+    for i, l in enumerate(links, start=1):
+        db.execute("INSERT INTO platform_links(platform, label, url, sort_order) VALUES (?,?,?,?)", (name, l.label, l.url, i))
+
+
+def add_link(db: sqlite3.Connection, name: str, label: str, url: str) -> None:
+    """CSV の取り込み用: 同じ URL が無ければ最後に追加、あれば名前を更新"""
+    url = check_url(url)
+    if not url:
+        return
+    row = db.execute("SELECT id FROM platform_links WHERE platform = ? AND url = ?", (name, url)).fetchone()
+    if row:
+        if label:
+            db.execute("UPDATE platform_links SET label = ? WHERE id = ?", (label, row["id"]))
+        return
+    order = db.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM platform_links WHERE platform = ?", (name,)).fetchone()[0]
+    db.execute("INSERT INTO platform_links(platform, label, url, sort_order) VALUES (?,?,?,?)", (name, label, url, order))
+
+
 def to_platform(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["areas"] = json.loads(d.get("areas") or "[]")
@@ -196,7 +262,9 @@ def fetch_platform(db: sqlite3.Connection, name: str) -> dict:
     row = db.execute(f"{PLATFORM_SELECT} WHERE p.name = ?", (name,)).fetchone()
     if row is None:
         raise HTTPException(404, f"基盤番号「{name}」は登録されていません（管理サイトで登録してください）")
-    return to_platform(row)
+    d = to_platform(row)
+    d["links"] = links_of(db, [name]).get(name, [])
+    return d
 
 
 PLATFORM_SELECT = """
@@ -218,7 +286,8 @@ PLATFORM_SELECT = """
 @router.get("")
 def list_platforms() -> list[dict]:
     with get_db() as db:
-        return [to_platform(r) for r in db.execute(f"{PLATFORM_SELECT} ORDER BY p.id")]
+        links = links_of(db)
+        return [{**to_platform(r), "links": links.get(r["name"], [])} for r in db.execute(f"{PLATFORM_SELECT} ORDER BY p.id")]
 
 
 # ---------------------------------------------------------------- エクスポート（CSV）
@@ -250,11 +319,11 @@ def export_platforms(area: str = "", person: str = "") -> Response:
             monthly = {(r["platform"], r["month"]): r["body"] for r in db.execute(q, names)}
     months = sorted({m for _, m in monthly}, reverse=True)
     rows = [["基盤番号", "基盤名", "領域", "PL", "メンバー", "全体目標", "研究計画リンク", "BOXリンク", "Teamsリンク",
-             "自由リンクの名前", "自由リンク", "目標の達成", "目標の総数", "次の期限",
+             "自由リンク（名前｜URL、改行区切り）", "目標の達成", "目標の総数", "次の期限",
              "タスク数", "ディスカッション数", "最新のディスカッション日", *(f"月報_{m}" for m in months)]]
     for p in ps:
         rows.append([p["name"], p["title"], "、".join(p["areas"]), p["owner"], p["members"], p["vision"],
-                     p["plan_url"], p["box_url"], p["teams_url"], p["link_label"], p["link_url"], p["goal_done"], p["goal_total"], p["next_due"] or "", p["task_count"], p["topic_count"],
+                     p["plan_url"], p["box_url"], p["teams_url"], "\n".join(f"{l['label']}｜{l['url']}" for l in p["links"]), p["goal_done"], p["goal_total"], p["next_due"] or "", p["task_count"], p["topic_count"],
                      p["last_topic_date"] or "", *(monthly.get((p["name"], m), "") for m in months)])
     return csv_response(rows, "platforms")
 
@@ -275,7 +344,9 @@ def export_backup(area: str = "", person: str = "") -> Response:
         for p in ps:
             add(種別="基盤", 基盤番号=p["name"], 基盤名=p["title"], 領域="、".join(p["areas"]), PL=p["owner"],
                 メンバー=p["members"], 全体目標=p["vision"], 研究計画リンク=p["plan_url"], BOXリンク=p["box_url"],
-                Teamsリンク=p["teams_url"], 自由リンクの名前=p["link_label"], 自由リンク=p["link_url"])
+                Teamsリンク=p["teams_url"])
+            for l in p["links"]:
+                add(種別="リンク", 基盤番号=p["name"], 自由リンクの名前=l["label"], 自由リンク=l["url"])
         for p in ps:
             for g in db.execute(f"SELECT * FROM platform_goals WHERE platform = ? {GOAL_ORDER}", (p["name"],)):
                 add(種別="目標", 基盤番号=p["name"], 目標=g["title"], 状態=g["status"], 期限=g["due_date"] or "",
@@ -376,10 +447,17 @@ def _import_platform(db: sqlite3.Connection, name: str, r: dict, line: int, resu
             "plan_url": cur.get("plan_url", ""), "box_url": cur.get("box_url", ""), "teams_url": cur.get("teams_url", ""),
             "link_label": cur.get("link_label", ""), "link_url": cur.get("link_url", "")}
     for col, key in (("基盤名", "title"), ("PL", "owner"), ("メンバー", "members"), ("全体目標", "vision"),
-                     ("研究計画リンク", "plan_url"), ("BOXリンク", "box_url"), ("Teamsリンク", "teams_url"),
-                     ("自由リンクの名前", "link_label"), ("自由リンク", "link_url")):
+                     ("研究計画リンク", "plan_url"), ("BOXリンク", "box_url"), ("Teamsリンク", "teams_url")):
         if r.get(col):
             data[key] = r[col]
+    # 自由リンク: 旧形式（自由リンクの名前・自由リンク）と一覧形式（名前｜URL を改行区切り）
+    new_links = []
+    if r.get("自由リンク"):
+        new_links.append((r.get("自由リンクの名前", ""), r["自由リンク"]))
+    for ln in (r.get("自由リンク（名前｜URL、改行区切り）") or "").splitlines():
+        if ln.strip():
+            label, _, url = ln.rpartition("｜")
+            new_links.append((label.strip(), url.strip()))
     if r.get("領域"):
         data["areas"] = [a for a in re.split(r"[\s\u3000;；、,/／]+", r["領域"]) if a]
     try:
@@ -393,6 +471,11 @@ def _import_platform(db: sqlite3.Connection, name: str, r: dict, line: int, resu
         " updated_at=datetime('now','localtime') WHERE name=?",
         (pin.title, json.dumps(pin.areas, ensure_ascii=False), pin.owner, pin.members, pin.vision,
          pin.plan_url, pin.box_url, pin.teams_url, pin.link_label.strip(), pin.link_url, name))
+    for label, url in new_links:
+        try:
+            add_link(db, name, label, url)
+        except ValueError as e:
+            raise HTTPException(422, f"{line} 行目（{name}）: {e}")
     result["platforms_updated"] += 1
     for h in headers:
         m = MONTH_COL.match(h)
@@ -455,7 +538,7 @@ def _import_topic(db: sqlite3.Connection, name: str, r: dict, line: int, result:
         result["topics_added"] += 1
 
 
-BACKUP_KINDS = ("基盤", "目標", "ディスカッション", "月報")
+BACKUP_KINDS = ("基盤", "リンク", "目標", "ディスカッション", "月報")
 
 
 @router.post("/import")
@@ -505,10 +588,15 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                 raise HTTPException(422, f"{line} 行目: 基盤番号は必須です")
             if _ensure_platform(db, name, line):
                 result["platforms_added"] += 1
-            row_kind = {"基盤": "platforms", "目標": "goals", "ディスカッション": "topics", "月報": "monthly"}[r["種別"]] \
+            row_kind = {"基盤": "platforms", "リンク": "links", "目標": "goals", "ディスカッション": "topics", "月報": "monthly"}[r["種別"]] \
                 if kind == "backup" else kind
             if row_kind == "platforms":
                 _import_platform(db, name, r, line, result, headers if kind == "platforms" else [])
+            elif row_kind == "links":
+                try:
+                    add_link(db, name, r.get("自由リンクの名前", ""), r.get("自由リンク", ""))
+                except ValueError as e:
+                    raise HTTPException(422, f"{line} 行目（{name}）: {e}")
             elif row_kind == "monthly":
                 _import_monthly(db, name, r, line, result)
             elif row_kind == "goals":
@@ -535,6 +623,8 @@ def update_platform(name: str, p: PlatformIn) -> dict:
             (p.title.strip(), json.dumps(p.areas, ensure_ascii=False), p.owner.strip(), p.members,
              p.vision.strip(), p.plan_url, p.box_url, p.teams_url, p.link_label.strip(), p.link_url, name),
         )
+        if p.links is not None:
+            save_links(db, name, p.links)
         return fetch_platform(db, name)
 
 
