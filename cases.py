@@ -18,7 +18,10 @@ from db import DB_PATH, ensure_master, get_db, sample_data_enabled
 router = APIRouter(prefix="/api/cases", tags=["案件管理"])
 
 # アーカイブ = 終了した案件（カンバンの一番右）。状況を選び直せば元に戻せる
-STATUSES = ("顧客開発", "打診", "見積提出", "契約中", "ブリーフィング前", "実施中", "QC", "アフターフォロー", "キャンセル",
+# 以前の状況「QC」「アフターフォロー」は「アフターフォロー・その他」にまとめた（起動時・復元後に自動で移す）
+FOLLOWUP = "アフターフォロー・その他"
+OLD_STATUSES = {"QC": FOLLOWUP, "アフターフォロー": FOLLOWUP, "アフターフォローその他": FOLLOWUP}
+STATUSES = ("顧客開発", "打診", "見積提出", "契約中", "ブリーフィング前", "実施中", FOLLOWUP, "キャンセル",
             "アーカイブ")
 Status = Literal[STATUSES]
 URL_FIELDS = ("box_url", "teams_url", "overview_url", "plan_url")
@@ -105,6 +108,7 @@ def init_db() -> None:
         db.execute("""INSERT OR IGNORE INTO platforms(name)
                       SELECT DISTINCT project FROM tasks
                       WHERE project <> '' AND project NOT IN (SELECT name FROM case_nos)""")
+    migrate_old_statuses()  # 旧い状況（QC・アフターフォロー）を「アフターフォロー・その他」へ
     allow_same_case_no()  # 同じ案件番号の案件を複数登録できるようにする（1 回だけ）
 
 
@@ -159,7 +163,7 @@ def seed_sample_cases(db: sqlite3.Connection) -> None:
          ["プロテオミクス", "バイオマーカー分析"], d(-40), d(25),
          [(w(-2), "サンプル受領（96 検体）。前処理プロトコル確定。"),
           (w(-1), "LC-MS/MS 測定 50% 完了。QC サンプルの CV 良好。")]),
-        ("C-2026-002", "Bバイオ", "RNA-seq 受託解析", "QC", "田中", "佐藤",
+        ("C-2026-002", "Bバイオ", "RNA-seq 受託解析", "実施中", "田中", "佐藤",
          ["トランスクリプトミクス", "バイオインフォマティクス"], d(-60), d(5),
          [(w(-1), "解析完了。レポートのダブルチェック中。")]),
         ("C-2026-003", "C大学", "代謝物プロファイリング", "見積提出", "鈴木", "",
@@ -307,6 +311,13 @@ def fetch_case(db: sqlite3.Connection, case_id: int) -> dict:
     if row is None:
         raise HTTPException(404, "案件が見つかりません")
     return to_case(row)
+
+
+def migrate_old_statuses() -> None:
+    """旧い状況名を新しい状況に読み替える（何度実行しても安全。古いバックアップの復元後にも実行される）"""
+    with get_db() as db:
+        for old, new in OLD_STATUSES.items():
+            db.execute("UPDATE cases SET status = ? WHERE status = ?", (new, old))
 
 
 def sync_finished(db: sqlite3.Connection, case_id: int) -> None:
@@ -508,6 +519,8 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
             if (no, trial) in seen:
                 raise HTTPException(422, f"{line} 行目: 案件「{case_label(no, trial)}」が CSV 内で重複しています")
             seen.add((no, trial))
+            if rec.get("status") in OLD_STATUSES:
+                rec["status"] = OLD_STATUSES[rec["status"]]  # 旧い状況名（QC・アフターフォロー）は読み替える
             if "status" in rec and rec["status"] and rec["status"] not in STATUSES:
                 raise HTTPException(422, f"{line} 行目: 状況「{rec['status']}」は次のいずれかにしてください: {'、'.join(STATUSES)}")
 

@@ -9,13 +9,12 @@ const STATUS_COLOR = {
   契約中: "#7a5af5",
   ブリーフィング前: "#b155d9",
   実施中: "#2fa36b",
-  QC: "#d99a00",
-  アフターフォロー: "#1f9fb4",
+  "アフターフォロー・その他": "#1f9fb4",
   キャンセル: "#a9adb6",
   アーカイブ: "#6b7280",
 };
 // 期限（終了予定日）の色分け対象外
-const NO_DEADLINE = new Set(["アフターフォロー", "キャンセル", "アーカイブ"]);
+const NO_DEADLINE = new Set(["アフターフォロー・その他", "キャンセル", "アーカイブ"]);
 const ARCHIVE = "アーカイブ"; // 終了した案件（カンバンの一番右）
 const LINKS = [
   ["box_url", "BOX", "BOX"],
@@ -75,7 +74,7 @@ function areaColor(area) {
   return `hsl(${(210 + i * 67) % 360} 62% 50%)`;
 }
 
-// 終了予定日: 過ぎたら赤（overdue）、2 週間を切ったらオレンジ（soon）。アフターフォロー・キャンセルは対象外
+// 終了予定日: 過ぎたら赤（overdue）、2 週間を切ったらオレンジ（soon）。アフターフォロー・その他・キャンセルは対象外
 const SOON_DAYS = 14;
 const daysToEnd = (c) => Math.round((parseDate(c.end_date) - todayMs()) / DAY_MS);
 function deadlineStatus(c) {
