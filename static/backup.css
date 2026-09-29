@@ -1,0 +1,15 @@
+/* バックアップ画面 */
+.csv-card { margin-top: 18px; max-height: none; }
+.csv-list { padding: 4px 14px 14px; display: flex; flex-direction: column; }
+.csv-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 0; border-bottom: 1px solid #d3d8e0; }
+.csv-row:last-child { border-bottom: 0; }
+.csv-info { flex: 1 1 320px; min-width: 240px; display: flex; flex-direction: column; gap: 2px; }
+.csv-info b { font-size: 14px; }
+.csv-info .hint { font-size: 12px; }
+.csv-ops { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+.csv-op { display: inline-flex; align-items: center; gap: 4px; }
+.csv-op input[type="month"] { padding: 3px 6px; }
+#dlg-import { width: min(600px, 94vw); }
+#dlg-import .import-notes { margin: 8px 0; padding-left: 18px; font-size: 12.5px; line-height: 1.7; color: #3b4252; }
+#dlg-import .filename { font-weight: 600; margin: 4px 0; }
+#dlg-import .radio { display: flex; gap: 6px; align-items: baseline; margin: 6px 0; }

@@ -284,6 +284,11 @@ def people_page():
     return FileResponse(STATIC_DIR / "people.html")
 
 
+@app.get("/backup", include_in_schema=False)
+def backup_page():
+    return FileResponse(STATIC_DIR / "backup.html")
+
+
 @app.get("/admin", include_in_schema=False)
 def admin_page():
     return FileResponse(STATIC_DIR / "admin.html")

@@ -268,7 +268,7 @@ function render() {
 
   const tasks = visibleTasks();
   if (!tasks.length) {
-    const empty = el("div", "empty", "タスクがありません。「＋ タスク追加」または CSV インポートで登録してください。");
+    const empty = el("div", "empty", "タスクがありません。「＋ タスク追加」で登録してください（まとめて登録するときは「バックアップ」画面の CSV インポート）。");
     gantt.append(empty);
     return;
   }
@@ -851,46 +851,6 @@ $("#form-task").addEventListener("submit", async (e) => {
     toast("タスクを追加しました");
   } catch (err) {
     $("#task-error").textContent = err.message;
-  }
-});
-
-// CSV インポート
-$("#btn-import").addEventListener("click", () => {
-  $("#import-file").value = "";
-  $("#import-file").click();
-});
-$("#import-file").addEventListener("change", () => {
-  const file = $("#import-file").files[0];
-  if (!file) return;
-  $("#import-filename").textContent = file.name;
-  $("#import-error").textContent = "";
-  const f = $("#form-import");
-  f.querySelector('input[value="append"]').checked = true;
-  f.confirm.value = "";
-  $("#replace-confirm").hidden = true;
-  $("#dlg-import").showModal();
-});
-$("#form-import").addEventListener("change", (e) => {
-  if (e.target.name === "mode") $("#replace-confirm").hidden = e.target.value !== "replace";
-});
-$("#form-import").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const file = $("#import-file").files[0];
-  const mode = new FormData(e.target).get("mode");
-  const confirmText = e.target.confirm.value.trim();
-  if (mode === "replace" && confirmText !== "置き換え") {
-    $("#import-error").textContent = "置き換えを実行するには確認欄に「置き換え」と入力してください";
-    return;
-  }
-  const fd = new FormData();
-  fd.append("file", file);
-  try {
-    const r = await api(`/api/import?mode=${mode}&confirm=${encodeURIComponent(confirmText)}`, { method: "POST", body: fd });
-    $("#dlg-import").close();
-    await reloadAll();
-    toast(`インポート完了: 追加 ${r.added} 件 / 更新 ${r.updated} 件`);
-  } catch (err) {
-    $("#import-error").textContent = err.message;
   }
 });
 

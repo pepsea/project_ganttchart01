@@ -19,14 +19,9 @@
       <a href="/documents">共有資料</a>
       <a href="/links">参考リンク</a>
       <a href="/admin">管理</a>
+      <a href="/backup">バックアップ</a>
     </nav>
     <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
-    <!-- CSV（全画面共通: ログアウトの隣） -->
-    <span class="csv-tools">
-      <a class="button" id="btn-export" href="/api/services/export.csv" title="CSV エクスポート：表示中の絞り込み（領域・メンバー）を反映">CSV E</a>
-      <button id="btn-import" title="CSV インポート">CSV I</button>
-      <input type="file" id="import-file" accept=".csv,text/csv" hidden>
-    </span>
   </header>
 
   <!-- 親リンク（サービス画面の一番上） -->
@@ -156,25 +151,6 @@
     </form>
   </dialog>
 
-  <!-- CSV インポート -->
-  <dialog id="dlg-import">
-    <form id="form-import" method="dialog">
-      <h2>サービス CSV インポート</h2>
-      <p id="import-filename" class="filename"></p>
-      <ul class="import-notes">
-        <li>列名は CSV エクスポートと同じ（必須: <b>サービス番号</b>。新規は<b>サービス名</b>も必須）。UTF-8 / Shift_JIS</li>
-        <li>サービス番号が一致するサービスは<b>更新</b>、一致しないものは<b>追加</b>されます</li>
-        <li>更新時、空欄のセルや CSV に無い列は元の値のまま残ります</li>
-        <li>領域・関連する基盤技術は「、」やスペース区切りで複数指定。基盤番号は管理サイトに登録済みのものだけ使えます</li>
-        <li>エラーのある行が 1 行でもあれば、何も取り込まれません</li>
-      </ul>
-      <p class="error" id="import-error"></p>
-      <div class="actions">
-        <button type="button" data-close>キャンセル</button>
-        <button type="submit" class="primary">取り込む</button>
-      </div>
-    </form>
-  </dialog>
 
   <!-- サービスの削除（パスワードで確認） -->
   <dialog id="dlg-svc-delete">

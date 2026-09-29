@@ -435,8 +435,7 @@ function renderAreaChips() {
       $("#f-area").value = state.area;
       renderAreaChips();
       render();
-      syncExport();
-    });
+        });
     box.append(b);
   };
   chip("", "すべて", state.services.length);
@@ -451,8 +450,7 @@ function showService(no) {
     state.q = state.area = state.person = "";
     $("#q").value = "";
     refreshFilters();
-    syncExport();
-  }
+    }
   flash(no);
 }
 
@@ -572,55 +570,11 @@ async function reload() {
   refreshFilters();
   render();
   renderPackages();
-  syncExport();
 }
 
 $("#q").addEventListener("input", (e) => { state.q = e.target.value; render(); });
-$("#f-area").addEventListener("change", (e) => { state.area = e.target.value; render(); syncExport(); });
-$("#f-person").addEventListener("change", (e) => { state.person = e.target.value; render(); syncExport(); });
-
-// ---- CSV エクスポート（領域・メンバーの絞り込みを反映）
-function syncExport() {
-  const params = new URLSearchParams();
-  if (state.area) params.set("area", state.area);
-  if (state.person) params.set("person", state.person);
-  const q = params.toString();
-  $("#btn-export").href = `/api/services/export.csv${q ? `?${q}` : ""}`;
-}
-
-// ---- CSV インポート（サービス番号で追加・更新）
-$("#btn-import").addEventListener("click", () => {
-  $("#import-file").value = "";
-  $("#import-file").click();
-});
-$("#import-file").addEventListener("change", () => {
-  const file = $("#import-file").files[0];
-  if (!file) return;
-  $("#import-filename").textContent = file.name;
-  $("#import-error").textContent = "";
-  $("#dlg-import").showModal();
-});
-$("#dlg-import [data-close]").addEventListener("click", () => $("#dlg-import").close());
-$("#form-import").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const btn = e.target.querySelector("button[type=submit]");
-  btn.disabled = true;
-  const fd = new FormData();
-  fd.append("file", $("#import-file").files[0]);
-  try {
-    const res = await fetch("/api/services/import", { method: "POST", body: fd });
-    if (res.status === 401) { location.href = "/login?next=/services"; return; }
-    const d = await res.json();
-    if (!res.ok) throw new Error(typeof d.detail === "string" ? d.detail : "取り込みに失敗しました");
-    $("#dlg-import").close();
-    await reload();
-    toast(`インポート完了: 追加 ${d.added} 件 / 更新 ${d.updated} 件`);
-  } catch (err) {
-    $("#import-error").textContent = err.message;
-  } finally {
-    btn.disabled = false;
-  }
-});
+$("#f-area").addEventListener("change", (e) => { state.area = e.target.value; render(); });
+$("#f-person").addEventListener("change", (e) => { state.person = e.target.value; render(); });
 
 (async () => {
   try {

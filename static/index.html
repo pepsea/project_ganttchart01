@@ -18,14 +18,9 @@
       <a href="/documents">共有資料</a>
       <a href="/links">参考リンク</a>
       <a href="/admin">管理</a>
+      <a href="/backup">バックアップ</a>
     </nav>
     <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
-    <!-- CSV（全画面共通: ログアウトの隣） -->
-    <span class="csv-tools">
-      <a id="btn-export" class="button" href="/api/export.csv" title="CSV エクスポート">CSV E</a>
-      <button id="btn-import" title="CSV インポート">CSV I</button>
-      <input type="file" id="import-file" accept=".csv,text/csv" hidden>
-    </span>
     <div class="tools">
       <button id="btn-add" class="primary">＋ タスク追加</button>
       <input id="q" type="search" class="search" placeholder="PJ名・タスク名・担当者で検索">
@@ -118,26 +113,6 @@
     </form>
   </dialog>
 
-  <!-- CSV インポート -->
-  <dialog id="dlg-import">
-    <form id="form-import" method="dialog">
-      <h2>CSV インポート</h2>
-      <p class="hint">列: id, 領域, PJ名, タスク, 担当者, 優先度, 開始日, 終了日（UTF-8 / Shift_JIS）</p>
-      <p id="import-filename" class="filename"></p>
-      <label class="radio"><input type="radio" name="mode" value="append" checked>
-        追加・更新（id が一致するタスクは上書き、それ以外は追加）</label>
-      <label class="radio"><input type="radio" name="mode" value="replace">
-        置き換え（既存タスクをすべて削除してから取り込み）</label>
-      <label id="replace-confirm" hidden>確認のため「置き換え」と入力してください
-        <input name="confirm" autocomplete="off">
-      </label>
-      <p class="error" id="import-error"></p>
-      <div class="actions">
-        <button type="button" data-close>キャンセル</button>
-        <button type="submit" class="primary">取り込む</button>
-      </div>
-    </form>
-  </dialog>
 
   <script src="/static/app.js"></script>
 </body>

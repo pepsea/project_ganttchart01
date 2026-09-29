@@ -19,14 +19,9 @@
       <a href="/documents">共有資料</a>
       <a href="/links">参考リンク</a>
       <a href="/admin">管理</a>
+      <a href="/backup">バックアップ</a>
     </nav>
     <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
-    <!-- CSV（全画面共通: ログアウトの隣） -->
-    <span class="csv-tools">
-      <a class="button" href="/api/cases/export.csv" title="CSV エクスポート">CSV E</a>
-      <button id="btn-import" title="CSV インポート">CSV I</button>
-      <input type="file" id="import-file" accept=".csv,text/csv" hidden>
-    </span>
     <div class="tools">
       <button id="btn-add" class="primary">＋ 案件追加</button>
       <div class="seg" role="tablist" id="view-tabs">
@@ -190,26 +185,6 @@
     </div>
   </dialog>
 
-  <!-- CSV インポート -->
-  <dialog id="dlg-import">
-    <form id="form-import" method="dialog">
-      <h2>案件 CSV インポート</h2>
-      <p id="import-filename" class="filename"></p>
-      <ul class="import-notes">
-        <li>必須列: <b>案件番号</b>・<b>案件名</b>（列名は CSV エクスポートと同じ。UTF-8 / Shift_JIS）</li>
-        <li>案件番号が一致する案件は<b>更新</b>、一致しない案件は<b>追加</b>されます</li>
-        <li>更新時、空欄のセルや CSV に無い列は元の値のまま残ります</li>
-        <li>領域は「、」やスペース区切りで複数指定できます。未登録の企業名・PJ名・領域・案件番号は自動登録されます（旧形式の「顧客名」列は企業名として読み込みます）</li>
-        <li>「月報_2026-09」「進捗_2026-09-21」のような日付の列は、その月の月報・その日の進捗メモとして登録されます（同じ月・日は上書き、空欄は変更なし。旧形式の「週次_」列も読み込めます）</li>
-        <li>エラーのある行が 1 行でもあれば、何も取り込まれません</li>
-      </ul>
-      <p class="error" id="import-error"></p>
-      <div class="actions">
-        <button type="button" data-close>キャンセル</button>
-        <button type="submit" class="primary">取り込む</button>
-      </div>
-    </form>
-  </dialog>
 
   <!-- 案件削除（案件番号入力で確認） -->
   <!-- 案件の終了（アーカイブへ）: 案件番号の入力で確認 -->

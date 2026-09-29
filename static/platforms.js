@@ -1062,90 +1062,12 @@ $("#f-person").addEventListener("change", (e) => {
   state.filterPerson = e.target.value;
   store.set("platforms.person", state.filterPerson);
   renderList();
-  syncExportLinks();
 });
 
 $("#f-area").addEventListener("change", (e) => {
   state.filterArea = e.target.value;
   store.set("platforms.area", state.filterArea);
   renderList();
-  syncExportLinks();
-});
-
-// ---- CSV エクスポート（左の領域の絞り込みを反映）
-function syncExportLinks() {
-  const month = $("#export-month").value;
-  const conds = [];
-  if (state.filterArea) conds.push(`領域「${state.filterArea}」`);
-  if (state.filterPerson) conds.push(`メンバー「${state.filterPerson}」`);
-  $("#export-scope").textContent = conds.length ? `対象: ${conds.join("・")}の基盤（左の絞り込みを反映）` : "対象: すべての基盤";
-  document.querySelectorAll("#export-menu [data-export]").forEach((a) => {
-    const params = new URLSearchParams();
-    if (state.filterArea) params.set("area", state.filterArea);
-    if (state.filterPerson) params.set("person", state.filterPerson);
-    if (a.hasAttribute("data-month")) {
-      if (month) params.set("month", month);
-      a.toggleAttribute("aria-disabled", !month);
-    }
-    const q = params.toString();
-    a.href = `/api/platforms/${a.dataset.export}${q ? `?${q}` : ""}`;
-  });
-}
-$("#export-month").value = thisMonth();
-$("#export-month").addEventListener("input", syncExportLinks);
-syncExportLinks();
-// メニューの外をクリックしたら閉じる
-document.addEventListener("click", (e) => {
-  const menu = $("#export-menu");
-  if (menu.open && !menu.contains(e.target)) menu.open = false;
-});
-document.querySelectorAll("#export-menu a[data-export]").forEach((a) =>
-  a.addEventListener("click", () => setTimeout(() => { $("#export-menu").open = false; }, 100)));
-
-// ---- CSV インポート（エクスポートした 4 種類を自動判別）
-$("#btn-import").addEventListener("click", () => {
-  if (state.dirty && !confirm("基本情報・全体目標に未保存の変更があります。インポート後に画面を更新すると失われます。続けますか？")) return;
-  $("#import-file").value = "";
-  $("#import-file").click();
-});
-$("#import-file").addEventListener("change", () => {
-  const file = $("#import-file").files[0];
-  if (!file) return;
-  $("#import-filename").textContent = file.name;
-  $("#import-error").textContent = "";
-  $("#dlg-import").showModal();
-});
-$("#dlg-import [data-close]").addEventListener("click", () => $("#dlg-import").close());
-$("#form-import").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const fd = new FormData();
-  fd.append("file", $("#import-file").files[0]);
-  const btn = e.target.querySelector("button[type=submit]");
-  btn.disabled = true;
-  try {
-    const res = await fetch("/api/platforms/import", { method: "POST", body: fd });
-    if (res.status === 401) { location.href = "/login?next=/platforms"; return; }
-    const d = await res.json();
-    if (!res.ok) throw new Error(typeof d.detail === "string" ? d.detail : "取り込みに失敗しました");
-    $("#dlg-import").close();
-    const label = { backup: "全データ", platforms: "基盤一覧＋月報", monthly: "月報一覧", goals: "目標一覧", topics: "ディスカッション一覧" }[d.kind];
-    const parts = [];
-    if (d.platforms_added) parts.push(`基盤 新規 ${d.platforms_added}`);
-    if (d.platforms_updated) parts.push(`基盤 更新 ${d.platforms_updated}`);
-    if (d.monthly) parts.push(`月報 ${d.monthly}`);
-    if (d.goals_added || d.goals_updated) parts.push(`目標 追加 ${d.goals_added}・更新 ${d.goals_updated}`);
-    if (d.topics_added || d.topics_updated) parts.push(`ディスカッション 追加 ${d.topics_added}・更新 ${d.topics_updated}`);
-    state.dirty = false;
-    state.editing = false;
-    state.platforms = await api("/api/platforms");
-    renderList();
-    if (state.current) await select(state.current);
-    toast(`インポート完了（${label}）: ${parts.join(" / ") || "変更なし"}`);
-  } catch (err) {
-    $("#import-error").textContent = err.message;
-  } finally {
-    btn.disabled = false;
-  }
 });
 
 window.addEventListener("beforeunload", (e) => {
@@ -1165,8 +1087,7 @@ window.addEventListener("beforeunload", (e) => {
     state.filterArea = areas.includes(savedArea) ? savedArea : "";
     fa.value = state.filterArea;
     state.filterPerson = store.get("platforms.person") || "";
-    syncExportLinks();
-    renderList();
+      renderList();
     const want = new URLSearchParams(location.search).get("id");
     if (want && platforms.some((p) => p.name === want)) await select(want);
     else showView(false);

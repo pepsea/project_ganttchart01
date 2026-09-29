@@ -1054,37 +1054,6 @@ monthlyForm.addEventListener("submit", async (e) => {
   }
 });
 
-// ---- CSV インポート（案件番号で追加・更新）
-$("#btn-import").addEventListener("click", () => {
-  $("#import-file").value = "";
-  $("#import-file").click();
-});
-$("#import-file").addEventListener("change", () => {
-  const file = $("#import-file").files[0];
-  if (!file) return;
-  $("#import-filename").textContent = file.name;
-  $("#import-error").textContent = "";
-  $("#dlg-import").showModal();
-});
-$("#dlg-import [data-close]").addEventListener("click", () => $("#dlg-import").close());
-$("#form-import").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const fd = new FormData();
-  fd.append("file", $("#import-file").files[0]);
-  try {
-    const res = await fetch("/api/cases/import", { method: "POST", body: fd });
-    if (res.status === 401) { location.href = "/login?next=/cases"; return; }
-    const data = await res.json();
-    if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "取り込みに失敗しました");
-    $("#dlg-import").close();
-    await Promise.all([loadCases(), loadMasters()]);
-    render();
-    toast(`インポート完了: 追加 ${data.added} 件 / 更新 ${data.updated} 件 / 月報 ${data.monthly} 件 / 進捗メモ ${data.notes} 件`);
-  } catch (err) {
-    $("#import-error").textContent = err.message;
-  }
-});
-
 // ---- 案件削除（案件番号の入力が必要）
 const delForm = $("#form-delete");
 $("#btn-delete").addEventListener("click", () => {
