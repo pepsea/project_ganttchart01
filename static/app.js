@@ -173,19 +173,18 @@ function inRange(task) {
 
 const NO_ASSIGNEE = "\u0000none"; // 担当者フィルターの「（未設定）」
 
-// 表示対象: 領域・PJ・担当者で絞り込み、担当者の名前順 → 締切（終了日）の早い順に並べる
+// 表示対象: 領域・PJ・担当者で絞り込み、初期の並びは終了日（締切）の早い順
 // 担当者（複数はスペース区切り）
 const assigneesOf = (t) => (t.assignee ? t.assignee.split(" ") : []);
 const assigneeText = (t) => assigneesOf(t).join("・");
 
-// 担当者が未設定のタスクは最後
 const nameCollator = new Intl.Collator("ja");
-const byAssigneeThenDue = (a, b) =>
-  (!a.assignee - !b.assignee) ||
-  nameCollator.compare(a.assignee, b.assignee) ||
-  a.end_date.localeCompare(b.end_date) || a.start_date.localeCompare(b.start_date) || a.id - b.id;
+// 初期の並び: 終了日（締切）の早い順 → 開始日 → 担当者（未設定は最後）→ 登録順
+const byDue = (a, b) =>
+  a.end_date.localeCompare(b.end_date) || a.start_date.localeCompare(b.start_date) ||
+  (!a.assignee - !b.assignee) || nameCollator.compare(a.assignee, b.assignee) || a.id - b.id;
 
-// 見出しクリックの並び替え: 1 回目 昇順 → 2 回目 降順 → 3 回目 初期の並び（担当者順 → 締切順）に戻る（ブラウザに記憶）
+// 見出しクリックの並び替え: 1 回目 昇順 → 2 回目 降順 → 3 回目 初期の並び（終了日順）に戻る（ブラウザに記憶）
 const SORT_COLS = {
   area: (t) => t.area,
   pj: (t) => t.project,
@@ -201,9 +200,10 @@ const savedSort = (() => {
     return v && SORT_COLS[v.key] ? v : null;
   } catch (_) { return null; }
 })();
-let taskSortState = savedSort; // 現在の並び { key, desc } または null（初期の並び）
+let taskSortState = savedSort; // 現在の並び { key, desc } または null（初期の並び = 終了日の早い順）
+const currentSort = () => taskSortState || { key: "end", desc: false }; // 初期の並びは「終了日 ▲」
 const sortTasks = (list) => {
-  if (!taskSortState) return list.sort(byAssigneeThenDue);
+  if (!taskSortState) return list.sort(byDue);
   const taskSort = taskSortState;
   const get = SORT_COLS[taskSort.key];
   const empty = (v) => v === "" || v === null || v === undefined;
@@ -211,13 +211,14 @@ const sortTasks = (list) => {
     const va = get(a), vb = get(b);
     if (empty(va) !== empty(vb)) return empty(va) ? 1 : -1; // 空欄は常に最後
     const c = typeof va === "number" ? va - vb : nameCollator.compare(String(va), String(vb), "ja");
-    return (taskSort.desc ? -c : c) || byAssigneeThenDue(a, b);
+    return (taskSort.desc ? -c : c) || byDue(a, b);
   });
 };
 const setTaskSort = (key) => {
-  if (!taskSortState || taskSortState.key !== key) taskSortState = { key, desc: false };
-  else if (!taskSortState.desc) taskSortState = { key, desc: true };
-  else taskSortState = null;
+  const cur = currentSort();
+  if (cur.key !== key) taskSortState = { key, desc: false };
+  else if (!cur.desc) taskSortState = { key, desc: true };
+  else taskSortState = null; // 初期の並び（終了日順）に戻る
   try {
     if (taskSortState) localStorage.setItem("gantt.sort", JSON.stringify(taskSortState));
     else localStorage.removeItem("gantt.sort");
@@ -288,10 +289,11 @@ function renderHeader(trackW) {
     const sortKey = ["area", "pj", "task", "assignee", "priority", "start", "end"][i] || null;
     if (sortKey) {
       cell.classList.add("sortable");
-      cell.title = "クリックで並び替え（もう一度で逆順、3 回目で元の並び）";
-      if (taskSortState && taskSortState.key === sortKey) {
+      cell.title = "クリックで並び替え（もう一度で逆順、3 回目で元の並び＝終了日順）";
+      const cur = currentSort();
+      if (cur.key === sortKey) {
         cell.classList.add("sorted");
-        cell.append(el("span", "sort-mark", taskSortState.desc ? " ▼" : " ▲"));
+        cell.append(el("span", "sort-mark", cur.desc ? " ▼" : " ▲"));
       }
       cell.addEventListener("click", () => { setTaskSort(sortKey); render(); });
     }
