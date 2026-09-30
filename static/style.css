@@ -587,3 +587,5 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 .cal-month .cal-day { min-height: 0; }
 .cal-title { min-width: 11em; }
 @media (max-width: 1000px) { .cal-months { flex-direction: column; } .cal-month { width: 100%; } }
+.cal-months { width: 80%; } /* カレンダーの大きさは 8 割 */
+@media (max-width: 1000px) { .cal-months { width: 100%; } }
