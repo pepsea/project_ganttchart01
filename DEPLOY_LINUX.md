@@ -106,7 +106,7 @@ cd /opt/gantt-pm
 `update.sh` がすること（データ・バックアップ・`.env` には触れません）:
 1. データやバックアップが git の管理下に入っていないか確認（入っていたら中止）
 2. 更新前のバックアップを `backups/manual-*.json` に保存（「バックアップ」タブの一覧に「手動」として表示）
-3. `git pull --ff-only`（サーバー側のファイルを上書き・マージしない）
+3. サーバー側でプログラムを書き換えた変更があれば `git stash`（git 管理のプログラムだけ。データ・バックアップ・`.env` は含めない）に退避してから、`git pull --ff-only`（マージしない）
 4. `docker compose up -d --build`（起動時にも `startup-*.json` を保存）
 
 **してはいけないこと**（データやバックアップが消えます）:
@@ -115,20 +115,35 @@ cd /opt/gantt-pm
 - git のフォルダを消して clone し直す（`DATA_PATH=./data` の場合、データも消える）
   → `DATA_PATH` を git のフォルダの外にしておけば、どれを行ってもデータは残ります。
 
-**「Pulling is not possible because you have unmerged files」と出たとき**（前の `git pull` が途中で止まり、競合したファイルが残っている状態。サーバー側で直接ファイルを書き換えたときにも起きます）:
+**git stash で退避するもの・しないもの**（サーバー側でプログラムを直接書き換えてしまったとき）:
+
+| | 内容 | stash |
+|---|---|---|
+| 退避する | git で管理しているプログラム（`*.py`・`static/`・`compose.yaml` など）への変更 | する（`git stash push`。`update.sh` が自動で行う） |
+| 退避しない | データ（`./data`・`DATA_PATH`）、バックアップ（`backups/`）、`.env`、`*.db` | しない（git 管理外。`.gitignore`） |
+
+- 元のコンセプトどおり、**データ・バックアップ・`.env` は git の対象外**です。stash の対象にも入れません。
+- `git stash -u`（管理外の新規ファイルも含める）や `git stash -a`（無視しているファイルも含める）は**使わないでください**。`-a` はデータまで stash に入れて取り除いてしまいます。
+- 手動で stash するときも、範囲を明示します:
+
+```bash
+git stash push -m "server local" -- . ':(exclude)data' ':(exclude)backups' ':(exclude).env'
+git stash list          # 退避したものの一覧
+git stash pop           # 戻す（競合したら内容を確認して直す）
+```
+
+**「Pulling is not possible because you have unmerged files」と出たとき**（前の `git pull` が途中で止まり、競合したファイルが残っている状態。`update.sh` は競合を見つけると、この手順を案内して止まります）:
 
 ```bash
 cd /opt/gantt-pm
 git status                      # 「Unmerged paths」に出ているファイルを確認
-git diff > ~/gantt-server-local.patch   # サーバー側の変更を念のため退避（不要なら省略可）
 git merge --abort               # 「You have not concluded your merge」と出ているとき。エラーになるなら次へ
 git reset                       # 競合の印を外す（作業ファイルの中身は変えない）
-git restore .                   # サーバー側で書き換えた追跡ファイルを、コミットの内容に戻す
+git stash push -m "server local" -- . ':(exclude)data' ':(exclude)backups' ':(exclude).env'   # プログラムの変更を退避
 ./update.sh
 ```
 
-- `git restore .` が戻すのは **git で管理しているファイル（プログラム）だけ**です。データ（`./data`・`DATA_PATH`）・バックアップ・`.env` は git 管理外なので変わりません。
-- サーバー側で意図してプログラムを書き換えている場合は、上の `gantt-server-local.patch` に残っています（`git restore .` の前に確認してください）。
+- 退避した変更は `git stash list` で確認でき、不要なら `git stash drop` で捨てられます。データ（`./data`・`DATA_PATH`）・バックアップ・`.env` は、どの手順でも変わりません。
 - 原因の多くは、`update.sh` を使わず `git pull`（マージ）を直接実行したことです。`update.sh` は `--ff-only` なので競合しません。
 
 git を使わずにファイルをコピーして更新する場合:
