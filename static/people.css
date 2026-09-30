@@ -152,3 +152,12 @@
 .pp-head .pp-areas:has(.area-choose) { flex-basis: auto; }
 .pp-head h2 { white-space: nowrap; margin-bottom: 0; }
 .pp-head { align-items: center; }
+
+/* 達成したこと: 目標達成に必要なタスクと同じカード（最大 4 列。文字が大きい環境では列を減らして折り返す） */
+.ach-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(210px, calc((100% - 30px) / 4)), 1fr)); gap: 10px; }
+.ach-cards li { display: block; min-width: 0; overflow-wrap: anywhere; border: 1px solid var(--line-strong); border-left: 4px solid #30a46c; border-radius: 8px; padding: 8px 10px; background: #f7faf8; }
+.ach-cards .a-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 4px; }
+.ach-cards .a-title { font-weight: 600; line-height: 1.5; }
+.ach-cards .a-meta { display: flex; gap: 8px; margin-top: 2px; }
+.ach-cards .a-note { color: var(--muted); font-size: 12.5px; margin-top: 2px; line-height: 1.6; }
+.ach-cards .status-badge { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: #d9f2e4; color: #1d6b43; white-space: nowrap; }
