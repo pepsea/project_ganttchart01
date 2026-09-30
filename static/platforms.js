@@ -508,8 +508,8 @@ function renderDetail() {
   };
   const summary = el("div", "pf-summary");
   summary.append(
-    stat("タスクの達成", `${p.goal_done}<small> / ${p.goal_total}</small>`),
-    stat("期限超過のタスク", `${overdue}<small> 件</small>`, overdue ? "warn" : ""),
+    stat("項目の達成", `${p.goal_done}<small> / ${p.goal_total}</small>`),
+    stat("期限超過の項目", `${overdue}<small> 件</small>`, overdue ? "warn" : ""),
     stat("次の期限", p.next_due ? `${p.next_due.slice(5).replace("-", "/")}<small> （あと ${daysLeft(p.next_due)} 日）</small>` : "—"),
   );
   head.append(summary);
@@ -609,7 +609,7 @@ function renderDetail() {
     });
   }
 
-  // 並び: 目標達成に必要なタスク → ガントチャートのタスク → ディスカッション・月報（タブ）
+  // 並び: 目標達成に必要な項目 → ガントチャートのタスク → ディスカッション・月報（タブ）
   root.append(renderGoals(p));
   root.append(renderTasks(p, tasks));
 
@@ -717,18 +717,18 @@ async function refreshAfterChange(kind) {
 // ---- 目標: 一覧で読みやすく表示し、目標をクリックすると編集画面を開く
 function renderGoals(p) {
   const sec = el("section", "pf-section pf-goals");
-  const h = el("h3", "", "目標達成に必要なタスク");
+  const h = el("h3", "", "目標達成に必要な項目");
   const done = state.goals.filter((g) => g.status === "達成").length;
   h.append(el("span", "count-badge", `${done} / ${state.goals.length} 達成`));
   h.append(el("span", "hint", "全体目標を達成するための項目です。クリックすると編集できます"));
-  const add = el("button", "primary right", "＋ タスクを追加");
+  const add = el("button", "primary right", "＋ 項目を追加");
   add.type = "button";
   add.addEventListener("click", () => openGoalDialog(p, null));
   h.append(add);
   sec.append(h);
 
   if (!state.goals.length) {
-    sec.append(el("p", "hint", "まだ項目がありません。「＋ タスクを追加」から登録してください。"));
+    sec.append(el("p", "hint", "まだ項目がありません。「＋ 項目を追加」から登録してください。"));
     return sec;
   }
   const ul = el("ul", "goal-list");
@@ -779,7 +779,7 @@ function openGoalDialog(p, g) {
   f.due_date.value = g?.due_date || "";
   f.note.value = g?.note || "";
   f.url.value = g?.url || "";
-  $("#goal-title").textContent = g ? "タスクの編集" : "タスクの追加";
+  $("#goal-title").textContent = g ? "項目の編集" : "項目の追加";
   $("#goal-meta").textContent = g ? `${p.name} ${p.title}　／　最終更新 ${g.updated_at.slice(0, 16)}` : `${p.name} ${p.title}`;
   $("#goal-submit").textContent = g ? "保存" : "追加";
   $("#goal-delete").hidden = !g;
@@ -809,7 +809,7 @@ $("#goal-delete").addEventListener("click", () => {
   const { platform, goal } = goalEditing;
   if (!goal) return;
   $("#dlg-goal").close();
-  confirmPasswordDelete(`/api/platforms/${enc(platform)}/goals/${goal.id}`, "タスク", `項目: ${goal.title}`, "goals");
+  confirmPasswordDelete(`/api/platforms/${enc(platform)}/goals/${goal.id}`, "項目", `項目: ${goal.title}`, "goals");
 });
 
 // 目標・月報の削除: パスワードを入力して確認（サーバー側でも検証）

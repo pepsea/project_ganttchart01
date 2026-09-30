@@ -46,7 +46,7 @@
     </main>
   </div>
 
-  <aside id="goal-panel" class="goal-panel" hidden aria-label="タスクの詳細"></aside>
+  <aside id="goal-panel" class="goal-panel" hidden aria-label="項目の詳細"></aside>
 
   <div id="toast" class="toast" role="status"></div>
 
@@ -83,7 +83,7 @@
     <form id="form-ach" method="dialog" autocomplete="off">
       <h2 id="ach-title">達成したことを追記</h2>
       <p id="ach-meta" class="hint"></p>
-      <label><span>関連タスク（目標達成に必要なタスク）</span><select name="goal_id"></select></label>
+      <label><span>関連項目（目標達成に必要な項目）</span><select name="goal_id"></select></label>
       <label><span>達成したこと <span class="req">*</span></span><input name="title" required placeholder="例: 新サービスをリリース"></label>
       <label><span>達成度 <b id="ach-pc">100%</b></span><input type="range" name="progress" min="0" max="100" step="5" value="100"></label>
       <div class="two">
@@ -106,7 +106,7 @@
   <!-- 目標の追加・編集 -->
   <dialog id="dlg-goal">
     <form id="form-goal" method="dialog" autocomplete="off">
-      <h2 id="goal-title">タスクの追加</h2>
+      <h2 id="goal-title">項目の追加</h2>
       <p id="goal-meta" class="hint"></p>
       <div class="two">
         <label><span>状態</span><select name="status"></select></label>

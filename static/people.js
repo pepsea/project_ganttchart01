@@ -299,13 +299,13 @@ function renderDetail(d) {
   ah.append(el("span", "count", `${d.achievements.length} 件`), el("span", "hint", "グループ目標の「達成したこと」から表示"));
   as.append(ah);
   if (!d.achievements.length) as.append(el("p", "hint", "まだ記録がありません"));
-  const al = el("ul", "ach-list ach-cards"); // 目標達成に必要なタスクと同じカード表示（最大 4 列で折り返し）
+  const al = el("ul", "ach-list ach-cards"); // 目標達成に必要な項目と同じカード表示（最大 4 列で折り返し）
   for (const a of d.achievements) {
     const li = el("li");
     const top = el("div", "a-top");
     top.append(el("span", "status-badge", `達成度 ${a.progress}%`), el("span", "a-date", a.achieved_on ? slashDate(a.achieved_on) : `${a.fiscal_year}年度`));
     li.append(top, el("div", "a-title", a.title));
-    if (a.goal) li.append(el("div", "a-goal", `関連タスク: ${a.goal}`));
+    if (a.goal) li.append(el("div", "a-goal", `関連項目: ${a.goal}`));
     const meta = el("div", "a-meta");
     meta.append(extLink([a.group, el("span", "arrow", " ↗")], `/groups?id=${a.group_id}&year=all`, "a-group"));
     if (a.url && /^https?:\/\//.test(a.url)) meta.append(extLink("リンク ↗", a.url, "a-link"));

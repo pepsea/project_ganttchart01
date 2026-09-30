@@ -96,7 +96,7 @@ def init_db() -> None:
             # 達成項目の達成度（％）。これまでの「達成したこと」は達成済みなので 100
             db.execute("ALTER TABLE team_achievements ADD COLUMN progress INTEGER NOT NULL DEFAULT 100")
         if "goal_id" not in ach_cols:
-            # 関連する「目標達成に必要なタスク」（team_goals.id。0 = どのタスクにも結びつけていない）
+            # 関連する「目標達成に必要な項目」（team_goals.id。0 = どの項目にも結びつけていない）
             db.execute("ALTER TABLE team_achievements ADD COLUMN goal_id INTEGER NOT NULL DEFAULT 0")
         # 年度（4 月始まり）。未設定の行は期限・達成日（無ければ作成日）から決める
         for table, date_col in (("team_goals", "due_date"), ("team_achievements", "achieved_on")):
@@ -201,7 +201,7 @@ class AchievementIn(BaseModel):
     achieved_on: date | None = None
     note: str = ""
     url: str = ""
-    goal_id: int = 0  # 関連する「目標達成に必要なタスク」（team_goals.id。0 = なし）
+    goal_id: int = 0  # 関連する「目標達成に必要な項目」（team_goals.id。0 = なし）
     progress: int = Field(default=100, ge=0, le=100)  # 達成度（％）
 
     @field_validator("title", "owner", mode="before")
@@ -426,7 +426,7 @@ async def delete_goal(gid: int, tid: int, body: PasswordIn) -> Response:
     with get_db() as db:
         if db.execute("DELETE FROM team_goals WHERE id=? AND group_id=?", (tid, gid)).rowcount == 0:
             raise HTTPException(404, "目標が見つかりません")
-        # そのタスクに結びついていた達成したことは残し、「タスクなし」に戻す
+        # その項目に結びついていた達成したことは残し、「項目なし」に戻す
         db.execute("UPDATE team_achievements SET goal_id = 0 WHERE goal_id = ? AND group_id = ?", (tid, gid))
     return Response(status_code=204)
 
@@ -474,7 +474,7 @@ async def delete_kpi(gid: int, kid: int, body: PasswordIn) -> Response:
 
 def _check_goal(db, gid: int, goal_id: int) -> None:
     if goal_id and not db.execute("SELECT 1 FROM team_goals WHERE id = ? AND group_id = ?", (goal_id, gid)).fetchone():
-        raise HTTPException(422, "関連するタスクがこのグループに見つかりません")
+        raise HTTPException(422, "関連する項目がこのグループに見つかりません")
 
 
 def _ach_values(a: AchievementIn) -> tuple:
@@ -531,7 +531,7 @@ async def delete_achievement(gid: int, aid: int, body: PasswordIn) -> Response:
 
 EXPORT_HEADERS = ["種別", "グループ名", "リーダー", "メンバー", "大目標", "関連サービス", "関連基盤技術",
                   "年度", "状態", "目標", "達成基準", "時期", "期限",
-                  "達成したこと", "関連タスク", "担当者", "達成日", "指標", "進捗", "メモ", "リンク"]
+                  "達成したこと", "関連項目", "担当者", "達成日", "指標", "進捗", "メモ", "リンク"]
 
 
 def _err(line: int, e: Exception) -> HTTPException:
@@ -560,7 +560,7 @@ def export_csv() -> Response:
                                 (g["id"],)):
                 goal = db.execute("SELECT title FROM team_goals WHERE id = ? AND group_id = ?", (a["goal_id"], g["id"])).fetchone()
                 add(種別="達成したこと", グループ名=g["name"], 年度=a["fiscal_year"] or "", 達成したこと=a["title"],
-                    関連タスク=goal["title"] if goal else "", 進捗=a["progress"], 担当者=a["owner"], 達成日=a["achieved_on"] or "", メモ=a["note"], リンク=a["url"])
+                    関連項目=goal["title"] if goal else "", 進捗=a["progress"], 担当者=a["owner"], 達成日=a["achieved_on"] or "", メモ=a["note"], リンク=a["url"])
             for k in db.execute("SELECT * FROM team_kpis WHERE group_id = ? ORDER BY sort_order, id", (g["id"],)):
                 add(種別="指標", グループ名=g["name"], 指標=k["title"], 担当者=k["owner"], 進捗=k["progress"])
         for r in db.execute("SELECT year FROM team_years ORDER BY year"):
@@ -652,11 +652,12 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                     raise _err(line, e)
                 vals = _ach_values(a)
                 gl = None
-                if r.get("関連タスク"):
+                rel = r.get("関連項目") or r.get("関連タスク")  # 以前の列名「関連タスク」も受け付ける
+                if rel:
                     gl = db.execute("SELECT id FROM team_goals WHERE group_id = ? AND title = ?"
-                                    " ORDER BY fiscal_year = ? DESC, id", (gid, r["関連タスク"], vals[-1])).fetchone()
+                                    " ORDER BY fiscal_year = ? DESC, id", (gid, rel, vals[-1])).fetchone()
                     if gl is None:
-                        raise HTTPException(422, f"{line} 行目: 関連タスク「{r['関連タスク']}」が見つかりません（先にそのタスクの行を登録してください）")
+                        raise HTTPException(422, f"{line} 行目: 関連項目「{rel}」が見つかりません（先にその項目の行を登録してください）")
                 goal_id = gl["id"] if gl else 0
                 hit = db.execute("SELECT id FROM team_achievements WHERE group_id = ? AND fiscal_year = ? AND title = ?",
                                  (gid, vals[-1], vals[0])).fetchone()

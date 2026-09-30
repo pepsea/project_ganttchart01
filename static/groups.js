@@ -166,8 +166,8 @@ function renderDetail() {
   };
   const stats = el("div", "stats");
   stats.append(
-    stat("タスクの達成", `${g.goal_done}<small> / ${g.goal_total}</small>`),
-    stat("期限超過のタスク", `${overdue}<small> 件</small>`, overdue ? "warn" : ""),
+    stat("項目の達成", `${g.goal_done}<small> / ${g.goal_total}</small>`),
+    stat("期限超過の項目", `${overdue}<small> 件</small>`, overdue ? "warn" : ""),
     stat(`${state.year ? `${state.year}年度に` : ""}達成したこと`, `${state.achievements.length}<small> 件</small>`),
   );
   head.append(stats);
@@ -189,13 +189,13 @@ function renderDetail() {
 // ---- 目標（達成基準・時期）: クリックで編集
 function renderGoals(g) {
   const gs = el("section", "gp-section");
-  const gh = el("h3", "", state.year ? `${state.year}年度の目標達成に必要なタスク` : "目標達成に必要なタスク（すべての年度）");
+  const gh = el("h3", "", state.year ? `${state.year}年度の目標達成に必要な項目` : "目標達成に必要な項目（すべての年度）");
   gh.append(el("span", "count-badge", `${g.goal_done} / ${g.goal_total} 達成`), el("span", "hint", "大目標を達成するための項目です。クリックすると編集できます"));
-  const add = el("button", "primary right", "＋ タスクを追加");
+  const add = el("button", "primary right", "＋ 項目を追加");
   add.addEventListener("click", () => openGoalDialog(g, null));
   gh.append(add);
   gs.append(gh);
-  if (!state.goals.length) gs.append(el("p", "hint", `${yearLabel(state.year)}の項目はまだありません。「＋ タスクを追加」から登録してください。`));
+  if (!state.goals.length) gs.append(el("p", "hint", `${yearLabel(state.year)}の項目はまだありません。「＋ 項目を追加」から登録してください。`));
   const ul = el("ul", "goal-list");
   for (const t of state.goals) {
     const li = el("li");
@@ -253,10 +253,10 @@ function renderAchievements(g) {
   const list = state.achievements.filter((a) => !a.goal_id); // どのタスクにも結びついていないもの
   if (!list.length) return null;
   const sec = el("div", "ach-block");
-  const h = el("h4", "", "タスクに結びついていない達成したこと");
-  h.append(el("span", "count-badge", `${list.length} 件`), el("span", "hint", "クリックして編集。「関連タスク」を選ぶとタスクの中に移ります"));
+  const h = el("h4", "", "項目に結びついていない達成したこと");
+  h.append(el("span", "count-badge", `${list.length} 件`), el("span", "hint", "クリックして編集。「関連項目」を選ぶと項目の中に移ります"));
   sec.append(h);
-  const ul = el("ul", "ach-list ach-cards"); // 目標達成に必要なタスクと同じカード（最大 4 列で折り返し）
+  const ul = el("ul", "ach-list ach-cards"); // 目標達成に必要な項目と同じカード（最大 4 列で折り返し）
   for (const a of list) {
     const li = el("li");
     li.tabIndex = 0;
@@ -409,7 +409,7 @@ function renderPanel() {
   fact("達成基準", t.criteria);
   fact("時期", t.period);
   fact("メモ", t.note, "pre");
-  const edit = el("button", "gpn-edit", "✎ タスクを編集");
+  const edit = el("button", "gpn-edit", "✎ 項目を編集");
   edit.type = "button";
   edit.addEventListener("click", () => openGoalDialog(g, t));
   panel.append(head, title, facts);
@@ -482,7 +482,7 @@ function openAchievementDialog(g, a, goalId = 0) {
   achForm.url.value = a?.url || "";
   achForm.progress.value = a ? a.progress : 100;
   $("#ach-pc").textContent = `${achForm.progress.value}%`;
-  // 関連タスク（目標達成に必要なタスク）。選択中の年度に限らず、このグループの全タスクから選ぶ
+  // 関連項目（目標達成に必要な項目）。選択中の年度に限らず、このグループの全項目から選ぶ
   const sel = achForm.goal_id;
   sel.innerHTML = "";
   sel.append(new Option("（なし）", "0"));
@@ -607,7 +607,7 @@ function openGoalDialog(g, t) {
   f.note.value = t?.note || "";
   f.url.value = t?.url || "";
   yearOptions(f.fiscal_year, t?.fiscal_year || state.year || state.currentYear);
-  $("#goal-title").textContent = t ? "タスクの編集" : "タスクの追加";
+  $("#goal-title").textContent = t ? "項目の編集" : "項目の追加";
   $("#goal-meta").textContent = t ? `${g.name}　／　最終更新 ${t.updated_at.slice(0, 16)}` : g.name;
   $("#goal-submit").textContent = t ? "保存" : "追加";
   $("#goal-delete").hidden = !t;
@@ -639,7 +639,7 @@ $("#form-goal").addEventListener("submit", async (e) => {
 $("#goal-delete").addEventListener("click", () => {
   const { group, goal } = goalEditing;
   $("#dlg-goal").close();
-  openDelete("タスク", `項目: ${goal.title}`, `/api/groups/${group.id}/goals/${goal.id}`, () => reload(group.id));
+  openDelete("項目", `項目: ${goal.title}`, `/api/groups/${group.id}/goals/${goal.id}`, () => reload(group.id));
 });
 
 // ------------------------------------------------------------ 削除（パスワード必須）
