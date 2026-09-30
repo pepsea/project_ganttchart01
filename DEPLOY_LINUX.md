@@ -115,6 +115,22 @@ cd /opt/gantt-pm
 - git のフォルダを消して clone し直す（`DATA_PATH=./data` の場合、データも消える）
   → `DATA_PATH` を git のフォルダの外にしておけば、どれを行ってもデータは残ります。
 
+**「Pulling is not possible because you have unmerged files」と出たとき**（前の `git pull` が途中で止まり、競合したファイルが残っている状態。サーバー側で直接ファイルを書き換えたときにも起きます）:
+
+```bash
+cd /opt/gantt-pm
+git status                      # 「Unmerged paths」に出ているファイルを確認
+git diff > ~/gantt-server-local.patch   # サーバー側の変更を念のため退避（不要なら省略可）
+git merge --abort               # 「You have not concluded your merge」と出ているとき。エラーになるなら次へ
+git reset                       # 競合の印を外す（作業ファイルの中身は変えない）
+git restore .                   # サーバー側で書き換えた追跡ファイルを、コミットの内容に戻す
+./update.sh
+```
+
+- `git restore .` が戻すのは **git で管理しているファイル（プログラム）だけ**です。データ（`./data`・`DATA_PATH`）・バックアップ・`.env` は git 管理外なので変わりません。
+- サーバー側で意図してプログラムを書き換えている場合は、上の `gantt-server-local.patch` に残っています（`git restore .` の前に確認してください）。
+- 原因の多くは、`update.sh` を使わず `git pull`（マージ）を直接実行したことです。`update.sh` は `--ff-only` なので競合しません。
+
 git を使わずにファイルをコピーして更新する場合:
 
 ```bash
