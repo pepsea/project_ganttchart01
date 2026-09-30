@@ -1024,6 +1024,11 @@ function renderCalendar() {
   const n2 = new Date(cal.y, cal.m + 1, 1);
   head.append(prev, el("b", "cal-title", `${cal.y}年${cal.m + 1}月 〜 ${n2.getFullYear() !== cal.y ? `${n2.getFullYear()}年` : ""}${n2.getMonth() + 1}月`), next, now,
     el("span", "hint", "バーをクリックでタスクの詳細（上の絞り込みが反映されます）"));
+  const copy = el("button", "cal-copy", "📋 カレンダーをコピー");
+  copy.type = "button";
+  copy.title = "この 2 か月のカレンダーだけを画像としてコピー（メール・Teams・資料に貼れる）";
+  copy.addEventListener("click", copyCalendar);
+  head.append(el("span", "spacer"), copy);
   box.append(head);
   const months = el("div", "cal-months"); // 2 か月を左右に並べる
   const tasks = visibleTasks();
@@ -1091,6 +1096,117 @@ function calMonth(y, m, tasks) {
   }
   blk.append(weeks);
   return blk;
+}
+
+// カレンダー部分だけを画像（PNG）としてコピー。クリップボードが使えない環境（http のアクセスなど）ではファイルとして保存
+function calendarCanvas() {
+  const tasks = visibleTasks();
+  const SC = 2, W = 1500, PAD = 16, GAP = 24;
+  const monthW = (W - PAD * 2 - GAP) / 2, cell = monthW / 7;
+  const font = (px, bold) => `${bold ? "700 " : ""}${px}px -apple-system, "Hiragino Sans", "Yu Gothic UI", Meiryo, "Noto Sans JP", sans-serif`;
+  const n = new Date(cal.y, cal.m + 1, 1);
+  const months = [[cal.y, cal.m], [n.getFullYear(), n.getMonth()]];
+  const today = todayMs();
+  // 週ごとの配置（画面のカレンダーと同じ並べ方）
+  const layout = months.map(([y, m]) => {
+    const first = Date.UTC(y, m, 1), last = Date.UTC(y, m + 1, 0);
+    const weeks = [];
+    for (let ws = first - new Date(first).getUTCDay() * DAY_MS; ws <= last; ws += 7 * DAY_MS) {
+      const we = ws + 6 * DAY_MS;
+      const laneEnd = [];
+      const placed = tasks
+        .filter((t) => parseDate(t.start_date) <= we && parseDate(t.end_date) >= ws)
+        .sort((p, q) => parseDate(p.start_date) - parseDate(q.start_date) || parseDate(p.end_date) - parseDate(q.end_date))
+        .map((t) => {
+          const s = Math.max(0, Math.round((parseDate(t.start_date) - ws) / DAY_MS));
+          const e = Math.min(6, Math.round((parseDate(t.end_date) - ws) / DAY_MS));
+          let lane = laneEnd.findIndex((x) => x < s);
+          if (lane < 0) lane = laneEnd.length;
+          laneEnd[lane] = e;
+          return { t, s, e, lane, cl: parseDate(t.start_date) < ws, cr: parseDate(t.end_date) > we };
+        });
+      weeks.push({ ws, placed, h: Math.max(cell, 24 + Math.max(laneEnd.length, 1) * 24 + 4) });
+    }
+    return { y, m, weeks };
+  });
+  const TOP = 40, HEAD = 22 + 26;
+  const monthH = (mo) => HEAD + mo.weeks.reduce((s, w) => s + w.h, 0);
+  const H = TOP + Math.max(...layout.map(monthH)) + PAD;
+  const cv = document.createElement("canvas");
+  cv.width = W * SC;
+  cv.height = H * SC;
+  const c = cv.getContext("2d");
+  c.scale(SC, SC);
+  c.fillStyle = "#fff";
+  c.fillRect(0, 0, W, H);
+  c.textBaseline = "middle";
+  c.fillStyle = "#1f2430";
+  c.font = font(18, true);
+  c.fillText(`${cal.y}年${cal.m + 1}月 〜 ${n.getFullYear() !== cal.y ? `${n.getFullYear()}年` : ""}${n.getMonth() + 1}月`, PAD, 22);
+  const fit = (text, maxW) => {
+    if (c.measureText(text).width <= maxW) return text;
+    let s = text;
+    while (s.length > 1 && c.measureText(s + "…").width > maxW) s = s.slice(0, -1);
+    return s + "…";
+  };
+  layout.forEach((mo, mi) => {
+    const x0 = PAD + mi * (monthW + GAP);
+    let y = TOP;
+    c.fillStyle = "#1f2430";
+    c.font = font(14, true);
+    c.fillText(`${mo.y}年${mo.m + 1}月`, x0, y + 10);
+    y += 26;
+    c.font = font(12);
+    WEEKDAYS.forEach((w, i) => {
+      c.fillStyle = i === 0 ? "#d6455d" : i === 6 ? "#2f6fed" : "#6b7280";
+      c.textAlign = "center";
+      c.fillText(w, x0 + cell * i + cell / 2, y + 11);
+    });
+    c.textAlign = "left";
+    y += 22;
+    for (const wk of mo.weeks) {
+      for (let i = 0; i < 7; i++) {
+        const d = wk.ws + i * DAY_MS, dt = new Date(d), x = x0 + cell * i;
+        c.fillStyle = d === today ? "#fff6d6" : dt.getUTCMonth() !== mo.m ? "#f6f7f9" : "#fff";
+        c.fillRect(x, y, cell, wk.h);
+        c.strokeStyle = "#e3e6eb";
+        c.strokeRect(x + 0.5, y + 0.5, cell, wk.h);
+        c.fillStyle = dt.getUTCMonth() !== mo.m ? "#b0b4bc" : i === 0 ? "#d6455d" : i === 6 ? "#2f6fed" : "#1f2430";
+        c.font = font(12, d === today);
+        c.fillText(dt.getUTCDate() === 1 ? `${dt.getUTCMonth() + 1}/1` : String(dt.getUTCDate()), x + 6, y + 12);
+      }
+      for (const { t, s, e, lane, cl, cr } of wk.placed) {
+        const bx = x0 + cell * s + (cl ? 0 : 3), bw = cell * (e - s + 1) - (cl ? 0 : 3) - (cr ? 0 : 3), by = y + 24 + lane * 24 + 2;
+        const st = deadlineStatus(t);
+        const hue = /hsl\((\d+)/.exec(areaColor(t.area))[1];
+        c.fillStyle = st === "overdue" ? "#ffd4d4" : st === "soon" ? "#ffe2b3" : `hsl(${hue} 62% 90%)`;
+        c.fillRect(bx, by, bw, 20);
+        c.fillStyle = areaColor(t.area);
+        if (!cl) c.fillRect(bx, by, 4, 20);
+        c.fillStyle = "#1f2430";
+        c.font = font(12);
+        c.fillText(fit(`${t.task}${t.assignee ? `（${assigneeText(t)}）` : ""}`, bw - (cl ? 6 : 12)), bx + (cl ? 4 : 8), by + 10.5);
+      }
+      y += wk.h;
+    }
+  });
+  return cv;
+}
+async function copyCalendar() {
+  const cv = calendarCanvas();
+  const blob = await new Promise((res) => cv.toBlob(res, "image/png"));
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    toast("カレンダーを画像としてコピーしました（貼り付けできます）");
+  } catch (_) {
+    // クリップボードが使えないとき（http のアクセスなど）は画像ファイルとして保存
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `calendar-${cal.y}-${String(cal.m + 1).padStart(2, "0")}.png`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast("この環境ではコピーできないため、画像ファイルとして保存しました");
+  }
 }
 function setCalendar(on) {
   cal.on = on;
