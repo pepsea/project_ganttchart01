@@ -25,9 +25,10 @@ STATUSES = ("顧客開発", "打診", "見積提出", "契約中", "ブリーフ
             "アーカイブ")
 Status = Literal[STATUSES]
 URL_FIELDS = ("box_url", "teams_url", "overview_url", "plan_url")
-FREE_LINK_COLS = ("link1_label", "link1_url", "link2_label", "link2_url")  # 自由リンク 2 つ（名前と URL）
+# （未使用）旧・自由リンク 2 つの列。自由リンクは case_links（何個でも）へ初回だけ引き継ぎ、以後は未使用として残す
+FREE_LINK_COLS = ("link1_label", "link1_url", "link2_label", "link2_url")
 CASE_COLS = ("case_no", "customer", "name", "status", "pl", "assignees", "areas",
-             "start_date", "end_date", *URL_FIELDS, "detail", *FREE_LINK_COLS, "trial", "contact")
+             "start_date", "end_date", *URL_FIELDS, "detail", "trial", "contact")
 
 
 # ---------------------------------------------------------------- DB
@@ -99,6 +100,18 @@ def init_db() -> None:
         for col in ("project", "detail", *FREE_LINK_COLS, "trial", "contact", "finished_at"):
             if col not in cols:
                 db.execute(f"ALTER TABLE cases ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
+        # 自由リンク（何個でも）。旧・自由リンク 2 つ（cases.link1_* / link2_*）は初回だけ引き継ぐ
+        has_links = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='case_links'").fetchone()
+        db.execute("""CREATE TABLE IF NOT EXISTS case_links (
+                          id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                          case_id    INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+                          label      TEXT NOT NULL DEFAULT '',  -- リンクの名前
+                          url        TEXT NOT NULL,
+                          sort_order INTEGER NOT NULL DEFAULT 0,
+                          created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+                      )""")
+        if not has_links:
+            db.execute(LEGACY_LINKS_COPY)
         if sample_data_enabled() and db.execute("SELECT COUNT(*) FROM cases").fetchone()[0] == 0:
             seed_sample_cases(db)
         # 既存の案件から顧客・案件番号のマスタを補完
@@ -110,6 +123,13 @@ def init_db() -> None:
                       WHERE project <> '' AND project NOT IN (SELECT name FROM case_nos)""")
     migrate_old_statuses()  # 旧い状況（QC・アフターフォロー）を「アフターフォロー・その他」へ
     allow_same_case_no()  # 同じ案件番号の案件を複数登録できるようにする（1 回だけ）
+
+
+# 旧・自由リンク 2 つ（cases.link1_* / link2_*）→ case_links の引き継ぎ（backup.py の復元でも使う）
+LEGACY_LINKS_COPY = """INSERT INTO case_links(case_id, label, url, sort_order)
+                       SELECT id, link1_label, link1_url, 1 FROM cases WHERE link1_url <> ''
+                       UNION ALL
+                       SELECT id, link2_label, link2_url, 2 FROM cases WHERE link2_url <> ''"""
 
 
 # 旧・週次進捗メモ（case_notes）→ 進捗メモ（case_progress）の引き継ぎ（backup.py の復元でも使う）
@@ -206,6 +226,24 @@ def normalize_people(v: str) -> str:
     return " ".join(dict.fromkeys(names))  # 重複除去（順序維持）
 
 
+class CaseLink(BaseModel):
+    label: str = ""
+    url: str = ""
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def strip_label(cls, v):
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("url", mode="before")
+    @classmethod
+    def check_url(cls, v):
+        v = (v or "").strip()
+        if v and not re.match(r"^https?://", v, re.I):
+            raise ValueError("リンクは http:// または https:// で始まる URL を入力してください")
+        return v
+
+
 class CaseIn(BaseModel):
     case_no: str = Field(min_length=1)
     customer: str = ""
@@ -221,14 +259,11 @@ class CaseIn(BaseModel):
     teams_url: str = ""
     overview_url: str = ""
     plan_url: str = ""
-    link1_label: str = ""  # 自由リンク 1 の名前
-    link1_url: str = ""
-    link2_label: str = ""  # 自由リンク 2 の名前
-    link2_url: str = ""
+    links: list["CaseLink"] | None = None  # 自由リンク（何個でも）。None なら変更しない
     trial: str = ""        # 試験名（同じ案件番号で試験が複数あるときに区別する）
     contact: str = ""      # 顧客名（個人名。自由記載）。customer は企業名
 
-    @field_validator("case_no", "customer", "name", "pl", "link1_label", "link2_label", "trial", "contact", mode="before")
+    @field_validator("case_no", "customer", "name", "pl", "trial", "contact", mode="before")
     @classmethod
     def strip(cls, v):
         return v.strip() if isinstance(v, str) else v
@@ -243,7 +278,7 @@ class CaseIn(BaseModel):
     def uniq_areas(cls, v: list[str]):
         return list(dict.fromkeys(a.strip() for a in v if a.strip()))
 
-    @field_validator(*URL_FIELDS, "link1_url", "link2_url", mode="before")
+    @field_validator(*URL_FIELDS, mode="before")
     @classmethod
     def check_url(cls, v):
         v = (v or "").strip()
@@ -263,7 +298,7 @@ class CaseIn(BaseModel):
                 self.start_date.isoformat() if self.start_date else None,
                 self.end_date.isoformat() if self.end_date else None,
                 self.box_url, self.teams_url, self.overview_url, self.plan_url, self.detail.strip(),
-                self.link1_label, self.link1_url, self.link2_label, self.link2_url, self.trial, self.contact)
+                self.trial, self.contact)
 
 
 class StatusIn(BaseModel):
@@ -306,11 +341,32 @@ def to_case(row: sqlite3.Row) -> dict:
     return d
 
 
+def attach_links(db: sqlite3.Connection, cases: list[dict]) -> list[dict]:
+    """各案件に自由リンク（links: [{label, url}]。並び順）を付ける"""
+    by_case: dict[int, list[dict]] = {}
+    for r in db.execute("SELECT case_id, label, url FROM case_links ORDER BY case_id, sort_order, id"):
+        by_case.setdefault(r["case_id"], []).append({"label": r["label"], "url": r["url"]})
+    for c in cases:
+        c["links"] = by_case.get(c["id"], [])
+    return cases
+
+
+def save_links(db: sqlite3.Connection, case_id: int, links: list[CaseLink]) -> None:
+    """自由リンクを入力どおりに置き換える（URL が空の行は除く）"""
+    db.execute("DELETE FROM case_links WHERE case_id = ?", (case_id,))
+    n = 0
+    for lk in links:
+        if lk.url:
+            n += 1
+            db.execute("INSERT INTO case_links(case_id, label, url, sort_order) VALUES (?,?,?,?)",
+                       (case_id, lk.label, lk.url, n))
+
+
 def fetch_case(db: sqlite3.Connection, case_id: int) -> dict:
     row = db.execute(f"{CASE_SELECT} WHERE c.id = ?", (case_id,)).fetchone()
     if row is None:
         raise HTTPException(404, "案件が見つかりません")
-    return to_case(row)
+    return attach_links(db, [to_case(row)])[0]
 
 
 def migrate_old_statuses() -> None:
@@ -382,7 +438,7 @@ def write_case(db: sqlite3.Connection, sql: str, params: tuple, case_no: str):
 def list_cases() -> list[dict]:
     with get_db() as db:
         rows = db.execute(f"{CASE_SELECT} ORDER BY COALESCE(c.end_date, '9999-12-31'), c.case_no")
-        return [to_case(r) for r in rows]
+        return attach_links(db, [to_case(r) for r in rows])
 
 
 @router.get("/statuses")
@@ -393,7 +449,6 @@ def list_statuses() -> list[str]:
 # エクスポートの基本列（月報・進捗メモの列はこの後ろに日付ごとに並ぶ）
 EXPORT_HEADERS = ["案件番号", "試験名", "状況", "企業名", "顧客名（個人名）", "案件名", "PL", "担当者", "領域", "開始日", "終了予定日",
                   "BOXリンク", "Teamsリンク", "案件概要書リンク", "試験計画書リンク", "案件詳細",
-                  "自由リンク1の名前", "自由リンク1", "自由リンク2の名前", "自由リンク2",
                   "登録日", "終了日"]  # 登録日 = 案件を登録した日時、終了日 = アーカイブにした日時（どちらも自動で記録）
 # 日付パターンの列名: 月報_YYYY-MM / 進捗_YYYY-MM-DD（旧形式の 週次_YYYY-MM-DD も読み込める）
 MONTH_COL = re.compile(r"^月報_(\d{4})[-/](\d{1,2})$")
@@ -419,11 +474,22 @@ def _import_note(db: sqlite3.Connection, case_id: int, day: str, body: str) -> b
     return True
 
 
-def _case_row(c: dict) -> list:
+def _link_heads(n: int) -> list[str]:
+    """自由リンクの列名（案件ごとの最大数だけ: 自由リンク1の名前, 自由リンク1, 自由リンク2の名前, …）"""
+    return [h for i in range(1, n + 1) for h in (f"自由リンク{i}の名前", f"自由リンク{i}")]
+
+
+def _headers(cases: list[dict]) -> tuple[list[str], int]:
+    n = max((len(c["links"]) for c in cases), default=0)
+    return [*EXPORT_HEADERS[:-2], *_link_heads(max(n, 2)), *EXPORT_HEADERS[-2:]], max(n, 2)
+
+
+def _case_row(c: dict, n: int = 2) -> list:
+    links = [x for lk in (c["links"] + [{"label": "", "url": ""}] * n)[:n] for x in (lk["label"], lk["url"])]
     return [c["case_no"], c["trial"], c["status"], c["customer"], c["contact"], c["name"], c["pl"], c["assignees"],
             " ".join(c["areas"]), c["start_date"] or "", c["end_date"] or "",
             c["box_url"], c["teams_url"], c["overview_url"], c["plan_url"], c["detail"],
-            c["link1_label"], c["link1_url"], c["link2_label"], c["link2_url"],
+            *links,
             (c["created_at"] or "")[:16], (c["finished_at"] or "")[:16]]
 
 
@@ -437,9 +503,10 @@ def export_csv() -> Response:
                    for r in db.execute("SELECT case_id, month, body FROM case_monthly")}
     months = sorted({m for _, m in monthly}, reverse=True)
     weeks = sorted({w for _, w in notes}, reverse=True)
-    rows = [[*EXPORT_HEADERS, *(f"月報_{m}" for m in months), *(f"進捗_{wk}" for wk in weeks)]]
+    heads, nl = _headers(cases)
+    rows = [[*heads, *(f"月報_{m}" for m in months), *(f"進捗_{wk}" for wk in weeks)]]
     for c in cases:
-        rows.append([*_case_row(c),
+        rows.append([*_case_row(c, nl),
                      *(monthly.get((c["id"], m), "") for m in months),
                      *(notes.get((c["id"], wk), "") for wk in weeks)])
     return csv_response(rows, "cases")
@@ -448,7 +515,9 @@ def export_csv() -> Response:
 @router.get("/export-list.csv")
 def export_list_csv() -> Response:
     """案件一覧のみ（月報・進捗メモは含めない）"""
-    return csv_response([EXPORT_HEADERS, *(_case_row(c) for c in list_cases())], "cases_list")
+    cases = list_cases()
+    heads, nl = _headers(cases)
+    return csv_response([heads, *(_case_row(c, nl) for c in cases)], "cases_list")
 
 
 LOG_HEADERS_MONTHLY = ["案件番号", "試験名", "企業名", "案件名", "月", "月報"]
@@ -513,7 +582,6 @@ IMPORT_ALIASES = {
     "試験計画書リンク": "plan_url", "試験計画書": "plan_url", "plan_url": "plan_url",
     "案件詳細": "detail", "detail": "detail",
     "登録日": "created_at", "終了日": "finished_at",
-    "自由リンク1の名前": "link1_label", "自由リンク1": "link1_url", "自由リンク2の名前": "link2_label", "自由リンク2": "link2_url",
     "最新進捗週": "note_week", "最新進捗メモ": "note_body",  # 旧形式
 }
 
@@ -579,6 +647,11 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
             log_cols[h] = ("month", f"{y:04d}-{mo:02d}")
         elif m := NOTE_COL.match(h.strip()):
             log_cols[h] = ("note", parse_date(m.group(1), 1, f"列名「{h}」の日付").isoformat())
+    # 自由リンク列: 自由リンクNの名前 / 自由リンクN（N = 1, 2, 3, …。何個でも）
+    link_cols: dict[int, dict[str, str]] = {}
+    for h in reader.fieldnames:
+        if m := re.fullmatch(r"自由リンク(\d+)(の名前)?", h.strip()):
+            link_cols.setdefault(int(m.group(1)), {})["label" if m.group(2) else "url"] = h
     missing = {"case_no", "name"} - set(colmap.values())
     if missing:
         raise HTTPException(422, "必須列がありません: " + ", ".join({"case_no": "案件番号", "name": "案件名"}[m] for m in sorted(missing)))
@@ -624,6 +697,14 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                 msg = "; ".join(err["msg"].replace("Value error, ", "") for err in e.errors())
                 raise HTTPException(422, f"{line} 行目（{no}）: {msg}")
 
+            links_in = None
+            if link_cols:
+                links_in = [(raw.get(cc.get("label", "")) or "", raw.get(cc.get("url", "")) or "") for _, cc in sorted(link_cols.items())]
+                try:
+                    links_in = [CaseLink(label=lb, url=u) for lb, u in links_in if u.strip()] if any(u.strip() for _, u in links_in) else None
+                except ValidationError as e:
+                    msg = "; ".join(err["msg"].replace("Value error, ", "") for err in e.errors())
+                    raise HTTPException(422, f"{line} 行目（{no}）: {msg}")
             save_case_masters(db, c)
             if row:
                 db.execute(f"UPDATE cases SET {', '.join(k + '=?' for k in CASE_COLS)},"
@@ -635,6 +716,8 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                     f"INSERT INTO cases({', '.join(CASE_COLS)}) VALUES ({', '.join('?' * len(CASE_COLS))})",
                     c.values()).lastrowid
                 added += 1
+            if links_in is not None:  # CSV に自由リンクがあれば置き換え（全部空欄なら今のまま）
+                save_links(db, case_id, links_in)
 
             # 登録日・終了日（CSV に書いてあれば、その日時で記録。無ければ自動）
             # （CSV は分までなので、今の値と分まで同じなら秒を含む元の値のままにする）
@@ -680,6 +763,8 @@ def create_case(c: CaseIn) -> dict:
             f"INSERT INTO cases({', '.join(CASE_COLS)}) VALUES ({', '.join('?' * len(CASE_COLS))})",
             c.values(), c.case_no,
         )
+        if c.links is not None:
+            save_links(db, cur.lastrowid, c.links)
         sync_finished(db, cur.lastrowid)
         return fetch_case(db, cur.lastrowid)
 
@@ -697,6 +782,8 @@ def update_case(case_id: int, c: CaseIn) -> dict:
             " updated_at = datetime('now', 'localtime') WHERE id = ?",
             (*c.values(), case_id), c.case_no,
         )
+        if c.links is not None:
+            save_links(db, case_id, c.links)
         sync_finished(db, case_id)
         return fetch_case(db, case_id)
 

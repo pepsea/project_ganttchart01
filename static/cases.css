@@ -567,3 +567,9 @@ table.cases.resizable-cols td.nowrap { text-overflow: ellipsis; }
 table.cases.resizable-cols td.memo-cell { max-width: none; }
 /* 一覧の最新の進捗は最大 3 行 */
 table.cases td.memo-cell .memo-body { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; white-space: pre-line; line-height: 1.5; }
+
+/* 自由リンクの追加・削除（何個でも） */
+#free-link-rows { display: grid; gap: 4px; }
+.free-del { border: 0; background: none; color: var(--muted); padding: 2px 8px; }
+.free-del:hover { color: var(--today); }
+.add-free { margin-top: 6px; padding: 3px 12px; font-size: 12px; }

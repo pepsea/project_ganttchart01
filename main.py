@@ -211,6 +211,7 @@ dbmod.finish_startup()
 # 復元のあとにも同じ更新処理を実行する（古いバックアップを新しいアプリに取り込めるように）
 backup.MIGRATIONS.extend(MIGRATIONS)
 backup.LEGACY_UPGRADES["case_progress"] = ("case_notes", cases.LEGACY_NOTES_COPY)
+backup.LEGACY_UPGRADES["case_links"] = ("cases", cases.LEGACY_LINKS_COPY)
 backup.LEGACY_UPGRADES["platform_links"] = ("platforms", platforms.LEGACY_LINKS_COPY)
 
 

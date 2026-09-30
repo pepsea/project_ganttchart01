@@ -218,10 +218,10 @@ function linkIcons(c) {
       box.append(s);
     }
   }
-  for (const i of [1, 2]) {
-    const url = safeUrl(c[`link${i}_url`]);
-    if (url) add(url, c[`link${i}_label`] || `リンク${i}`, c[`link${i}_label`] || `自由リンク ${i}`, "free");
-  }
+  (c.links || []).forEach((lk, i) => {
+    const url = safeUrl(lk.url);
+    if (url) add(url, lk.label || `リンク${i + 1}`, lk.label || `自由リンク ${i + 1}`, "free");
+  });
   return box;
 }
 
@@ -702,11 +702,62 @@ function syncLinks() {
     }
   });
 }
-for (const key of [...LINKS.map(([k]) => k), "link1_url", "link2_url", "link1_label", "link2_label"]) form[key].addEventListener("input", syncLinks);
+for (const key of LINKS.map(([k]) => k)) form[key].addEventListener("input", syncLinks);
+
+// 自由リンク: 1 つずつ追加していく（名前 + URL。何個でも）
+function addFreeRow(label = "", url = "") {
+  const row = el("div", "link-field free");
+  const nameLab = el("label", "free-name", "名前");
+  const nameIn = el("input");
+  nameIn.placeholder = "例: 見積書";
+  nameIn.value = label;
+  nameLab.append(nameIn);
+  const urlLab = el("label", "", "URL");
+  const urlIn = el("input");
+  urlIn.type = "url";
+  urlIn.placeholder = "https://";
+  urlIn.value = url;
+  urlLab.append(urlIn);
+  const open = el("a", "open-link", "開く ↗");
+  open.target = "_blank";
+  open.rel = "noopener noreferrer";
+  const del = el("button", "free-del", "✕");
+  del.type = "button";
+  del.title = "この自由リンクを削除（保存で確定）";
+  const sync = () => {
+    const u = safeUrl(urlIn.value.trim());
+    if (u) {
+      open.href = u;
+      open.setAttribute("aria-disabled", "false");
+      open.title = u;
+      open.textContent = `${nameIn.value.trim() || "開く"} ↗`;
+    } else {
+      open.removeAttribute("href");
+      open.setAttribute("aria-disabled", "true");
+      open.title = "URL を入力すると開けます";
+      open.textContent = "開く ↗";
+    }
+  };
+  nameIn.addEventListener("input", sync);
+  urlIn.addEventListener("input", sync);
+  del.addEventListener("click", () => row.remove());
+  row.append(nameLab, urlLab, open, del);
+  row._get = () => ({ label: nameIn.value.trim(), url: urlIn.value.trim() });
+  sync();
+  $("#free-link-rows").append(row);
+  return nameIn;
+}
+function renderFreeRows(links) {
+  $("#free-link-rows").innerHTML = "";
+  for (const lk of links || []) addFreeRow(lk.label, lk.url);
+}
+const freeLinks = () => [...$("#free-link-rows").children].map((r) => r._get()).filter((l) => l.url);
+$("#btn-add-free").addEventListener("click", () => addFreeRow().focus());
 
 function openDrawer(c = null) {
   state.current = c;
   form.reset();
+  renderFreeRows([]);
   $("#case-error").textContent = "";
   const sel = form.status;
   sel.innerHTML = "";
@@ -724,7 +775,8 @@ function openDrawer(c = null) {
       .filter(Boolean).join("\n");
     $("#d-title").textContent = c.name;
     for (const k of ["name", "detail", "status", "pl", "assignees", "start_date", "end_date",
-      "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url", "contact"]) form[k].value = c[k] || "";
+      "box_url", "teams_url", "overview_url", "plan_url", "contact"]) form[k].value = c[k] || "";
+    renderFreeRows(c.links);
     renderAreaChecks(c.areas);
     $("#case-top-actions").hidden = false;
     $("#btn-delete").hidden = false;
@@ -767,7 +819,8 @@ form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const body = {};
   for (const k of ["case_no", "customer", "name", "detail", "status", "pl", "assignees", "start_date", "end_date",
-    "box_url", "teams_url", "overview_url", "plan_url", "link1_label", "link1_url", "link2_label", "link2_url", "contact"]) body[k] = form[k].value.trim();
+    "box_url", "teams_url", "overview_url", "plan_url", "contact"]) body[k] = form[k].value.trim();
+  body.links = freeLinks();
   // 試験名（番号）は入力しない: 編集では今の値を引き継ぎ、新規で同じ案件番号があればサーバーが自動で番号を付ける
   body.trial = state.current && state.current.case_no === body.case_no ? state.current.trial || "" : "";
   body.start_date ||= null;

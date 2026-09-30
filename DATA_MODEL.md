@@ -39,14 +39,15 @@
 | | start_date / end_date | 開始日 / 終了予定日（空欄可） |
 | | box_url / teams_url / overview_url / plan_url | 各リンク |
 | | detail | 案件詳細 |
-| | link1_label / link1_url / link2_label / link2_url | 自由リンク 1・2（名前と URL。任意） |
+| | link1_label / link1_url / link2_label / link2_url | （未使用）旧・自由リンク 2 つ。`case_links` 作成時に 1 回だけ引き継ぎ済み |
 | | created_at / updated_at | 作成・更新日時 |
 | | project | （未使用。旧 PJ名。PJ名 = 案件番号に統一） |
+| `case_links` | id, case_id, label, url, sort_order, created_at | 案件の自由リンク（何個でも。名前と URL）。`case_links` を含まない古いバックアップを復元したときは、復元した cases の旧列から作り直す |
 | `case_notes` | id, case_id, week, body, updated_at | （未使用）旧・週次進捗メモ（week = その週の月曜日。案件×週で一意）。`case_progress` 作成時に 1 回だけ引き継ぎ済み |
 | `case_progress` | id, case_id, note_date, body, created_at, updated_at | 進捗メモ（note_date = 日付。同じ日に複数可）。`case_progress` を含まない古いバックアップを復元したときは、復元した `case_notes` から作り直す |
 | `case_monthly` | id, case_id, month, body, updated_at | 案件の月報（案件×月で一意） |
 
-`case_notes` / `case_progress` / `case_monthly` は `cases.id` を参照し、案件の削除時に一緒に削除されます。
+`case_links` / `case_notes` / `case_progress` / `case_monthly` は `cases.id` を参照し、案件の削除時に一緒に削除されます。
 
 ## 基盤技術
 
