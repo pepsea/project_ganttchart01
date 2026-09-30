@@ -1000,7 +1000,9 @@ $("#btn-compact").addEventListener("click", (e) => {
   e.target.textContent = state.compact ? "展開" : "折り畳み";
   e.target.title = state.compact ? "折りたたんだ列を元に戻す" : "担当者・優先度・日付の列を折りたたむ";
   render();
-  scrollToDate(c, true);
+  // 折りたたんだときは、今日の 5 日前がガントチャートの左端（始まり）になるようにする
+  if (state.compact) scroller.scrollLeft = Math.max(0, ((todayMs() - 5 * DAY_MS - state.rangeStart) / DAY_MS) * state.dayW);
+  else scrollToDate(c, true);
 });
 
 
