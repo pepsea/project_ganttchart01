@@ -256,6 +256,7 @@ function refreshAssigneeFilter() {
 function render() {
   refreshAssigneeFilter();
   renderSide();
+  renderCalendar();
   computeRange();
   const trackW = state.days * state.dayW;
   gantt.classList.toggle("compact", state.compact);
@@ -989,7 +990,10 @@ $("#zoom").addEventListener("change", (e) => {
   render();
   scrollToDate(c, true);
 });
-$("#btn-today").addEventListener("click", () => scrollToDate(todayMs(), true));
+$("#btn-today").addEventListener("click", () => {
+  if (cal.on) { const t = new Date(); cal.y = t.getFullYear(); cal.m = t.getMonth(); renderCalendar(); return; }
+  scrollToDate(todayMs(), true);
+});
 $("#btn-compact").addEventListener("click", (e) => {
   const c = centerDate();
   state.compact = !state.compact;
@@ -998,6 +1002,96 @@ $("#btn-compact").addEventListener("click", (e) => {
   render();
   scrollToDate(c, true);
 });
+
+
+// ------------------------------------------------------------ カレンダー表示（月）
+// 今の絞り込み（領域・PJ名・担当者・検索）に合うタスクを、期間のバーで月カレンダーに表示。バーをクリックでタスク詳細
+const cal = { on: false, y: new Date().getFullYear(), m: new Date().getMonth() };
+function renderCalendar() {
+  const box = $("#calendar");
+  box.hidden = !cal.on;
+  scroller.hidden = cal.on;
+  if (!cal.on) return;
+  box.innerHTML = "";
+  const head = el("div", "cal-head");
+  const prev = el("button", "", "◀");
+  const next = el("button", "", "▶");
+  const now = el("button", "", "今月");
+  const step = (d) => { const t = new Date(cal.y, cal.m + d, 1); cal.y = t.getFullYear(); cal.m = t.getMonth(); renderCalendar(); };
+  prev.addEventListener("click", () => step(-1));
+  next.addEventListener("click", () => step(1));
+  now.addEventListener("click", () => { const t = new Date(); cal.y = t.getFullYear(); cal.m = t.getMonth(); renderCalendar(); });
+  head.append(prev, el("b", "cal-title", `${cal.y}年${cal.m + 1}月`), next, now,
+    el("span", "hint", "バーをクリックでタスクの詳細（上の絞り込みが反映されます）"));
+  box.append(head);
+  const wd = el("div", "cal-wd");
+  WEEKDAYS.forEach((w, i) => wd.append(el("span", i === 0 ? "sun" : i === 6 ? "sat" : "", w)));
+  box.append(wd);
+
+  const tasks = visibleTasks();
+  const first = Date.UTC(cal.y, cal.m, 1);
+  const last = Date.UTC(cal.y, cal.m + 1, 0);
+  const start = first - new Date(first).getUTCDay() * DAY_MS; // 月の最初の週の日曜日
+  const today = todayMs();
+  const weeks = el("div", "cal-weeks");
+  for (let ws = start; ws <= last; ws += 7 * DAY_MS) {
+    const we = ws + 6 * DAY_MS;
+    const inWeek = tasks
+      .filter((t) => parseDate(t.start_date) <= we && parseDate(t.end_date) >= ws)
+      .sort((x, y) => parseDate(x.start_date) - parseDate(y.start_date) || parseDate(x.end_date) - parseDate(y.end_date));
+    const laneEnd = []; // レーンごとの最後の列
+    const placed = inWeek.map((t) => {
+      const s = Math.max(0, Math.round((parseDate(t.start_date) - ws) / DAY_MS));
+      const e = Math.min(6, Math.round((parseDate(t.end_date) - ws) / DAY_MS));
+      let lane = laneEnd.findIndex((x) => x < s);
+      if (lane < 0) lane = laneEnd.length;
+      laneEnd[lane] = e;
+      return { t, s, e, lane };
+    });
+    const week = el("div", "cal-week");
+    week.style.gridTemplateRows = `24px repeat(${Math.max(laneEnd.length, 1)}, 24px)`;
+    for (let i = 0; i < 7; i++) {
+      const d = ws + i * DAY_MS;
+      const dt = new Date(d);
+      const cell = el("div", "cal-day", String(dt.getUTCDate() === 1 ? `${dt.getUTCMonth() + 1}/1` : dt.getUTCDate()));
+      cell.style.gridColumn = String(i + 1);
+      cell.style.gridRow = `1 / span ${Math.max(laneEnd.length, 1) + 1}`;
+      if (dt.getUTCMonth() !== cal.m) cell.classList.add("other");
+      if (i === 0) cell.classList.add("sun");
+      if (i === 6) cell.classList.add("sat");
+      if (d === today) cell.classList.add("today");
+      week.append(cell);
+    }
+    for (const { t, s, e, lane } of placed) {
+      const bar = el("button", "cal-bar");
+      bar.type = "button";
+      bar.style.gridColumn = `${s + 1} / ${e + 2}`;
+      bar.style.gridRow = String(lane + 2);
+      bar.style.setProperty("--c", areaColor(t.area));
+      const st = deadlineStatus(t);
+      if (st) bar.classList.add(st);
+      if (parseDate(t.start_date) < ws) bar.classList.add("cont-l");
+      if (parseDate(t.end_date) > we) bar.classList.add("cont-r");
+      bar.textContent = `${t.task}${t.assignee ? `（${assigneeText(t)}）` : ""}`;
+      bar.title = `${t.task}\n${pjText(t.project) || "PJ名なし"}\n担当: ${assigneeText(t) || "未設定"}\n${t.start_date} 〜 ${t.end_date}`;
+      bar.addEventListener("click", () => openTaskDialog(t));
+      week.append(bar);
+    }
+    weeks.append(week);
+  }
+  box.append(weeks);
+}
+function setCalendar(on) {
+  cal.on = on;
+  document.body.classList.toggle("cal-mode", on);
+  $("#btn-cal").textContent = on ? "ガント表示" : "カレンダー";
+  $("#btn-cal").title = on ? "ガントチャートの表示に戻す" : "タスクをカレンダー（月表示）で見る";
+  $("#btn-cal").classList.toggle("on", on);
+  $("#zoom").closest("label").hidden = on;
+  $("#btn-compact").hidden = on;
+  renderCalendar();
+}
+$("#btn-cal").addEventListener("click", () => setCalendar(!cal.on));
 
 // ------------------------------------------------------------ 起動
 (async () => {

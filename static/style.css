@@ -555,3 +555,26 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 .sp-head { padding: 7px 8px; border-radius: 0; }
 .sp-head.on { box-shadow: inset 3px 0 0 var(--accent); }
 .area-chip .ro-cell { display: none; } /* 領域の文字は出さず、色の帯だけ残す */
+
+/* 領域の選択窓を短く */
+#filter-areas { max-width: 96px; }
+/* カレンダー表示 */
+.calendar { flex: 1; min-width: 0; overflow: auto; background: var(--panel); padding: 10px 14px 20px; }
+.calendar[hidden] { display: none; }
+.cal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.cal-title { font-size: 16px; min-width: 7em; text-align: center; }
+.cal-wd { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line-strong); padding-bottom: 4px; }
+.cal-wd .sun, .cal-day.sun { color: #d6455d; }
+.cal-wd .sat, .cal-day.sat { color: #2f6fed; }
+.cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); column-gap: 0; border-bottom: 1px solid var(--line); }
+.cal-day { border-right: 1px solid var(--line); padding: 2px 6px; font-size: 12px; font-variant-numeric: tabular-nums; min-height: 72px; }
+.cal-day:first-child { border-left: 1px solid var(--line); }
+.cal-day.other { background: #f6f7f9; color: #b0b4bc; }
+.cal-day.today { background: #fff6d6; font-weight: 700; }
+.cal-bar { z-index: 1; margin: 1px 3px; padding: 0 6px; border: 0; border-left: 4px solid var(--c); border-radius: 4px; background: color-mix(in srgb, var(--c) 22%, #fff); text-align: left; font-size: 12px; line-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); cursor: pointer; }
+.cal-bar:hover { background: color-mix(in srgb, var(--c) 38%, #fff); }
+.cal-bar.overdue { background: #ffd4d4; }
+.cal-bar.soon { background: #ffe2b3; }
+.cal-bar.cont-l { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 0; }
+.cal-bar.cont-r { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: 0; }
+#btn-cal.on { background: var(--accent); border-color: var(--accent); color: #fff; }

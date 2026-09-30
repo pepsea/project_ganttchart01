@@ -46,6 +46,7 @@
       </label>
       <button id="btn-today" title="今日の位置へ移動">今日</button>
       <button id="btn-compact" title="担当者・優先度・日付の列を折りたたむ">折り畳み</button>
+      <button id="btn-cal" title="タスクをカレンダー（月表示）で見る">カレンダー</button>
     </div>
     <!-- 2 行目: 色の説明 -->
       <span class="legend legend-row">
@@ -59,6 +60,7 @@
     <main id="scroller" class="scroller">
       <div id="gantt" class="gantt"></div>
     </main>
+    <section id="calendar" class="calendar" hidden aria-label="カレンダー表示"></section>
     <!-- 右: 個人ごとのタスク状況（折りたためる） -->
     <aside id="side" class="side" aria-label="個人ごとのタスク状況">
       <button type="button" id="side-toggle" class="side-toggle" title="個人ごとのタスク状況を開閉">◀ 個人別</button>
