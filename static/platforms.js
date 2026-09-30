@@ -18,6 +18,9 @@ const state = {
   filterPerson: "", // PL またはメンバーで絞り込み
   current: null, // 選択中の基盤番号
   goals: [],
+  goalTasks: [], // 項目の中のタスク（進捗率つき）
+  panelGoal: null, // 右の詳細の窓で開いている項目の id
+  openTask: null,
   topics: [],
   monthly: [],
   tab: store.get("platforms.tab") || "topics",
@@ -348,6 +351,8 @@ function backToList(push = true) {
   state.editing = false;
   state.dirty = false;
   state.current = null;
+  state.panelGoal = null;
+  $("#goal-panel").hidden = true;
   if (push) history.pushState(null, "", "/platforms");
   renderList();
   showView(false);
@@ -366,8 +371,9 @@ async function select(name) {
   if (fromList && location.pathname + location.search !== url) history.pushState(null, "", url);
   else history.replaceState(null, "", url);
   const base = `/api/platforms/${enc(name)}`;
-  [state.goals, state.topics, state.monthly] = await Promise.all(
-    [api(`${base}/goals`), api(`${base}/topics`), api(`${base}/monthly`)]);
+  if (fromList) { state.panelGoal = null; state.openTask = null; }
+  [state.goals, state.goalTasks, state.topics, state.monthly] = await Promise.all(
+    [api(`${base}/goals`), api(`${base}/goal-tasks`), api(`${base}/topics`), api(`${base}/monthly`)]);
   renderList();
   renderDetail();
   const p = state.platforms.find((x) => x.name === name);
@@ -611,6 +617,7 @@ function renderDetail() {
 
   // 並び: 目標達成に必要な項目 → ガントチャートのタスク → ディスカッション・月報（タブ）
   root.append(renderGoals(p));
+  renderGoalPanel();
   root.append(renderTasks(p, tasks));
 
   // 下部タブ
@@ -707,6 +714,8 @@ async function refreshAfterChange(kind) {
   const keep = state.dirty ? collectUnsaved() : null;
   const base = `/api/platforms/${enc(state.current)}`;
   if (kind === "tasks") state.tasks = await api("/api/tasks");
+  else if (kind === "goalTasks") state.goalTasks = await api(`${base}/goal-tasks`);
+  else if (kind === "goals") [state.goals, state.goalTasks] = await Promise.all([api(`${base}/goals`), api(`${base}/goal-tasks`)]);
   else if (kind) state[kind] = await api(`${base}/${kind}`);
   state.platforms = await api("/api/platforms");
   renderList();
@@ -715,12 +724,24 @@ async function refreshAfterChange(kind) {
 }
 
 // ---- 目標: 一覧で読みやすく表示し、目標をクリックすると編集画面を開く
+const progClass = (p) => (p >= 100 ? "p3" : p >= 70 ? "p2" : p >= 30 ? "p1" : "p0");
+function progBar(p) {
+  const bar = el("div", `prog ${progClass(p)}`);
+  const fill = el("i");
+  fill.style.width = `${p}%`;
+  bar.append(fill);
+  return bar;
+}
+const goalTasksOf = (id) => state.goalTasks.filter((t) => t.goal_id === id);
+const avgProgress = (list) => (list.length ? Math.round(list.reduce((n, t) => n + t.progress, 0) / list.length) : 0);
+
+// 1 項目 1 行（グループの「目標達成に必要な項目」と同じ構造）。クリックすると右に詳細の窓が開き、中にタスクをリストで表示
 function renderGoals(p) {
   const sec = el("section", "pf-section pf-goals");
   const h = el("h3", "", "目標達成に必要な項目");
   const done = state.goals.filter((g) => g.status === "達成").length;
   h.append(el("span", "count-badge", `${done} / ${state.goals.length} 達成`));
-  h.append(el("span", "hint", "全体目標を達成するための項目です。クリックすると編集できます"));
+  h.append(el("span", "hint", "全体目標を達成するための項目です。クリックすると詳細（タスクと進捗率）を開きます"));
   const add = el("button", "primary right", "＋ 項目を追加");
   add.type = "button";
   add.addEventListener("click", () => openGoalDialog(p, null));
@@ -731,33 +752,29 @@ function renderGoals(p) {
     sec.append(el("p", "hint", "まだ項目がありません。「＋ 項目を追加」から登録してください。"));
     return sec;
   }
-  const ul = el("ul", "goal-list");
+  const ul = el("ul", "pf-goal-rows");
   for (const g of state.goals) {
     const li = el("li");
     li.tabIndex = 0;
-    li.title = "クリックして編集";
+    li.title = g.note ? `メモ: ${g.note}\n（クリックで詳細）` : "クリックで詳細";
     const due = goalDue(g);
     li.classList.toggle("done", g.status === "達成");
+    li.classList.toggle("sel", state.panelGoal === g.id);
     if (due) li.classList.add(due);
     const st = el("span", "status-badge", g.status);
     st.dataset.v = g.status;
     const main = el("div", "g-main");
-    const titleRow = el("div", "g-title");
-    titleRow.append(g.title);
-    if (safeUrl(g.url)) titleRow.append(" ", linkButton("リンク", g.url, "目標のリンク"));
-    main.append(titleRow);
-    // メモ: 一覧では改行を除いてつなげ、できるだけ全体を表示（保存したメモの改行はそのまま。マウスを重ねると改行ありで表示）
-    if (g.note) {
-      const n = el("div", "g-note", g.note.replace(/\s*\n\s*/g, "　").trim());
-      n.title = g.note;
-      main.append(n);
-    }
-    const d = el("span", `g-due ${due}`, g.due_date ? slashDate(g.due_date) : "期限なし");
+    main.append(el("span", "g-title", g.title));
+    if (safeUrl(g.url)) main.append(linkButton("リンク", g.url, "項目のリンク"));
+    if (g.note) main.append(el("span", "g-note", g.note.replace(/\s*\n\s*/g, "　").trim()));
+    const tasks = goalTasksOf(g.id);
+    const sum = el("div", "t-sum");
+    sum.append(el("div", "lbl", tasks.length ? `タスク ${tasks.length} 件・${avgProgress(tasks)}%` : "タスクなし"));
+    if (tasks.length) sum.append(progBar(avgProgress(tasks)));
+    const d = el("span", `g-due ${due}`, g.due_date ? `期限 ${slashDate(g.due_date)}` : "");
     if (due) d.title = due === "overdue" ? `期限超過（${-daysLeft(g.due_date)} 日経過）` : `期限まであと ${daysLeft(g.due_date)} 日`;
-    const top = el("div", "g-top");
-    top.append(st, d);
-    li.append(top, main);
-    const open = () => openGoalDialog(p, g);
+    li.append(st, main, sum, d);
+    const open = () => { state.panelGoal = g.id; state.openTask = null; renderDetail(); };
     li.addEventListener("click", open);
     li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
     ul.append(li);
@@ -765,6 +782,127 @@ function renderGoals(p) {
   sec.append(ul);
   return sec;
 }
+
+// 項目の詳細（右の窓）: 項目の内容と、タスクのリスト（バー = 進捗率。％で色が変わる。クリックで詳細）
+function renderGoalPanel() {
+  const panel = $("#goal-panel");
+  const p = state.platforms.find((x) => x.name === state.current);
+  const g = state.panelGoal && state.goals.find((x) => x.id === state.panelGoal);
+  panel.hidden = !g || !p;
+  if (!g || !p) return;
+  panel.innerHTML = "";
+  const head = el("div", "gpn-head");
+  const st = el("span", "status-badge", g.status);
+  st.dataset.v = g.status;
+  const close = el("button", "gpn-close", "✕");
+  close.type = "button";
+  close.title = "閉じる";
+  close.addEventListener("click", () => { state.panelGoal = null; renderDetail(); });
+  head.append(st, el("span", "spacer"), close);
+  const due = goalDue(g);
+  const facts = el("dl", "gpn-facts");
+  const fact = (k, v, cls = "") => { if (v) facts.append(el("dt", "", k), el("dd", cls, v)); };
+  fact("期限", g.due_date ? `${slashDate(g.due_date)}${due === "overdue" ? `（${-daysLeft(g.due_date)} 日超過）` : g.status !== "達成" ? `（あと ${daysLeft(g.due_date)} 日）` : ""}` : "", due);
+  fact("メモ", g.note, "pre");
+  panel.append(head, el("h3", "gpn-title", g.title), facts);
+  if (safeUrl(g.url)) {
+    const a = el("a", "g-link", "リンク ↗");
+    a.href = g.url; a.target = "_blank"; a.rel = "noopener noreferrer";
+    panel.append(a, " ");
+  }
+  const edit = el("button", "gpn-edit", "✎ 項目を編集");
+  edit.type = "button";
+  edit.addEventListener("click", () => openGoalDialog(p, g));
+  panel.append(edit);
+
+  const tasks = goalTasksOf(g.id);
+  const ah = el("div", "gpn-ah");
+  ah.append(el("b", "", "タスク"), el("span", "count-badge", `${tasks.length} 件${tasks.length ? `・進捗率 ${avgProgress(tasks)}%` : ""}`), el("span", "spacer"));
+  const add = el("button", "primary", "＋ タスクを追加");
+  add.type = "button";
+  add.addEventListener("click", () => openGoalTaskDialog(p, g, null));
+  ah.append(add);
+  panel.append(ah);
+  if (tasks.length) {
+    panel.append(progBar(avgProgress(tasks)));
+    const legend = el("div", "gpn-legend");
+    legend.innerHTML = '<span class="p0"><i></i>〜29%</span><span class="p1"><i></i>30〜69%</span><span class="p2"><i></i>70〜99%</span><span class="p3"><i></i>100%</span>';
+    panel.append(legend);
+  } else {
+    panel.append(el("p", "hint", "まだタスクがありません。「＋ タスクを追加」から登録してください。"));
+  }
+  for (const t of tasks) {
+    const item = el("div", "gpn-ach");
+    const row = el("button", `gpn-bar ${progClass(t.progress)}`);
+    row.type = "button";
+    row.title = "クリックで詳細";
+    const lab = el("span", "lab");
+    lab.append(el("span", "nm", t.title), el("span", "pc", `${t.progress}%`));
+    row.append(lab, progBar(t.progress));
+    row.addEventListener("click", () => { state.openTask = state.openTask === t.id ? null : t.id; renderDetail(); });
+    item.append(row);
+    if (state.openTask === t.id) {
+      const d = el("div", "gpn-ach-detail");
+      const dl = el("dl", "gpn-facts");
+      const f2 = (k, v, cls = "") => { if (v) dl.append(el("dt", "", k), el("dd", cls, v)); };
+      f2("進捗率", `${t.progress}%`);
+      f2("担当者", t.owner ? t.owner.split(" ").join("・") : "");
+      f2("期限", t.due_date ? slashDate(t.due_date) : "");
+      f2("メモ", t.note, "pre");
+      d.append(dl);
+      const eb = el("button", "", "✎ 編集");
+      eb.type = "button";
+      eb.addEventListener("click", () => openGoalTaskDialog(p, g, t));
+      d.append(eb);
+      item.append(d);
+    }
+    panel.append(item);
+  }
+}
+
+// タスクの追加・編集（項目の中）
+let gtEditing = null; // { platform, goal, task }
+function openGoalTaskDialog(p, g, t) {
+  gtEditing = { platform: p.name, goal: g, task: t };
+  const f = $("#form-gtask");
+  f.reset();
+  f.title.value = t?.title || "";
+  f.progress.value = t ? t.progress : 0;
+  $("#gt-pc").textContent = `${f.progress.value}%`;
+  f.owner.value = t?.owner || "";
+  f.due_date.value = t?.due_date || "";
+  f.note.value = t?.note || "";
+  $("#gt-title").textContent = t ? "タスクの編集" : "タスクの追加";
+  $("#gt-meta").textContent = `${p.name} ${p.title}　／　項目: ${g.title}`;
+  $("#gt-submit").textContent = t ? "保存" : "追加";
+  $("#gt-delete").hidden = !t;
+  $("#gt-error").textContent = "";
+  $("#dlg-gtask").showModal();
+  f.title.focus();
+}
+$("#form-gtask").progress.addEventListener("input", (e) => { $("#gt-pc").textContent = `${e.target.value}%`; });
+$("#dlg-gtask [data-close]").addEventListener("click", () => $("#dlg-gtask").close());
+$("#form-gtask").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const { platform, goal, task } = gtEditing;
+  const body = { title: f.title.value.trim(), progress: Number(f.progress.value), owner: f.owner.value.trim(), due_date: f.due_date.value || null, note: f.note.value };
+  if (!body.title) { $("#gt-error").textContent = "タスクを入力してください"; return; }
+  try {
+    await api(task ? `/api/platforms/${enc(platform)}/goal-tasks/${task.id}` : `/api/platforms/${enc(platform)}/goals/${goal.id}/tasks`,
+      { method: task ? "PUT" : "POST", body: JSON.stringify(body) });
+    $("#dlg-gtask").close();
+    await refreshAfterChange("goalTasks");
+    toast(task ? "保存しました" : "追加しました", false);
+  } catch (err) {
+    $("#gt-error").textContent = err.message;
+  }
+});
+$("#gt-delete").addEventListener("click", () => {
+  const { platform, task } = gtEditing;
+  $("#dlg-gtask").close();
+  confirmPasswordDelete(`/api/platforms/${enc(platform)}/goal-tasks/${task.id}`, "タスク", `タスク: ${task.title}`, "goalTasks");
+});
 
 // 目標の追加・編集ダイアログ
 let goalEditing = null; // { platform, goal }

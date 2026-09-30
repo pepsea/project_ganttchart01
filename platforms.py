@@ -71,6 +71,21 @@ def init_db() -> None:
         goal_cols = {r["name"] for r in db.execute("PRAGMA table_info(platform_goals)")}
         if "url" not in goal_cols:  # 目標のリンク
             db.execute("ALTER TABLE platform_goals ADD COLUMN url TEXT NOT NULL DEFAULT ''")
+        # 目標達成に必要な項目（platform_goals）の中のタスク（リスト。進捗率 0〜100 ％）
+        db.execute(
+            """CREATE TABLE IF NOT EXISTS platform_goal_tasks (
+                   id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                   platform   TEXT NOT NULL,          -- 基盤番号（platforms.name）
+                   goal_id    INTEGER NOT NULL,       -- 項目（platform_goals.id）
+                   title      TEXT NOT NULL,          -- タスク
+                   progress   INTEGER NOT NULL DEFAULT 0,  -- 進捗率（％）
+                   owner      TEXT NOT NULL DEFAULT '',    -- 担当者（半角スペース区切り）
+                   due_date   TEXT,                   -- 期限（任意）
+                   note       TEXT NOT NULL DEFAULT '',
+                   created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                   updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+               )"""
+        )
         db.executescript(
             """
             CREATE TABLE IF NOT EXISTS platform_topics (
@@ -216,6 +231,19 @@ class GoalIn(BaseModel):
     url: str = ""           # 目標のリンク
 
     _url = field_validator("url", mode="before")(classmethod(lambda cls, v: check_url(v)))
+
+
+class GoalTaskIn(BaseModel):
+    title: str = Field(min_length=1)
+    progress: int = Field(default=0, ge=0, le=100)   # 進捗率（％）
+    owner: str = ""
+    due_date: date | None = None
+    note: str = ""
+
+    @field_validator("title", "owner", mode="before")
+    @classmethod
+    def strip(cls, v):
+        return v.strip() if isinstance(v, str) else v
 
 
 # ---------------------------------------------------------------- helpers
@@ -729,6 +757,52 @@ async def delete_goal(name: str, goal_id: int, body: ConfirmIn) -> Response:
         cur = db.execute("DELETE FROM platform_goals WHERE id=? AND platform=?", (goal_id, name))
         if cur.rowcount == 0:
             raise HTTPException(404, "目標が見つかりません")
+        db.execute("DELETE FROM platform_goal_tasks WHERE goal_id=? AND platform=?", (goal_id, name))  # 項目の中のタスクも一緒に削除
+    return Response(status_code=204)
+
+
+# ---------------------------------------------------------------- 項目の中のタスク（リスト・進捗率）
+
+def _goal_task_values(t: GoalTaskIn) -> tuple:
+    return (t.title, t.progress, t.owner, t.due_date.isoformat() if t.due_date else None, t.note.strip())
+
+
+@router.get("/{name}/goal-tasks")
+def list_goal_tasks(name: str) -> list[dict]:
+    """基盤の全項目のタスク（項目ごとに作成順）"""
+    with get_db() as db:
+        fetch_platform(db, name)
+        return [dict(r) for r in db.execute("SELECT * FROM platform_goal_tasks WHERE platform = ? ORDER BY goal_id, id", (name,))]
+
+
+@router.post("/{name}/goals/{goal_id}/tasks", status_code=201)
+def add_goal_task(name: str, goal_id: int, t: GoalTaskIn) -> dict:
+    with get_db() as db:
+        if not db.execute("SELECT 1 FROM platform_goals WHERE id=? AND platform=?", (goal_id, name)).fetchone():
+            raise HTTPException(404, "項目が見つかりません")
+        cur = db.execute("INSERT INTO platform_goal_tasks(platform, goal_id, title, progress, owner, due_date, note)"
+                         " VALUES (?,?,?,?,?,?,?)", (name, goal_id, *_goal_task_values(t)))
+        return dict(db.execute("SELECT * FROM platform_goal_tasks WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+
+@router.put("/{name}/goal-tasks/{task_id}")
+def update_goal_task(name: str, task_id: int, t: GoalTaskIn) -> dict:
+    with get_db() as db:
+        cur = db.execute("UPDATE platform_goal_tasks SET title=?, progress=?, owner=?, due_date=?, note=?,"
+                         " updated_at=datetime('now','localtime') WHERE id=? AND platform=?",
+                         (*_goal_task_values(t), task_id, name))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "タスクが見つかりません")
+        return dict(db.execute("SELECT * FROM platform_goal_tasks WHERE id = ?", (task_id,)).fetchone())
+
+
+@router.delete("/{name}/goal-tasks/{task_id}", status_code=204)
+async def delete_goal_task(name: str, task_id: int, body: ConfirmIn) -> Response:
+    """項目の中のタスクの削除（パスワード必須）"""
+    await require_password(body)
+    with get_db() as db:
+        if db.execute("DELETE FROM platform_goal_tasks WHERE id=? AND platform=?", (task_id, name)).rowcount == 0:
+            raise HTTPException(404, "タスクが見つかりません")
     return Response(status_code=204)
 
 
