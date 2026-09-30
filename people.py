@@ -169,6 +169,14 @@ def person(name: str) -> dict:
                   for r in db.execute("SELECT id, name, pl, members FROM team_groups ORDER BY created_at DESC, id DESC")
                   if (role := _role(name, r["pl"], r["members"]))]
 
+        # 達成したこと: グループ目標の「達成したこと」で担当者にこの人が入っているもの（新しい順）
+        achievements = [{"id": r["id"], "group_id": r["group_id"], "group": r["group_name"], "title": r["title"],
+                         "achieved_on": r["achieved_on"], "fiscal_year": r["fiscal_year"], "note": r["note"], "url": r["url"]}
+                        for r in db.execute("SELECT a.*, g.name AS group_name FROM team_achievements a"
+                                            " JOIN team_groups g ON g.id = a.group_id"
+                                            " ORDER BY COALESCE(NULLIF(a.achieved_on, ''), a.created_at) DESC, a.id DESC")
+                        if name in _names(r["owner"])]
+
         memo = db.execute("SELECT body, areas, updated_at FROM person_notes WHERE name = ?", (name,)).fetchone()
 
     counts = {}
@@ -176,5 +184,5 @@ def person(name: str) -> dict:
         counts[t["state"]] = counts.get(t["state"], 0) + 1
     # areas = 自分で設定した担当領域、auto_areas = 担当の案件・タスクなどに出てくる領域（参考）
     return {"name": name, "areas": json.loads(memo["areas"] or "[]") if memo else [], "auto_areas": list(areas), "tasks": tasks, "task_counts": counts, "cases": cases,
-            "platforms": platforms, "services": services, "groups": groups,
+            "platforms": platforms, "services": services, "groups": groups, "achievements": achievements,
             "memo": memo["body"] if memo else "", "memo_updated_at": memo["updated_at"] if memo else ""}

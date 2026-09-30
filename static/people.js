@@ -207,7 +207,15 @@ function renderDetail(d) {
   const roles = [d.groups.length && `グループ ${d.groups.length}`, d.platforms.length && `基盤技術 ${d.platforms.length}`,
     d.cases.length && `案件 ${d.cases.length}`, d.services.length && `サービス ${d.services.length}`].filter(Boolean);
   nameBox.append(el("div", "hint", roles.length ? `担当: ${roles.join("・")}` : "担当の登録はありません"));
-  head.append(nameBox, el("span", "spacer"));
+  // 担当領域・担当グループは名前の隣
+  const info = el("div", "pp-info");
+  info.append(areasSection(d));
+  const gr = el("div", "pp-groups");
+  gr.append(el("span", "lbl", "担当グループ"));
+  if (d.groups.length) for (const g of d.groups) gr.append(extLink([roleTag(g.role), g.name, el("span", "arrow", "↗")], `/groups?id=${g.id}&year=all`));
+  else gr.append(el("span", "hint", "なし"));
+  info.append(gr);
+  head.append(nameBox, info, el("span", "spacer"));
   const stats = el("div", "stats");
   for (const [k, label] of TASK_STATES) {
     const s = el("div", `stat st-${k}`);
@@ -282,6 +290,25 @@ function renderDetail(d) {
   ts.append(ul);
   root.append(ts);
 
+  // 達成したこと（グループ目標の「達成したこと」で担当者がこの人のもの。新しい順）
+  const as = el("section", "pp-section");
+  const ah = el("h3", "", "達成したこと");
+  ah.append(el("span", "count", `${d.achievements.length} 件`), el("span", "hint", "グループ目標の「達成したこと」から表示"));
+  as.append(ah);
+  if (!d.achievements.length) as.append(el("p", "hint", "まだ記録がありません"));
+  const al = el("ul", "ach-list");
+  for (const a of d.achievements) {
+    const li = el("li");
+    li.append(el("span", "a-date", a.achieved_on ? slashDate(a.achieved_on) : `${a.fiscal_year}年度`),
+      extLink([a.group, el("span", "arrow", " ↗")], `/groups?id=${a.group_id}&year=all`, "a-group"),
+      el("span", "a-title", a.title));
+    if (a.note) li.append(el("span", "a-note", a.note.replace(/\s*\n\s*/g, " ")));
+    if (a.url && /^https?:\/\//.test(a.url)) li.append(extLink("リンク ↗", a.url, "a-link"));
+    al.append(li);
+  }
+  as.append(al);
+  root.append(as);
+
   // 担当領域は自分で設定（領域の札を選んで保存）。ほかの担当は登録内容から自動で表示
   const grid = el("div", "pp-grid");
   const box = (title, items, empty = "なし") => {
@@ -296,8 +323,6 @@ function renderDetail(d) {
     return sec;
   };
   grid.append(
-    areasSection(d),
-    box("担当グループ", d.groups.map((g) => extLink([roleTag(g.role), g.name, el("span", "arrow", "↗")], `/groups?id=${g.id}&year=all`))),
     box("担当基盤技術", d.platforms.map((p) => extLink([roleTag(p.role), el("b", "", p.name), p.title, el("span", "arrow", "↗")],
       `/platforms?id=${enc(p.name)}`))),
     box("担当サービス", d.services.map((s) => extLink([roleTag(s.role), el("b", "", s.service_no), s.name, el("span", "arrow", "↗")],
