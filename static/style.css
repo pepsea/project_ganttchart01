@@ -544,3 +544,6 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 .sp-task.soon { border-left-color: #f5a524; }
 .sp-task.act { border-left-color: #3b6fe0; }
 .sp-task small { color: var(--muted); display: block; }
+.sp-head.on { background: #e8efff; font-weight: 600; }
+#filter-projects { max-width: 120px; }
+.assignee-chip { background: #e8efff; border-color: var(--accent); color: var(--accent); white-space: nowrap; }

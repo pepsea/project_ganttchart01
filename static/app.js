@@ -242,17 +242,14 @@ const visibleTasks = () => sortTasks(state.tasks.filter((t) =>
 
 // 担当者の選択肢はタスクから集計する
 function refreshAssigneeFilter() {
-  const sel = $("#filter-assignees");
-  const names = [...new Set(state.tasks.flatMap(assigneesOf))].sort((a, b) => a.localeCompare(b, "ja"));
-  const hasNone = state.tasks.some((t) => !t.assignee);
+  // 担当者の絞り込みは右の「個人ごとのタスク状況」から行う。該当者がいなくなったら解除
   const cur = state.filter.assignees;
-  sel.innerHTML = "";
-  sel.append(new Option("すべて", ""));
-  for (const n of names) sel.append(new Option(n, n));
-  if (hasNone) sel.append(new Option("（未設定）", NO_ASSIGNEE));
-  const valid = cur === "" || names.includes(cur) || (cur === NO_ASSIGNEE && hasNone);
+  const names = state.tasks.flatMap(assigneesOf);
+  const valid = cur === "" || names.includes(cur) || (cur === NO_ASSIGNEE && state.tasks.some((t) => !t.assignee));
   state.filter.assignees = valid ? cur : "";
-  sel.value = state.filter.assignees;
+  const chip = $("#assignee-chip");
+  chip.hidden = !state.filter.assignees;
+  chip.textContent = `担当: ${state.filter.assignees === NO_ASSIGNEE ? NO_PERSON : state.filter.assignees} ✕`;
 }
 
 // ------------------------------------------------------------ 描画
@@ -279,7 +276,10 @@ function render() {
 }
 
 // ------------------------------------------------------------ 個人ごとのタスク状況（右の折りたたみ窓）
-const sideOpen = new Set(); // 開いている人
+function setAssigneeFilter(v) {
+  state.filter.assignees = v;
+  rerenderKeepScroll();
+}
 const NO_PERSON = "（担当者未設定）";
 function renderSide() {
   const today = todayMs();
@@ -301,34 +301,20 @@ function renderSide() {
   const list = $("#side-list");
   list.innerHTML = "";
   if (!people.size) return list.append(el("p", "hint", "該当するタスクはありません。"));
-  const rank = { overdue: 0, soon: 1, act: 2 };
   const sorted = [...people].sort((a, b) => b[1].over - a[1].over || b[1].soon - a[1].soon || b[1].act - a[1].act || nameCollator.compare(a[0], b[0]));
   for (const [name, e] of sorted) {
     const box = el("div", "sp-person");
     const head = el("button", "sp-head");
     head.type = "button";
-    head.append(el("span", "sp-name", (sideOpen.has(name) ? "▾ " : "▸ ") + name));
+    head.append(el("span", "sp-name", name));
     for (const [k, cls] of [["act", "c-act"], ["soon", "c-soon"], ["over", "c-over"]])
       head.append(el("span", `sp-n ${e[k] ? cls : "zero"}`, String(e[k])));
-    head.title = `${name}: 実施中 ${e.act}・3日以内 ${e.soon}・超過 ${e.over}（クリックでタスクを表示）`;
-    head.addEventListener("click", () => {
-      sideOpen.has(name) ? sideOpen.delete(name) : sideOpen.add(name);
-      renderSide();
-    });
+    const key = name === NO_PERSON ? NO_ASSIGNEE : name;
+    const on = state.filter.assignees === key;
+    head.classList.toggle("on", on);
+    head.title = `${name}: 実施中 ${e.act}・3日以内 ${e.soon}・超過 ${e.over}（クリックでガントチャートを${on ? "全員表示に戻す" : "この人に絞る"}）`;
+    head.addEventListener("click", () => setAssigneeFilter(on ? "" : key));
     box.append(head);
-    if (sideOpen.has(name)) {
-      const wrap = el("div", "sp-tasks");
-      e.tasks.sort((a, b) => rank[a.kind] - rank[b.kind] || a.left - b.left);
-      for (const { t, left, kind } of e.tasks) {
-        const b = el("button", `sp-task ${kind}`);
-        b.type = "button";
-        b.append(document.createTextNode(t.task));
-        b.append(el("small", "", `${pjText(t.project) || "PJ名なし"}｜〜${shortDate(t.end_date)}（${left < 0 ? `${-left}日超過` : left === 0 ? "今日" : `あと${left}日`}）`));
-        b.addEventListener("click", () => { scrollToDate(parseDate(t.end_date), true); openTaskDialog(t); });
-        wrap.append(b);
-      }
-      box.append(wrap);
-    }
     list.append(box);
   }
 }
@@ -655,8 +641,8 @@ function refreshRow(task, row) {
   const list = visibleTasks();
   const rows = gantt.querySelectorAll(".g-row[data-id]");
   const orderChanged = rows.length !== list.length || rows[list.indexOf(task)] !== row;
-  const opts = new Set([...$("#filter-assignees").options].map((o) => o.value));
-  const newAssignee = assigneesOf(task).some((n) => !opts.has(n));
+  const known = new Set(state.tasks.filter((t) => t !== task).flatMap(assigneesOf));
+  const newAssignee = assigneesOf(task).some((n) => !known.has(n));
   if (!inRange(task) || !list.includes(task) || orderChanged || newAssignee) return rerenderKeepScroll();
   row.style.setProperty("--area-color", areaColor(task.area));
   for (const name of ["start_date", "end_date"]) {
@@ -919,13 +905,14 @@ $("#form-task").addEventListener("submit", async (e) => {
 });
 
 // フィルター・検索・ズーム・今日へ・列の折りたたみ
-for (const kind of ["areas", "projects", "assignees"]) {
+for (const kind of ["areas", "projects"]) {
   $(`#filter-${kind}`).addEventListener("change", (e) => {
     state.filter[kind] = e.target.value;
     syncPjActions();
     rerenderKeepScroll();
   });
 }
+$("#assignee-chip").addEventListener("click", () => setAssigneeFilter(""));
 $("#q").addEventListener("input", (e) => {
   state.q = e.target.value;
   rerenderKeepScroll();
