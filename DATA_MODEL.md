@@ -63,7 +63,7 @@
 | | updated_at | 基本情報の更新日時 |
 | | area | （未使用。旧・単一領域。起動時に areas へ引き継ぎ） |
 | `platform_goals` | id, platform, title, due_date, status, note, url, created_at, updated_at | 目標（状態: 未着手・取組中・達成・保留。url は目標のリンク） |
-| `platform_goal_tasks` | id, platform, goal_id, title, progress, owner, due_date, note, created_at, updated_at | 目標達成に必要な項目（`platform_goals`）の中のタスク（リスト）。goal_id = `platform_goals.id`、progress = 進捗率（％。0〜100）。項目の削除時に一緒に削除 |
+| `platform_goal_tasks` | id, platform, goal_id, title, progress, owner, due_date, note, created_at, updated_at | 目標達成に必要な項目（`platform_goals`）の中の実施内容（リスト）。goal_id = `platform_goals.id`、progress = 進捗率（％。0〜100）。項目の削除時に一緒に削除 |
 | `platform_topics` | id, platform, meeting_date, title, body, created_at, updated_at | ディスカッション |
 | `platform_monthly` | id, platform, month, body, updated_at | 基盤の月報（基盤×月で一意） |
 

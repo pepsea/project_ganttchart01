@@ -53,12 +53,12 @@
 
   <div id="toast" class="toast" role="status"></div>
 
-  <!-- 項目の中のタスクの追加・編集 -->
+  <!-- 項目の中の実施内容の追加・編集 -->
   <dialog id="dlg-gtask">
     <form id="form-gtask" method="dialog" autocomplete="off">
-      <h2 id="gt-title">タスクの追加</h2>
+      <h2 id="gt-title">実施内容の追加</h2>
       <p id="gt-meta" class="hint"></p>
-      <label><span>タスク <span class="req">*</span></span><input name="title" required placeholder="例: 解析パイプラインの検証"></label>
+      <label><span>実施内容 <span class="req">*</span></span><input name="title" required placeholder="例: 解析パイプラインの検証"></label>
       <label><span>進捗率 <b id="gt-pc">0%</b></span><input type="range" name="progress" min="0" max="100" step="5" value="0"></label>
       <div class="goal-form-grid">
         <label><span>担当者（複数はスペース区切り）</span><input name="owner" placeholder="例: 高橋 鈴木"></label>

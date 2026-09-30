@@ -46,7 +46,7 @@ TABLE_LABELS = {
     "case_monthly": "案件の月報",
     "platforms": "基盤（基盤番号・基本情報・全体目標）",
     "platform_goals": "基盤の目標",
-    "platform_goal_tasks": "基盤の項目の中のタスク（進捗率）",
+    "platform_goal_tasks": "基盤の項目の中の実施内容（進捗率）",
     "platform_topics": "基盤のディスカッション",
     "platform_monthly": "基盤の月報",
     "services": "サービス",

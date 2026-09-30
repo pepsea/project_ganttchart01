@@ -77,7 +77,7 @@ def init_db() -> None:
                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
                    platform   TEXT NOT NULL,          -- 基盤番号（platforms.name）
                    goal_id    INTEGER NOT NULL,       -- 項目（platform_goals.id）
-                   title      TEXT NOT NULL,          -- タスク
+                   title      TEXT NOT NULL,          -- 実施内容
                    progress   INTEGER NOT NULL DEFAULT 0,  -- 進捗率（％）
                    owner      TEXT NOT NULL DEFAULT '',    -- 担当者（半角スペース区切り）
                    due_date   TEXT,                   -- 期限（任意）
@@ -757,11 +757,11 @@ async def delete_goal(name: str, goal_id: int, body: ConfirmIn) -> Response:
         cur = db.execute("DELETE FROM platform_goals WHERE id=? AND platform=?", (goal_id, name))
         if cur.rowcount == 0:
             raise HTTPException(404, "目標が見つかりません")
-        db.execute("DELETE FROM platform_goal_tasks WHERE goal_id=? AND platform=?", (goal_id, name))  # 項目の中のタスクも一緒に削除
+        db.execute("DELETE FROM platform_goal_tasks WHERE goal_id=? AND platform=?", (goal_id, name))  # 項目の中の実施内容も一緒に削除
     return Response(status_code=204)
 
 
-# ---------------------------------------------------------------- 項目の中のタスク（リスト・進捗率）
+# ---------------------------------------------------------------- 項目の中の実施内容（リスト・進捗率）
 
 def _goal_task_values(t: GoalTaskIn) -> tuple:
     return (t.title, t.progress, t.owner, t.due_date.isoformat() if t.due_date else None, t.note.strip())
@@ -792,17 +792,17 @@ def update_goal_task(name: str, task_id: int, t: GoalTaskIn) -> dict:
                          " updated_at=datetime('now','localtime') WHERE id=? AND platform=?",
                          (*_goal_task_values(t), task_id, name))
         if cur.rowcount == 0:
-            raise HTTPException(404, "タスクが見つかりません")
+            raise HTTPException(404, "実施内容が見つかりません")
         return dict(db.execute("SELECT * FROM platform_goal_tasks WHERE id = ?", (task_id,)).fetchone())
 
 
 @router.delete("/{name}/goal-tasks/{task_id}", status_code=204)
 async def delete_goal_task(name: str, task_id: int, body: ConfirmIn) -> Response:
-    """項目の中のタスクの削除（パスワード必須）"""
+    """項目の中の実施内容の削除（パスワード必須）"""
     await require_password(body)
     with get_db() as db:
         if db.execute("DELETE FROM platform_goal_tasks WHERE id=? AND platform=?", (task_id, name)).rowcount == 0:
-            raise HTTPException(404, "タスクが見つかりません")
+            raise HTTPException(404, "実施内容が見つかりません")
     return Response(status_code=204)
 
 

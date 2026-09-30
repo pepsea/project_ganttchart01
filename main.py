@@ -49,7 +49,7 @@ MASTERS = {
     "platforms": ("platforms", "基盤番号", [
         ("SELECT COUNT(*) FROM tasks WHERE project = ?", "タスク（PJ名）"),
         ("SELECT COUNT(*) FROM platform_goals WHERE platform = ?", "基盤の目標"),
-        ("SELECT COUNT(*) FROM platform_goal_tasks WHERE platform = ?", "基盤の項目の中のタスク"),
+        ("SELECT COUNT(*) FROM platform_goal_tasks WHERE platform = ?", "基盤の項目の中の実施内容"),
         ("SELECT COUNT(*) FROM platform_topics WHERE platform = ?", "基盤のディスカッション"),
         ("SELECT COUNT(*) FROM platform_links WHERE platform = ?", "基盤の自由リンク"),
         ("SELECT COUNT(*) FROM platform_monthly WHERE platform = ?", "基盤の月報"),
