@@ -1098,8 +1098,9 @@ function setCalendar(on) {
   $("#btn-cal").textContent = on ? "ガント表示" : "カレンダー";
   $("#btn-cal").title = on ? "ガントチャートの表示に戻す" : "タスクをカレンダー（月表示）で見る";
   $("#btn-cal").classList.toggle("on", on);
-  $("#zoom").closest("label").hidden = on;
-  $("#btn-compact").hidden = on;
+  // 位置が動かないよう、隠すのではなく見えなくする（ツールバーの並びを変えない）
+  $("#zoom").closest("label").style.visibility = on ? "hidden" : "";
+  $("#btn-compact").style.visibility = on ? "hidden" : "";
   renderCalendar();
 }
 $("#btn-cal").addEventListener("click", () => setCalendar(!cal.on));
