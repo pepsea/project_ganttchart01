@@ -505,6 +505,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 a.back-btn { font-weight: 700; color: #fff; text-decoration: none; }
 a.back-btn.to-case { background: #3563d6; border-color: #3563d6; }
 a.back-btn.to-platform { background: #2fa36b; border-color: #2fa36b; }
+a.back-btn.to-person { background: #8250df; border-color: #8250df; }
 a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 
 /* タスク詳細: 内容とリンクをコピー */

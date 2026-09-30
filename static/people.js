@@ -56,6 +56,14 @@ function extLink(parts, href, cls = "chip") {
   a.append(...(Array.isArray(parts) ? parts : [parts]));
   return a;
 }
+// ガントチャートへは同じ画面で移り、ガントチャート側の「← 個人に戻る」で戻れるようにする
+const ganttUrl = (params) => `/?${new URLSearchParams({ ...params, from: "people", person: state.current })}`;
+function sameLink(parts, href, cls = "chip") {
+  const a = el("a", cls);
+  a.href = href;
+  a.append(...(Array.isArray(parts) ? parts : [parts]));
+  return a;
+}
 const roleTag = (role) => el("span", `role-tag${role === "PL" || role === "リーダー" ? " pl" : ""}`, role);
 
 // タスクの状態ごとの件数（小さな色付きの数字）
@@ -267,7 +275,7 @@ function renderDetail(d) {
     lg.append(el("i"), label);
     legend.append(lg);
   }
-  th.append(legend, extLink("ガントチャートで開く ↗", `/?q=${enc(d.name)}`, "open-btn"));
+  th.append(legend, sameLink("ガントチャートで開く →", ganttUrl({ q: d.name }), "open-btn"));
   ts.append(th);
   if (!d.tasks.length) ts.append(el("p", "hint", "担当のタスクはありません"));
   const ul = el("ul", "task-list");
@@ -275,7 +283,7 @@ function renderDetail(d) {
     const li = el("li", `st-${t.state}`);
     li.append(el("span", "st-badge", stateLabel(t.state)), el("span", "t-name", t.task));
     li.append(t.project
-      ? extLink(`${t.project}${t.project_name ? `｜${t.project_name}` : ""}`, `/?pj=${enc(t.project)}`, "t-pj")
+      ? sameLink(`${t.project}${t.project_name ? `｜${t.project_name}` : ""}`, ganttUrl({ pj: t.project }), "t-pj")
       : el("span", "t-pj none", "PJ名なし"));
     li.append(areaPill(t.area, "t-area"), el("span", `t-prio p-${t.priority}`, `優先度 ${t.priority}`),
       el("span", "t-date", `${slashDate(t.start_date)} 〜 ${slashDate(t.end_date)}`));

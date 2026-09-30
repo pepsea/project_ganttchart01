@@ -1008,6 +1008,13 @@ $("#btn-compact").addEventListener("click", (e) => {
     state.filter.projects = params.get("pj") || "";
     if (params.get("back") && params.get("pj")) backCase = { pj: params.get("pj"), id: params.get("back") };
     state.q = params.get("q") || "";
+    if (params.get("from") === "people" && params.get("person")) {
+      // 個人の画面から来たとき: 同じ画面のまま個人に戻れる
+      const b = $("#person-back");
+      b.hidden = false;
+      b.href = `/people?name=${encodeURIComponent(params.get("person"))}`;
+      b.title = `個人の ${params.get("person")} に戻る（同じ画面のまま）`;
+    }
     $("#q").value = state.q;
     await Promise.all([loadMasters(), loadTasks()]);
     if (params.get("pj") && !state.filter.projects) {
