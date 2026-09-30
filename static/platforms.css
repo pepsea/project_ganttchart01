@@ -612,3 +612,4 @@ table.pf-table td.order { width: 40px; text-align: center; }
 .goal-list li.overdue { border-left-color: #e5484d; }
 .goal-list li:last-child { border-bottom: 1px solid var(--line-strong); }
 .goal-list .g-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 4px; }
+.pf-head .edit-btn { align-self: center; margin-left: 12px; white-space: nowrap; }

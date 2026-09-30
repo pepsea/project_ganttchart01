@@ -379,14 +379,8 @@ function renderDetail() {
     const btns = el("span", "btns");
     btns.append(done, save);
     modeBar.append(btns);
-  } else {
-    modeBar.append(el("span", "hint", `基本情報・全体目標の修正は「編集する」から${p.updated_at ? `（最終更新 ${p.updated_at.slice(0, 16)}）` : ""}。目標達成に必要なタスク・ディスカッション・月報はいつでも編集できます`));
-    const edit = el("button", "", "✎ 編集する");
-    edit.title = "基盤名・領域・PL・メンバー・全体目標を修正します";
-    edit.addEventListener("click", () => setEditing(true));
-    modeBar.append(edit);
   }
-  root.append(modeBar);
+  if (state.editing) root.append(modeBar);
 
   // 見出し・サマリー
   const head = el("div", "pf-head");
@@ -450,6 +444,14 @@ function renderDetail() {
     stat("次の期限", p.next_due ? `${p.next_due.slice(5).replace("-", "/")}<small> （あと ${daysLeft(p.next_due)} 日）</small>` : "—"),
   );
   head.append(summary);
+  if (!state.editing) {
+    // 「編集する」は次の期限の隣（基本情報・全体目標の修正）
+    const edit = el("button", "edit-btn", "✎ 編集する");
+    edit.type = "button";
+    edit.title = `基盤名・領域・PL・メンバー・全体目標を修正します${p.updated_at ? `（最終更新 ${p.updated_at.slice(0, 16)}）` : ""}`;
+    edit.addEventListener("click", () => setEditing(true));
+    head.append(edit);
+  }
   root.append(head);
 
   // 全体目標
