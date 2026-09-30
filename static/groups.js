@@ -249,16 +249,17 @@ function renderAchievements(g) {
     sec.append(el("p", "hint", `${yearLabel(state.year)}の記録はまだありません。「＋ 追記」から登録してください。`));
     return sec;
   }
-  const ul = el("ul", "ach-list");
+  const ul = el("ul", "ach-list ach-cards"); // 目標達成に必要なタスクと同じカード（最大 4 列で折り返し）
   for (const a of state.achievements) {
     const li = el("li");
     li.tabIndex = 0;
-    li.title = "クリックして編集";
+    li.title = a.note ? `メモ: ${a.note}\n（クリックして編集）` : "クリックして編集";
+    const top = el("div", "g-top");
+    top.append(el("span", "status-badge", "達成"), el("span", "a-date", a.achieved_on ? `達成日 ${slashDate(a.achieved_on)}` : ""));
+    li.append(top);
     const main = el("div", "a-main");
-    const at = el("span", "a-title", a.title);
-    at.title = a.title;
     if (!state.year) main.append(el("span", "fy-tag", `${a.fiscal_year}年度`));
-    main.append(at);
+    main.append(el("span", "a-title", a.title));
     if (safeUrl(a.url)) {
       const link = el("a", "g-link", "リンク ↗");
       link.href = a.url;
@@ -267,13 +268,9 @@ function renderAchievements(g) {
       link.addEventListener("click", (e) => e.stopPropagation());
       main.append(link);
     }
-    if (a.note) {
-      const n = el("span", "a-note", a.note.replace(/\s*\n\s*/g, " "));
-      n.title = a.note; // 一行に収まらない分はマウスを重ねると全文を表示
-      main.append(n);
-    }
-    li.append(el("span", "a-date", a.achieved_on ? slashDate(a.achieved_on) : "—"), main,
-      el("span", a.owner ? "a-owner" : "a-owner none", a.owner ? `担当 ${a.owner.split(" ").join("・")}` : "担当未設定"));
+    li.append(main);
+    li.append(el("div", a.owner ? "a-owner" : "a-owner none", a.owner ? `担当 ${a.owner.split(" ").join("・")}` : "担当未設定"));
+    if (a.note) li.append(el("div", "a-note", a.note.replace(/\s*\n\s*/g, "　").trim()));
     const openIt = () => openAchievementDialog(g, a);
     li.addEventListener("click", openIt);
     li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openIt(); } });
