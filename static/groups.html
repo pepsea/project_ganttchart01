@@ -13,7 +13,7 @@
       <a href="/">ガントチャート</a>
       <a href="/cases">案件管理</a>
       <a href="/platforms">基盤技術</a>
-      <a href="/groups" class="active">グループ目標</a>
+      <a href="/groups" class="active">グループ</a>
       <a href="/people">個人</a>
       <a href="/services">サービス</a>
       <a href="/documents">共有資料</a>
@@ -81,6 +81,7 @@
     <form id="form-ach" method="dialog" autocomplete="off">
       <h2 id="ach-title">達成したことを追記</h2>
       <p id="ach-meta" class="hint"></p>
+      <label><span>関連タスク（目標達成に必要なタスク）</span><select name="goal_id"></select></label>
       <label><span>達成したこと <span class="req">*</span></span><input name="title" required placeholder="例: 新サービスをリリース"></label>
       <div class="two">
         <label><span>担当者（複数はスペース区切り）</span><input name="owner" placeholder="例: 高橋 鈴木"></label>

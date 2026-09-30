@@ -257,3 +257,14 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .ach-block > h4 { margin: 0 0 8px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
 .ach-block > h4 .hint { font-weight: 400; font-size: 12px; }
 .ach-block > h4 .right { margin-left: auto; padding: 3px 10px; font-size: 12px; }
+
+/* タスクのカードの中の「達成したこと」 */
+.goal-list .t-ach { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--line-strong); cursor: default; }
+.t-ach-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.t-ach-head .lbl { font-size: 11.5px; font-weight: 700; color: #1d6b43; }
+.t-ach-add { padding: 1px 8px; font-size: 11.5px; }
+.t-ach-item { display: block; width: 100%; text-align: left; white-space: normal; border: 0; border-left: 3px solid #30a46c; border-radius: 4px; background: #eef8f2; margin-top: 4px; padding: 3px 6px; font-size: 12.5px; line-height: 1.5; }
+.t-ach-item:hover { background: #dff2e7; }
+.t-ach-item .d { color: var(--muted); font-size: 11.5px; margin-right: 6px; font-variant-numeric: tabular-nums; }
+.t-ach-item .t { font-weight: 600; }
+.t-ach-item .o { display: block; color: #3b4252; font-size: 11.5px; }

@@ -89,8 +89,12 @@ def init_db() -> None:
                    updated_at  TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
                )"""
         )
-        if "url" not in {r["name"] for r in db.execute("PRAGMA table_info(team_achievements)")}:
+        ach_cols = {r["name"] for r in db.execute("PRAGMA table_info(team_achievements)")}
+        if "url" not in ach_cols:
             db.execute("ALTER TABLE team_achievements ADD COLUMN url TEXT NOT NULL DEFAULT ''")  # 関連リンク
+        if "goal_id" not in ach_cols:
+            # 関連する「目標達成に必要なタスク」（team_goals.id。0 = どのタスクにも結びつけていない）
+            db.execute("ALTER TABLE team_achievements ADD COLUMN goal_id INTEGER NOT NULL DEFAULT 0")
         # 年度（4 月始まり）。未設定の行は期限・達成日（無ければ作成日）から決める
         for table, date_col in (("team_goals", "due_date"), ("team_achievements", "achieved_on")):
             if "fiscal_year" not in {r["name"] for r in db.execute(f"PRAGMA table_info({table})")}:
@@ -194,6 +198,7 @@ class AchievementIn(BaseModel):
     achieved_on: date | None = None
     note: str = ""
     url: str = ""
+    goal_id: int = 0  # 関連する「目標達成に必要なタスク」（team_goals.id。0 = なし）
 
     @field_validator("title", "owner", mode="before")
     @classmethod
@@ -417,6 +422,8 @@ async def delete_goal(gid: int, tid: int, body: PasswordIn) -> Response:
     with get_db() as db:
         if db.execute("DELETE FROM team_goals WHERE id=? AND group_id=?", (tid, gid)).rowcount == 0:
             raise HTTPException(404, "目標が見つかりません")
+        # そのタスクに結びついていた達成したことは残し、「タスクなし」に戻す
+        db.execute("UPDATE team_achievements SET goal_id = 0 WHERE goal_id = ? AND group_id = ?", (tid, gid))
     return Response(status_code=204)
 
 
@@ -461,6 +468,11 @@ async def delete_kpi(gid: int, kid: int, body: PasswordIn) -> Response:
 
 # ---------------------------------------------------------------- 今年度達成したこと（内容・担当者・達成日）
 
+def _check_goal(db, gid: int, goal_id: int) -> None:
+    if goal_id and not db.execute("SELECT 1 FROM team_goals WHERE id = ? AND group_id = ?", (goal_id, gid)).fetchone():
+        raise HTTPException(422, "関連するタスクがこのグループに見つかりません")
+
+
 def _ach_values(a: AchievementIn) -> tuple:
     return (a.title, a.owner, a.achieved_on.isoformat() if a.achieved_on else None, a.note.strip(), a.url,
             a.fiscal_year or fiscal_year_of(a.achieved_on))
@@ -479,8 +491,9 @@ def list_achievements(gid: int, year: int | None = None) -> list[dict]:
 def add_achievement(gid: int, a: AchievementIn) -> dict:
     with get_db() as db:
         _fetch(db, gid)
-        cur = db.execute("INSERT INTO team_achievements(group_id, title, owner, achieved_on, note, url, fiscal_year) VALUES (?,?,?,?,?,?,?)",
-                         (gid, *_ach_values(a)))
+        _check_goal(db, gid, a.goal_id)
+        cur = db.execute("INSERT INTO team_achievements(group_id, title, owner, achieved_on, note, url, fiscal_year, goal_id)"
+                         " VALUES (?,?,?,?,?,?,?,?)", (gid, *_ach_values(a), a.goal_id))
         _register_year(db, _ach_values(a)[-1])
         return dict(db.execute("SELECT * FROM team_achievements WHERE id = ?", (cur.lastrowid,)).fetchone())
 
@@ -488,8 +501,9 @@ def add_achievement(gid: int, a: AchievementIn) -> dict:
 @router.put("/{gid}/achievements/{aid}")
 def update_achievement(gid: int, aid: int, a: AchievementIn) -> dict:
     with get_db() as db:
-        cur = db.execute("UPDATE team_achievements SET title=?, owner=?, achieved_on=?, note=?, url=?, fiscal_year=?,"
-                         " updated_at=datetime('now','localtime') WHERE id=? AND group_id=?", (*_ach_values(a), aid, gid))
+        _check_goal(db, gid, a.goal_id)
+        cur = db.execute("UPDATE team_achievements SET title=?, owner=?, achieved_on=?, note=?, url=?, fiscal_year=?, goal_id=?,"
+                         " updated_at=datetime('now','localtime') WHERE id=? AND group_id=?", (*_ach_values(a), a.goal_id, aid, gid))
         if cur.rowcount == 0:
             raise HTTPException(404, "記録が見つかりません")
         _register_year(db, _ach_values(a)[-1])
@@ -512,7 +526,7 @@ async def delete_achievement(gid: int, aid: int, body: PasswordIn) -> Response:
 
 EXPORT_HEADERS = ["種別", "グループ名", "リーダー", "メンバー", "大目標", "関連サービス", "関連基盤技術",
                   "年度", "状態", "目標", "達成基準", "時期", "期限",
-                  "達成したこと", "担当者", "達成日", "指標", "進捗", "メモ", "リンク"]
+                  "達成したこと", "関連タスク", "担当者", "達成日", "指標", "進捗", "メモ", "リンク"]
 
 
 def _err(line: int, e: Exception) -> HTTPException:
@@ -539,8 +553,9 @@ def export_csv() -> Response:
                     達成基準=t["criteria"], 時期=t["period"], 期限=t["due_date"] or "", メモ=t["note"], リンク=t["url"])
             for a in db.execute("SELECT * FROM team_achievements WHERE group_id = ? ORDER BY fiscal_year, achieved_on, id",
                                 (g["id"],)):
+                goal = db.execute("SELECT title FROM team_goals WHERE id = ? AND group_id = ?", (a["goal_id"], g["id"])).fetchone()
                 add(種別="達成したこと", グループ名=g["name"], 年度=a["fiscal_year"] or "", 達成したこと=a["title"],
-                    担当者=a["owner"], 達成日=a["achieved_on"] or "", メモ=a["note"], リンク=a["url"])
+                    関連タスク=goal["title"] if goal else "", 担当者=a["owner"], 達成日=a["achieved_on"] or "", メモ=a["note"], リンク=a["url"])
             for k in db.execute("SELECT * FROM team_kpis WHERE group_id = ? ORDER BY sort_order, id", (g["id"],)):
                 add(種別="指標", グループ名=g["name"], 指標=k["title"], 担当者=k["owner"], 進捗=k["progress"])
         for r in db.execute("SELECT year FROM team_years ORDER BY year"):
@@ -630,14 +645,21 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                 except ValidationError as e:
                     raise _err(line, e)
                 vals = _ach_values(a)
+                gl = None
+                if r.get("関連タスク"):
+                    gl = db.execute("SELECT id FROM team_goals WHERE group_id = ? AND title = ?"
+                                    " ORDER BY fiscal_year = ? DESC, id", (gid, r["関連タスク"], vals[-1])).fetchone()
+                    if gl is None:
+                        raise HTTPException(422, f"{line} 行目: 関連タスク「{r['関連タスク']}」が見つかりません（先にそのタスクの行を登録してください）")
+                goal_id = gl["id"] if gl else 0
                 hit = db.execute("SELECT id FROM team_achievements WHERE group_id = ? AND fiscal_year = ? AND title = ?",
                                  (gid, vals[-1], vals[0])).fetchone()
                 if hit:
                     db.execute("UPDATE team_achievements SET title=?, owner=?, achieved_on=?, note=?, url=?, fiscal_year=?,"
-                               " updated_at=datetime('now','localtime') WHERE id=?", (*vals, hit["id"]))
+                               " goal_id=?, updated_at=datetime('now','localtime') WHERE id=?", (*vals, goal_id, hit["id"]))
                 else:
-                    db.execute("INSERT INTO team_achievements(group_id, title, owner, achieved_on, note, url, fiscal_year)"
-                               " VALUES (?,?,?,?,?,?,?)", (gid, *vals))
+                    db.execute("INSERT INTO team_achievements(group_id, title, owner, achieved_on, note, url, fiscal_year, goal_id)"
+                               " VALUES (?,?,?,?,?,?,?,?)", (gid, *vals, goal_id))
                 _register_year(db, vals[-1])
                 result["achievements"] += 1
             else:  # 指標

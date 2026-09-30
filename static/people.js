@@ -305,6 +305,7 @@ function renderDetail(d) {
     const top = el("div", "a-top");
     top.append(el("span", "status-badge", "達成"), el("span", "a-date", a.achieved_on ? slashDate(a.achieved_on) : `${a.fiscal_year}年度`));
     li.append(top, el("div", "a-title", a.title));
+    if (a.goal) li.append(el("div", "a-goal", `関連タスク: ${a.goal}`));
     const meta = el("div", "a-meta");
     meta.append(extLink([a.group, el("span", "arrow", " ↗")], `/groups?id=${a.group_id}&year=all`, "a-group"));
     if (a.url && /^https?:\/\//.test(a.url)) meta.append(extLink("リンク ↗", a.url, "a-link"));

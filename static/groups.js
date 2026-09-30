@@ -3,7 +3,7 @@
 // グループ目標: 左にグループ一覧、右に選んだグループ（グループ名・リーダー・メンバー・全体目標・目標）。リーダーはデータ上は pl 列
 const DAY_MS = 86400000;
 const $ = (sel, root = document) => root.querySelector(sel);
-const state = { groups: [], goals: [], achievements: [], statuses: [], current: null, services: [], platforms: [],
+const state = { groups: [], goals: [], achievements: [], achAll: [], statuses: [], current: null, services: [], platforms: [],
   year: null, currentYear: null, years: [] }; // year: 表示中の年度（"" = すべての年度）
 const serviceName = (no) => state.services.find((s) => s.service_no === no)?.name || "";
 const platformName = (no) => state.platforms.find((p) => p.name === no)?.title || "";
@@ -121,9 +121,11 @@ function renderList() {
 async function select(id) {
   state.current = id;
   history.replaceState(null, "", `/groups?id=${id}&year=${state.year || "all"}`);
-  [state.goals, state.achievements] = await Promise.all([
-    api(`/api/groups/${id}/goals${yearQuery()}`), api(`/api/groups/${id}/achievements${yearQuery()}`),
+  [state.goals, state.goalsAll, state.achAll] = await Promise.all([
+    api(`/api/groups/${id}/goals${yearQuery()}`), api(`/api/groups/${id}/goals`), api(`/api/groups/${id}/achievements`),
   ]);
+  // 達成したことは結びついたタスクの中に表示（年度に関わらず）。件数・タスクなしの一覧は選択中の年度で絞る
+  state.achievements = state.year ? state.achAll.filter((a) => a.fiscal_year === state.year) : state.achAll;
   renderList();
   renderDetail();
 }
@@ -178,7 +180,8 @@ function renderDetail() {
   root.append(vs);
 
   const goalSec = renderGoals(g);
-  goalSec.append(renderAchievements(g)); // 達成したことは「目標達成に必要なタスク」の中に記載
+  const orphans = renderAchievements(g); // タスクに結びついていない達成したこと（あれば）
+  if (orphans) goalSec.append(orphans);
   root.append(goalSec, renderPlatformRelations(g), renderServiceRelations(g));
 }
 
@@ -223,12 +226,33 @@ function renderGoals(g) {
       return f;
     };
     main.append(fact("達成基準", t.criteria, "f-criteria"), fact("時期", t.period, "f-period"));
+    // このタスクに関連した達成したこと（カードの中に追加していく）
+    const mine = state.achAll.filter((x) => x.goal_id === t.id);
+    const box = el("div", "t-ach");
+    const bh = el("div", "t-ach-head");
+    bh.append(el("span", "lbl", `達成したこと ${mine.length} 件`));
+    const addA = el("button", "t-ach-add", "＋ 追記");
+    addA.type = "button";
+    addA.title = "このタスクに関連した達成したことを追記";
+    addA.addEventListener("click", (e) => { e.stopPropagation(); openAchievementDialog(g, null, t.id); });
+    bh.append(addA);
+    box.append(bh);
+    for (const x of mine) {
+      const item = el("button", "t-ach-item");
+      item.type = "button";
+      item.title = x.note ? `${x.title}\nメモ: ${x.note}\n（クリックして編集）` : `${x.title}\n（クリックして編集）`;
+      item.append(el("span", "d", x.achieved_on ? slashDate(x.achieved_on) : `${x.fiscal_year}年度`), el("span", "t", x.title));
+      if (x.owner) item.append(el("span", "o", x.owner.split(" ").join("・")));
+      item.addEventListener("click", (e) => { e.stopPropagation(); openAchievementDialog(g, x); });
+      box.append(item);
+    }
+    box.addEventListener("click", (e) => e.stopPropagation());
     if (t.note) li.title = `メモ: ${t.note}\n（クリックして編集）`;
     const d = el("span", `g-due ${due}`, t.due_date ? `期限 ${slashDate(t.due_date)}` : "");
     if (due) d.title = due === "overdue" ? `期限超過（${-daysLeft(t.due_date)} 日経過）` : `期限まであと ${daysLeft(t.due_date)} 日`;
     const top = el("div", "g-top");
     top.append(st, d);
-    li.append(top, main);
+    li.append(top, main, box);
     const openIt = () => openGoalDialog(g, t);
     li.addEventListener("click", openIt);
     li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openIt(); } });
@@ -240,19 +264,14 @@ function renderGoals(g) {
 
 // ---- 達成したこと（内容・担当者・達成日）: クリックで編集
 function renderAchievements(g) {
+  const list = state.achievements.filter((a) => !a.goal_id); // どのタスクにも結びついていないもの
+  if (!list.length) return null;
   const sec = el("div", "ach-block");
-  const h = el("h4", "", state.year ? `${state.year}年度に達成したこと` : "達成したこと（すべての年度）");
-  h.append(el("span", "count-badge", `${state.achievements.length} 件`), el("span", "hint", "達成したことと担当者を追記"));
-  const add = el("button", "right", "＋ 達成したことを追記");
-  add.addEventListener("click", () => openAchievementDialog(g, null));
-  h.append(add);
+  const h = el("h4", "", "タスクに結びついていない達成したこと");
+  h.append(el("span", "count-badge", `${list.length} 件`), el("span", "hint", "クリックして編集。「関連タスク」を選ぶとタスクの中に移ります"));
   sec.append(h);
-  if (!state.achievements.length) {
-    sec.append(el("p", "hint", `${yearLabel(state.year)}の記録はまだありません。「＋ 達成したことを追記」から登録してください。`));
-    return sec;
-  }
   const ul = el("ul", "ach-list ach-cards"); // 目標達成に必要なタスクと同じカード（最大 4 列で折り返し）
-  for (const a of state.achievements) {
+  for (const a of list) {
     const li = el("li");
     li.tabIndex = 0;
     li.title = a.note ? `メモ: ${a.note}\n（クリックして編集）` : "クリックして編集";
@@ -359,7 +378,7 @@ function renderServiceRelations(g) {
 // ---- 達成したことの追加・編集
 let achEditing = null; // { group, item }
 const achForm = $("#form-ach");
-function openAchievementDialog(g, a) {
+function openAchievementDialog(g, a, goalId = 0) {
   achEditing = { group: g, item: a };
   achForm.reset();
   achForm.title.value = a?.title || "";
@@ -367,6 +386,12 @@ function openAchievementDialog(g, a) {
   achForm.achieved_on.value = a?.achieved_on || "";
   achForm.note.value = a?.note || "";
   achForm.url.value = a?.url || "";
+  // 関連タスク（目標達成に必要なタスク）。選択中の年度に限らず、このグループの全タスクから選ぶ
+  const sel = achForm.goal_id;
+  sel.innerHTML = "";
+  sel.append(new Option("（なし）", "0"));
+  for (const t of state.goalsAll || state.goals) sel.append(new Option(`${t.fiscal_year}年度 ${t.title}`, String(t.id)));
+  sel.value = String(a ? a.goal_id || 0 : goalId);
   yearOptions(achForm.fiscal_year, a?.fiscal_year || state.year || state.currentYear);
   $("#ach-title").textContent = a ? "達成したことの編集" : "達成したことを追記";
   $("#ach-meta").textContent = a ? `${g.name}　／　最終更新 ${a.updated_at.slice(0, 16)}` : g.name;
@@ -388,7 +413,7 @@ achForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const { group, item } = achEditing;
   const body = { title: achForm.title.value.trim(), owner: achForm.owner.value.trim(), achieved_on: achForm.achieved_on.value || null, note: achForm.note.value, url: achForm.url.value.trim(),
-    fiscal_year: Number(achForm.fiscal_year.value) };
+    fiscal_year: Number(achForm.fiscal_year.value), goal_id: Number(achForm.goal_id.value) };
   try {
     await api(item ? `/api/groups/${group.id}/achievements/${item.id}` : `/api/groups/${group.id}/achievements`,
       { method: item ? "PUT" : "POST", body: JSON.stringify(body) });
