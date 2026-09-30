@@ -578,3 +578,12 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 .cal-bar.cont-l { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 0; }
 .cal-bar.cont-r { border-top-right-radius: 0; border-bottom-right-radius: 0; margin-right: 0; }
 #btn-cal.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* 2 か月を左右に並べ、日付のマスは正方形に近く */
+.cal-months { display: flex; gap: 18px; align-items: flex-start; }
+.cal-month { flex: 1 1 0; min-width: 0; container-type: inline-size; }
+.cal-mtitle { font-weight: 700; font-size: 14px; margin: 2px 0 4px; }
+.cal-month .cal-week { min-height: calc(100cqw / 7); }
+.cal-month .cal-day { min-height: 0; }
+.cal-title { min-width: 11em; }
+@media (max-width: 1000px) { .cal-months { flex-direction: column; } .cal-month { width: 100%; } }

@@ -1021,16 +1021,26 @@ function renderCalendar() {
   prev.addEventListener("click", () => step(-1));
   next.addEventListener("click", () => step(1));
   now.addEventListener("click", () => { const t = new Date(); cal.y = t.getFullYear(); cal.m = t.getMonth(); renderCalendar(); });
-  head.append(prev, el("b", "cal-title", `${cal.y}年${cal.m + 1}月`), next, now,
+  const n2 = new Date(cal.y, cal.m + 1, 1);
+  head.append(prev, el("b", "cal-title", `${cal.y}年${cal.m + 1}月 〜 ${n2.getFullYear() !== cal.y ? `${n2.getFullYear()}年` : ""}${n2.getMonth() + 1}月`), next, now,
     el("span", "hint", "バーをクリックでタスクの詳細（上の絞り込みが反映されます）"));
   box.append(head);
+  const months = el("div", "cal-months"); // 2 か月を左右に並べる
+  const tasks = visibleTasks();
+  const n = new Date(cal.y, cal.m + 1, 1);
+  months.append(calMonth(cal.y, cal.m, tasks), calMonth(n.getFullYear(), n.getMonth(), tasks));
+  box.append(months);
+}
+function calMonth(y, m, tasks) {
+  const blk = el("div", "cal-month");
+  blk.append(el("div", "cal-mtitle", `${y}年${m + 1}月`));
   const wd = el("div", "cal-wd");
   WEEKDAYS.forEach((w, i) => wd.append(el("span", i === 0 ? "sun" : i === 6 ? "sat" : "", w)));
-  box.append(wd);
+  blk.append(wd);
 
-  const tasks = visibleTasks();
-  const first = Date.UTC(cal.y, cal.m, 1);
-  const last = Date.UTC(cal.y, cal.m + 1, 0);
+
+  const first = Date.UTC(y, m, 1);
+  const last = Date.UTC(y, m + 1, 0);
   const start = first - new Date(first).getUTCDay() * DAY_MS; // 月の最初の週の日曜日
   const today = todayMs();
   const weeks = el("div", "cal-weeks");
@@ -1056,7 +1066,7 @@ function renderCalendar() {
       const cell = el("div", "cal-day", String(dt.getUTCDate() === 1 ? `${dt.getUTCMonth() + 1}/1` : dt.getUTCDate()));
       cell.style.gridColumn = String(i + 1);
       cell.style.gridRow = `1 / span ${Math.max(laneEnd.length, 1) + 1}`;
-      if (dt.getUTCMonth() !== cal.m) cell.classList.add("other");
+      if (dt.getUTCMonth() !== m) cell.classList.add("other");
       if (i === 0) cell.classList.add("sun");
       if (i === 6) cell.classList.add("sat");
       if (d === today) cell.classList.add("today");
@@ -1079,7 +1089,8 @@ function renderCalendar() {
     }
     weeks.append(week);
   }
-  box.append(weeks);
+  blk.append(weeks);
+  return blk;
 }
 function setCalendar(on) {
   cal.on = on;
