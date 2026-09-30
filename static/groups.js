@@ -291,7 +291,7 @@ function renderAchievements(g) {
 function renderPlatformRelations(g) {
   const sec = el("section", "gp-section");
   const h = el("h3", "", "関連基盤技術");
-  h.append(el("span", "hint", "目標の達成状況（基盤名をクリックで基盤技術の画面を開く。「✎ 編集」から変更）"));
+  h.append(el("span", "hint", "目標の達成状況（基盤名をクリックで基盤技術の画面へ。「✎ 編集」から変更）"));
   sec.append(h);
   if (!g.platforms.length) {
     sec.append(el("p", "hint", "なし"));
@@ -303,10 +303,9 @@ function renderPlatformRelations(g) {
     const item = el("div", "pf-rel");
     const top = el("div", "pf-rel-top");
     const a = el("a", "pf-rel-name");
-    a.href = `/platforms?id=${encodeURIComponent(no)}`;
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.append(el("b", "", no), pf.title || "（基盤名未設定）", el("span", "arrow", "↗"));
+    // 同じタブで基盤技術へ移り、基盤技術の「← グループに戻る」で同じグループに戻る
+    a.href = `/platforms?id=${encodeURIComponent(no)}&from=groups&group=${g.id}&year=${state.year || "all"}`;
+    a.append(el("b", "", no), pf.title || "（基盤名未設定）", el("span", "arrow", "→"));
     const meter = el("div", "meter");
     const bar = el("i");
     bar.style.width = pf.goal_total ? `${(pf.goal_done / pf.goal_total) * 100}%` : "0";

@@ -623,3 +623,5 @@ table.pf-table.resizable-cols td { overflow: hidden; overflow-wrap: anywhere; }
 table.pf-table.resizable-cols td.nowrap, table.pf-table.resizable-cols td.no { text-overflow: ellipsis; }
 table.pf-table.resizable-cols td.ttl { min-width: 0; }
 table.pf-table.resizable-cols td.order { width: auto; }
+a.back-group { font-weight: 700; color: #fff; background: #8250df; border-color: #8250df; text-decoration: none; padding: 3px 12px; }
+a.back-group:hover { filter: brightness(1.1); color: #fff; }

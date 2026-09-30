@@ -424,7 +424,7 @@ dialog textarea {
   white-space: nowrap;
 }
 .nav a:hover { color: var(--text); }
-.nav a.active { background: var(--accent); color: #fff; font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,.18); } /* 選択中のタブは青 */
+.nav a.active { background: #2fa36b; color: #fff; font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,.18); } /* 選択中のタブは緑 */
 
 /* 検索・PJ名のコピー・ページ間移動（両ページ共通） */
 .search { width: 200px; padding: 5px 8px; border: 1px solid var(--line-strong); border-radius: 6px; }

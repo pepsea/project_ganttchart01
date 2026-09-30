@@ -362,7 +362,7 @@ async function select(name) {
   const fromList = state.current !== name;
   state.current = name;
   state.dirty = false;
-  const url = `/platforms?id=${enc(name)}`;
+  const url = `/platforms?id=${enc(name)}${backGroup ? `&from=groups&group=${backGroup.id}&year=${backGroup.year}` : ""}`;
   if (fromList && location.pathname + location.search !== url) history.pushState(null, "", url);
   else history.replaceState(null, "", url);
   const base = `/api/platforms/${enc(name)}`;
@@ -377,6 +377,18 @@ async function select(name) {
 }
 
 $("#btn-back").addEventListener("click", () => backToList());
+// グループ画面から来たとき: 同じタブで元のグループに戻れる（?from=groups&group=ID&year=年度）
+const backGroup = (() => {
+  const q = new URLSearchParams(location.search);
+  if (q.get("from") !== "groups" || !q.get("group")) return null;
+  return { id: q.get("group"), year: q.get("year") || "all" };
+})();
+if (backGroup) {
+  const a = el("a", "button back-group", "← グループに戻る");
+  a.href = `/groups?id=${backGroup.id}&year=${backGroup.year}`;
+  a.title = "グループ画面の元のグループに戻る（同じタブのまま）";
+  $("#btn-back").after(a);
+}
 // 個々の基盤へのリンク（/platforms?id=基盤番号）をコピー
 $("#btn-copy-link").addEventListener("click", async () => {
   if (!state.current) return;
