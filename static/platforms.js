@@ -143,6 +143,41 @@ const PF_COLS = [
   ["last_topic_date", "最新ディスカッション", (p) => p.last_topic_date],
   ["last_month", "最新の月報", (p) => p.last_month],
 ];
+// 一覧の列幅: 見出しの右端をドラッグで変更（ブラウザに記憶。ダブルクリックで元の幅）
+const PF_W_DEFAULT = { order: 64, name: 110, title: 260, areas: 200, owner: 90, members: 180, task_count: 70,
+  last_topic_date: 150, last_month: 110 };
+const pfW = (() => {
+  try { return { ...PF_W_DEFAULT, ...JSON.parse(localStorage.getItem("platforms.colW") || "{}") }; }
+  catch (_) { return { ...PF_W_DEFAULT }; }
+})();
+const savePfW = () => { try { localStorage.setItem("platforms.colW", JSON.stringify(pfW)); } catch (_) { /* 記憶できなくても幅は変わる */ } };
+const pfTableW = () => PF_COLS.reduce((n, [k]) => n + pfW[k], 0);
+function startPfResize(e, key, col, table) {
+  e.preventDefault();
+  e.stopPropagation(); // 並び替えにしない
+  const handle = e.currentTarget;
+  const x0 = e.clientX;
+  const w0 = pfW[key];
+  handle.setPointerCapture(e.pointerId);
+  handle.classList.add("active");
+  document.body.classList.add("resizing");
+  const move = (ev) => {
+    pfW[key] = Math.min(800, Math.max(40, Math.round(w0 + ev.clientX - x0)));
+    col.style.width = `${pfW[key]}px`;
+    table.style.width = `${pfTableW()}px`;
+  };
+  const up = () => {
+    handle.removeEventListener("pointermove", move);
+    handle.removeEventListener("pointerup", up);
+    handle.removeEventListener("pointercancel", up);
+    handle.classList.remove("active");
+    document.body.classList.remove("resizing");
+    savePfW();
+  };
+  handle.addEventListener("pointermove", move);
+  handle.addEventListener("pointerup", up);
+  handle.addEventListener("pointercancel", up);
+}
 const pfSort = (() => {
   try { return JSON.parse(localStorage.getItem("platforms.sort2")) || { key: "order", desc: false }; }
   catch (_) { return { key: "order", desc: false }; }
@@ -224,7 +259,17 @@ function renderList() {
     box.append(el("p", "hint pf-empty", "条件に合う基盤はありません。"));
     return;
   }
-  const table = el("table", "pf-table");
+  const table = el("table", "pf-table resizable-cols");
+  table.style.width = `${pfTableW()}px`;
+  const colgroup = el("colgroup");
+  const cols = {};
+  for (const [key] of PF_COLS) {
+    const col = el("col");
+    col.style.width = `${pfW[key]}px`;
+    cols[key] = col;
+    colgroup.append(col);
+  }
+  table.append(colgroup);
   const thead = el("thead");
   const hr = el("tr");
   for (const [key, label] of PF_COLS) {
@@ -240,6 +285,18 @@ function renderList() {
       try { localStorage.setItem("platforms.sort2", JSON.stringify(pfSort)); } catch (_) { /* 保存できなくても並び替えは行う */ }
       renderList();
     });
+    const handle = el("span", "col-resizer");
+    handle.title = "ドラッグで列幅を変更（ダブルクリックで元の幅）";
+    handle.addEventListener("pointerdown", (e) => startPfResize(e, key, cols[key], table));
+    handle.addEventListener("click", (e) => e.stopPropagation());
+    handle.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      pfW[key] = PF_W_DEFAULT[key];
+      cols[key].style.width = `${pfW[key]}px`;
+      table.style.width = `${pfTableW()}px`;
+      savePfW();
+    });
+    th.append(handle);
     hr.append(th);
   }
   thead.append(hr);
