@@ -142,3 +142,13 @@
 .ach-list .a-title { font-weight: 600; }
 .ach-list .a-note { color: var(--muted); font-size: 12.5px; flex-basis: 100%; }
 .ach-list .a-link { font-size: 12px; color: var(--accent); }
+.pp-info { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 16px; flex: 0 1 auto; }
+.pp-head .pp-areas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.pp-head .pp-areas > h3 { order: 2; display: flex; margin: 0; gap: 6px; }
+.pp-head .pp-areas .area-body { order: 1; }
+.pp-head .pp-areas .memo-save { padding: 2px 10px; font-size: 12px; }
+.pp-head .pp-areas:has(.area-choose) { flex-basis: 100%; }
+.pp-info { flex: 1 1 300px; }
+.pp-head .pp-areas:has(.area-choose) { flex-basis: auto; }
+.pp-head h2 { white-space: nowrap; margin-bottom: 0; }
+.pp-head { align-items: center; }

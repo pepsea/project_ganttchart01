@@ -122,8 +122,9 @@ async function select(name) {
 // 未設定のときは全領域の札を出して選んでもらう
 function areasSection(d) {
   const sec = el("section", "pp-section pp-areas");
-  const h = el("h3", "", "担当領域");
+  const h = el("h3", "");
   const count = el("span", "count", "");
+  count.hidden = true; // 「N 件」の表示は出さない
   const btn = el("button", "primary memo-save", "保存");
   btn.type = "button";
   const cancel = el("button", "memo-save", "キャンセル");
@@ -204,17 +205,11 @@ function renderDetail(d) {
   const head = el("div", "pp-head");
   const nameBox = el("div");
   nameBox.append(el("h2", "", d.name));
-  const roles = [d.groups.length && `グループ ${d.groups.length}`, d.platforms.length && `基盤技術 ${d.platforms.length}`,
-    d.cases.length && `案件 ${d.cases.length}`, d.services.length && `サービス ${d.services.length}`].filter(Boolean);
-  nameBox.append(el("div", "hint", roles.length ? `担当: ${roles.join("・")}` : "担当の登録はありません"));
   // 担当領域・担当グループは名前の隣
   const info = el("div", "pp-info");
-  info.append(areasSection(d));
   const gr = el("div", "pp-groups");
-  gr.append(el("span", "lbl", "担当グループ"));
   if (d.groups.length) for (const g of d.groups) gr.append(extLink([roleTag(g.role), g.name, el("span", "arrow", "↗")], `/groups?id=${g.id}&year=all`));
-  else gr.append(el("span", "hint", "なし"));
-  info.append(gr);
+  info.append(gr, areasSection(d)); // 名前のすぐ右にグループ、その隣に領域
   head.append(nameBox, info, el("span", "spacer"));
   const stats = el("div", "stats");
   for (const [k, label] of TASK_STATES) {
