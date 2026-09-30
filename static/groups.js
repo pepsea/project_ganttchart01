@@ -128,6 +128,7 @@ async function select(id) {
   state.achievements = state.year ? state.achAll.filter((a) => a.fiscal_year === state.year) : state.achAll;
   renderList();
   renderDetail();
+  renderPanel();
 }
 
 // ------------------------------------------------------------ 詳細
@@ -199,6 +200,7 @@ function renderGoals(g) {
   for (const t of state.goals) {
     const li = el("li");
     li.tabIndex = 0;
+    li.dataset.gid = String(t.id);
     li.title = "クリックして編集";
     const due = goalDue(t);
     li.classList.toggle("done", t.status === "達成");
@@ -226,34 +228,18 @@ function renderGoals(g) {
       return f;
     };
     main.append(fact("達成基準", t.criteria, "f-criteria"), fact("時期", t.period, "f-period"));
-    // このタスクに関連した達成したこと（カードの中に追加していく）
+    // このタスクに関連した達成項目の概要（詳細は、カードをクリックで開く右の窓）
     const mine = state.achAll.filter((x) => x.goal_id === t.id);
     const box = el("div", "t-ach");
-    const bh = el("div", "t-ach-head");
-    bh.append(el("span", "lbl", `達成したこと ${mine.length} 件`));
-    const addA = el("button", "t-ach-add", "＋ 追記");
-    addA.type = "button";
-    addA.title = "このタスクに関連した達成したことを追記";
-    addA.addEventListener("click", (e) => { e.stopPropagation(); openAchievementDialog(g, null, t.id); });
-    bh.append(addA);
-    box.append(bh);
-    for (const x of mine) {
-      const item = el("button", "t-ach-item");
-      item.type = "button";
-      item.title = x.note ? `${x.title}\nメモ: ${x.note}\n（クリックして編集）` : `${x.title}\n（クリックして編集）`;
-      item.append(el("span", "d", x.achieved_on ? slashDate(x.achieved_on) : `${x.fiscal_year}年度`), el("span", "t", x.title));
-      if (x.owner) item.append(el("span", "o", x.owner.split(" ").join("・")));
-      item.addEventListener("click", (e) => { e.stopPropagation(); openAchievementDialog(g, x); });
-      box.append(item);
-    }
-    box.addEventListener("click", (e) => e.stopPropagation());
-    if (t.note) li.title = `メモ: ${t.note}\n（クリックして編集）`;
+    const avg = mine.length ? Math.round(mine.reduce((n, x) => n + x.progress, 0) / mine.length) : 0;
+    box.append(el("div", "lbl", mine.length ? `達成項目 ${mine.length} 件・${avg}%` : "達成項目なし"));
+    if (mine.length) box.append(progBar(avg));
+    li.title = t.note ? `メモ: ${t.note}\n（クリックで詳細）` : "クリックで詳細";
     const d = el("span", `g-due ${due}`, t.due_date ? `期限 ${slashDate(t.due_date)}` : "");
     if (due) d.title = due === "overdue" ? `期限超過（${-daysLeft(t.due_date)} 日経過）` : `期限まであと ${daysLeft(t.due_date)} 日`;
-    const top = el("div", "g-top");
-    top.append(st, d);
-    li.append(top, main, box);
-    const openIt = () => openGoalDialog(g, t);
+    li.append(st, main, box, d);
+    const openIt = () => openGoalPanel(t.id);
+    li.classList.toggle("sel", state.panelGoal === t.id);
     li.addEventListener("click", openIt);
     li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openIt(); } });
     ul.append(li);
@@ -375,6 +361,115 @@ function renderServiceRelations(g) {
   return sec;
 }
 
+
+// ---- タスクの詳細（右の窓）: 達成項目をバー（％で色が変わる）で表示し、バーをクリックで詳細
+state.panelGoal = null;
+state.openAch = null;
+const progClass = (p) => (p >= 100 ? "p3" : p >= 70 ? "p2" : p >= 30 ? "p1" : "p0");
+function progBar(p) {
+  const bar = el("div", `prog ${progClass(p)}`);
+  const fill = el("i");
+  fill.style.width = `${p}%`;
+  bar.append(fill);
+  return bar;
+}
+function openGoalPanel(id) {
+  state.panelGoal = id;
+  state.openAch = null;
+  renderPanel();
+  renderGoalsMark();
+}
+function renderGoalsMark() {
+  document.querySelectorAll(".goal-list li").forEach((li) => li.classList.toggle("sel", li.dataset.gid === String(state.panelGoal)));
+}
+function closeGoalPanel() {
+  state.panelGoal = null;
+  renderPanel();
+  renderGoalsMark();
+}
+function renderPanel() {
+  const panel = $("#goal-panel");
+  const t = state.panelGoal && (state.goalsAll || []).find((x) => x.id === state.panelGoal);
+  const g = state.groups.find((x) => x.id === state.current);
+  panel.hidden = !t || !g;
+  if (!t || !g) return;
+  panel.innerHTML = "";
+  const head = el("div", "gpn-head");
+  const st = el("span", "status-badge", t.status);
+  st.dataset.v = t.status;
+  const close = el("button", "gpn-close", "✕");
+  close.type = "button";
+  close.title = "閉じる";
+  close.addEventListener("click", closeGoalPanel);
+  head.append(st, el("span", "gpn-fy", `${t.fiscal_year}年度`), el("span", "spacer"), close);
+  const title = el("h3", "gpn-title", t.title);
+  const due = goalDue(t);
+  const facts = el("dl", "gpn-facts");
+  const fact = (k, v, cls = "") => { if (v) facts.append(el("dt", "", k), el("dd", cls, v)); };
+  fact("期限", t.due_date ? `${slashDate(t.due_date)}${due === "overdue" ? `（${-daysLeft(t.due_date)} 日超過）` : t.due_date && t.status !== "達成" ? `（あと ${daysLeft(t.due_date)} 日）` : ""}` : "", due);
+  fact("達成基準", t.criteria);
+  fact("時期", t.period);
+  fact("メモ", t.note, "pre");
+  const edit = el("button", "gpn-edit", "✎ タスクを編集");
+  edit.type = "button";
+  edit.addEventListener("click", () => openGoalDialog(g, t));
+  panel.append(head, title, facts);
+  if (safeUrl(t.url)) {
+    const a = el("a", "g-link", "リンク ↗");
+    a.href = t.url; a.target = "_blank"; a.rel = "noopener noreferrer";
+    panel.append(a, " ");
+  }
+  panel.append(edit);
+
+  // 達成項目（バー）
+  const mine = state.achAll.filter((x) => x.goal_id === t.id);
+  const avg = mine.length ? Math.round(mine.reduce((n, x) => n + x.progress, 0) / mine.length) : 0;
+  const ah = el("div", "gpn-ah");
+  ah.append(el("b", "", "達成したこと"), el("span", "count-badge", `${mine.length} 件${mine.length ? `・平均 ${avg}%` : ""}`), el("span", "spacer"));
+  const add = el("button", "primary", "＋ 達成項目を追加");
+  add.type = "button";
+  add.addEventListener("click", () => openAchievementDialog(g, null, t.id));
+  ah.append(add);
+  panel.append(ah);
+  if (!mine.length) panel.append(el("p", "hint", "まだ達成項目がありません。「＋ 達成項目を追加」から登録してください。"));
+  const legend = el("div", "gpn-legend");
+  legend.innerHTML = '<span class="p0"><i></i>〜29%</span><span class="p1"><i></i>30〜69%</span><span class="p2"><i></i>70〜99%</span><span class="p3"><i></i>100%</span>';
+  if (mine.length) panel.append(legend);
+  for (const x of mine) {
+    const item = el("div", "gpn-ach");
+    const row = el("button", `gpn-bar ${progClass(x.progress)}`);
+    row.type = "button";
+    row.title = "クリックで詳細";
+    const lab = el("span", "lab");
+    lab.append(el("span", "nm", x.title), el("span", "pc", `${x.progress}%`));
+    row.append(lab, progBar(x.progress));
+    row.addEventListener("click", () => { state.openAch = state.openAch === x.id ? null : x.id; renderPanel(); });
+    item.append(row);
+    if (state.openAch === x.id) {
+      const d = el("div", "gpn-ach-detail");
+      const dl = el("dl", "gpn-facts");
+      const f2 = (k, v, cls = "") => { if (v) dl.append(el("dt", "", k), el("dd", cls, v)); };
+      f2("達成度", `${x.progress}%`);
+      f2("担当者", x.owner ? x.owner.split(" ").join("・") : "");
+      f2("達成日", x.achieved_on ? slashDate(x.achieved_on) : "");
+      f2("年度", `${x.fiscal_year}年度`);
+      f2("メモ", x.note, "pre");
+      d.append(dl);
+      if (safeUrl(x.url)) {
+        const a = el("a", "g-link", "リンク ↗");
+        a.href = x.url; a.target = "_blank"; a.rel = "noopener noreferrer";
+        d.append(a, " ");
+      }
+      const eb = el("button", "", "✎ 編集");
+      eb.type = "button";
+      eb.addEventListener("click", () => openAchievementDialog(g, x));
+      d.append(eb);
+      item.append(d);
+    }
+    panel.append(item);
+  }
+}
+
 // ---- 達成したことの追加・編集
 let achEditing = null; // { group, item }
 const achForm = $("#form-ach");
@@ -386,6 +481,8 @@ function openAchievementDialog(g, a, goalId = 0) {
   achForm.achieved_on.value = a?.achieved_on || "";
   achForm.note.value = a?.note || "";
   achForm.url.value = a?.url || "";
+  achForm.progress.value = a ? a.progress : 100;
+  $("#ach-pc").textContent = `${achForm.progress.value}%`;
   // 関連タスク（目標達成に必要なタスク）。選択中の年度に限らず、このグループの全タスクから選ぶ
   const sel = achForm.goal_id;
   sel.innerHTML = "";
@@ -402,6 +499,7 @@ function openAchievementDialog(g, a, goalId = 0) {
   achForm.title.focus();
 }
 // 達成日を入れたら年度を合わせる
+achForm.progress.addEventListener("input", () => { $("#ach-pc").textContent = `${achForm.progress.value}%`; });
 achForm.achieved_on.addEventListener("change", () => {
   const y = fiscalYearOf(achForm.achieved_on.value);
   if (!y) return;
@@ -413,7 +511,7 @@ achForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const { group, item } = achEditing;
   const body = { title: achForm.title.value.trim(), owner: achForm.owner.value.trim(), achieved_on: achForm.achieved_on.value || null, note: achForm.note.value, url: achForm.url.value.trim(),
-    fiscal_year: Number(achForm.fiscal_year.value), goal_id: Number(achForm.goal_id.value) };
+    fiscal_year: Number(achForm.fiscal_year.value), goal_id: Number(achForm.goal_id.value), progress: Number(achForm.progress.value) };
   try {
     await api(item ? `/api/groups/${group.id}/achievements/${item.id}` : `/api/groups/${group.id}/achievements`,
       { method: item ? "PUT" : "POST", body: JSON.stringify(body) });

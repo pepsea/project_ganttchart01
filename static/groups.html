@@ -46,6 +46,8 @@
     </main>
   </div>
 
+  <aside id="goal-panel" class="goal-panel" hidden aria-label="タスクの詳細"></aside>
+
   <div id="toast" class="toast" role="status"></div>
 
   <!-- グループの追加・編集 -->
@@ -83,6 +85,7 @@
       <p id="ach-meta" class="hint"></p>
       <label><span>関連タスク（目標達成に必要なタスク）</span><select name="goal_id"></select></label>
       <label><span>達成したこと <span class="req">*</span></span><input name="title" required placeholder="例: 新サービスをリリース"></label>
+      <label><span>達成度 <b id="ach-pc">100%</b></span><input type="range" name="progress" min="0" max="100" step="5" value="100"></label>
       <div class="two">
         <label><span>担当者（複数はスペース区切り）</span><input name="owner" placeholder="例: 高橋 鈴木"></label>
         <label><span>達成日</span><input type="date" name="achieved_on"></label>

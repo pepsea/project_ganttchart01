@@ -225,20 +225,6 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .pf-rel-goals .g-due.overdue { color: var(--today); font-weight: 700; }
 .pf-rel-goals .g-due.soon { color: #b56d00; font-weight: 700; }
 
-/* 目標達成に必要なタスク: カードを横に並べ、4 項目で折り返す */
-.goal-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(210px, calc((100% - 30px) / 4)), 1fr)); gap: 10px; } /* 最大 4 列。文字が大きい環境（Windows）では自動で列を減らして折り返す */
-.goal-list li { overflow-wrap: anywhere; min-width: 0; }
-.goal-list li { display: block; border: 1px solid var(--line-strong); border-left: 4px solid var(--accent); border-radius: 8px; padding: 8px 10px; background: var(--panel); margin-top: 0; }
-.goal-list li:last-child { border-bottom: 1px solid var(--line-strong); }
-.goal-list li.done { border-left-color: #30a46c; background: #f7faf8; }
-.goal-list li.soon { border-left-color: #e08a00; }
-.goal-list li.overdue { border-left-color: var(--today); }
-.goal-list .g-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 4px; }
-.goal-list .g-main { display: block; white-space: normal; overflow: visible; }
-.goal-list .g-title { display: block; max-width: none; white-space: normal; overflow: visible; margin-bottom: 4px; }
-.goal-list .fy-tag, .goal-list .g-link { display: inline-block; margin: 0 4px 4px 0; }
-.goal-list .fact { display: flex; max-width: none; margin-top: 2px; align-items: flex-start; }
-.goal-list .fact .fv { overflow: visible; white-space: normal; }
 
 /* 達成したこと: 目標達成に必要なタスクと同じカード */
 .ach-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(210px, calc((100% - 30px) / 4)), 1fr)); gap: 10px; }
@@ -258,13 +244,42 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .ach-block > h4 .hint { font-weight: 400; font-size: 12px; }
 .ach-block > h4 .right { margin-left: auto; padding: 3px 10px; font-size: 12px; }
 
-/* タスクのカードの中の「達成したこと」 */
-.goal-list .t-ach { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--line-strong); cursor: default; }
-.t-ach-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.t-ach-head .lbl { font-size: 11.5px; font-weight: 700; color: #1d6b43; }
-.t-ach-add { padding: 1px 8px; font-size: 11.5px; }
-.t-ach-item { display: block; width: 100%; text-align: left; white-space: normal; border: 0; border-left: 3px solid #30a46c; border-radius: 4px; background: #eef8f2; margin-top: 4px; padding: 3px 6px; font-size: 12.5px; line-height: 1.5; }
-.t-ach-item:hover { background: #dff2e7; }
-.t-ach-item .d { color: var(--muted); font-size: 11.5px; margin-right: 6px; font-variant-numeric: tabular-nums; }
-.t-ach-item .t { font-weight: 600; }
-.t-ach-item .o { display: block; color: #3b4252; font-size: 11.5px; }
+/* 行の中の達成項目の概要（件数・平均％と細いバー） */
+.goal-list .t-ach { min-width: 120px; cursor: pointer; }
+.goal-list .t-ach .lbl { white-space: nowrap; }
+.goal-list li { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+
+/* タスク詳細の右の窓 */
+.goal-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 92vw); z-index: 40; background: var(--panel); border-left: 1px solid var(--line-strong); box-shadow: -6px 0 18px rgba(0,0,0,.12); overflow-y: auto; padding: 14px 16px 24px; }
+.goal-panel[hidden] { display: none; }
+.gpn-head { display: flex; align-items: center; gap: 8px; }
+.gpn-head .spacer { flex: 1; }
+.gpn-fy { font-size: 12px; color: var(--muted); }
+.gpn-close { border: 0; background: none; font-size: 16px; padding: 2px 8px; }
+.gpn-title { margin: 8px 0; font-size: 16px; line-height: 1.5; }
+.gpn-facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 10px; font-size: 13px; }
+.gpn-facts dt { color: var(--muted); font-size: 12px; }
+.gpn-facts dd { margin: 0; overflow-wrap: anywhere; }
+.gpn-facts dd.pre { white-space: pre-wrap; }
+.gpn-facts dd.overdue { color: var(--today); font-weight: 700; }
+.gpn-ah { display: flex; align-items: center; gap: 8px; margin: 16px 0 6px; padding-top: 10px; border-top: 1px solid var(--line-strong); }
+.gpn-ah .spacer { flex: 1; }
+.gpn-legend { display: flex; gap: 10px; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.gpn-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 3px; vertical-align: -1px; }
+.prog { height: 8px; border-radius: 4px; background: #e9ecf1; overflow: hidden; }
+.prog i { display: block; height: 100%; border-radius: 4px; }
+.prog.p0 i, .gpn-legend .p0 i { background: #e5484d; }
+.prog.p1 i, .gpn-legend .p1 i { background: #f5a524; }
+.prog.p2 i, .gpn-legend .p2 i { background: #3b6fe0; }
+.prog.p3 i, .gpn-legend .p3 i { background: #30a46c; }
+.gpn-ach { margin-top: 8px; }
+.gpn-bar { display: block; width: 100%; text-align: left; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--panel); white-space: normal; }
+.gpn-bar:hover { background: #f3f7ff; }
+.gpn-bar .lab { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; font-size: 13px; }
+.gpn-bar .nm { font-weight: 600; overflow-wrap: anywhere; }
+.gpn-bar .pc { font-variant-numeric: tabular-nums; font-weight: 700; }
+.gpn-bar.p0 .pc { color: #e5484d; } .gpn-bar.p1 .pc { color: #b56d00; } .gpn-bar.p2 .pc { color: #3b6fe0; } .gpn-bar.p3 .pc { color: #1d6b43; }
+.gpn-ach-detail { margin: 4px 0 0 6px; padding: 8px 10px; background: var(--bg); border-radius: 6px; }
+.goal-list li.sel { box-shadow: 0 0 0 2px var(--accent); }
+.goal-list .t-ach .lbl { font-size: 11.5px; font-weight: 700; color: #1d6b43; margin-bottom: 3px; }
+#form-ach input[type="range"] { width: 100%; }

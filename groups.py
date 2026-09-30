@@ -92,6 +92,9 @@ def init_db() -> None:
         ach_cols = {r["name"] for r in db.execute("PRAGMA table_info(team_achievements)")}
         if "url" not in ach_cols:
             db.execute("ALTER TABLE team_achievements ADD COLUMN url TEXT NOT NULL DEFAULT ''")  # 関連リンク
+        if "progress" not in ach_cols:
+            # 達成項目の達成度（％）。これまでの「達成したこと」は達成済みなので 100
+            db.execute("ALTER TABLE team_achievements ADD COLUMN progress INTEGER NOT NULL DEFAULT 100")
         if "goal_id" not in ach_cols:
             # 関連する「目標達成に必要なタスク」（team_goals.id。0 = どのタスクにも結びつけていない）
             db.execute("ALTER TABLE team_achievements ADD COLUMN goal_id INTEGER NOT NULL DEFAULT 0")
@@ -199,6 +202,7 @@ class AchievementIn(BaseModel):
     note: str = ""
     url: str = ""
     goal_id: int = 0  # 関連する「目標達成に必要なタスク」（team_goals.id。0 = なし）
+    progress: int = Field(default=100, ge=0, le=100)  # 達成度（％）
 
     @field_validator("title", "owner", mode="before")
     @classmethod
@@ -494,6 +498,7 @@ def add_achievement(gid: int, a: AchievementIn) -> dict:
         _check_goal(db, gid, a.goal_id)
         cur = db.execute("INSERT INTO team_achievements(group_id, title, owner, achieved_on, note, url, fiscal_year, goal_id)"
                          " VALUES (?,?,?,?,?,?,?,?)", (gid, *_ach_values(a), a.goal_id))
+        db.execute("UPDATE team_achievements SET progress = ? WHERE id = ?", (a.progress, cur.lastrowid))
         _register_year(db, _ach_values(a)[-1])
         return dict(db.execute("SELECT * FROM team_achievements WHERE id = ?", (cur.lastrowid,)).fetchone())
 
@@ -502,8 +507,8 @@ def add_achievement(gid: int, a: AchievementIn) -> dict:
 def update_achievement(gid: int, aid: int, a: AchievementIn) -> dict:
     with get_db() as db:
         _check_goal(db, gid, a.goal_id)
-        cur = db.execute("UPDATE team_achievements SET title=?, owner=?, achieved_on=?, note=?, url=?, fiscal_year=?, goal_id=?,"
-                         " updated_at=datetime('now','localtime') WHERE id=? AND group_id=?", (*_ach_values(a), a.goal_id, aid, gid))
+        cur = db.execute("UPDATE team_achievements SET title=?, owner=?, achieved_on=?, note=?, url=?, fiscal_year=?, goal_id=?, progress=?,"
+                         " updated_at=datetime('now','localtime') WHERE id=? AND group_id=?", (*_ach_values(a), a.goal_id, a.progress, aid, gid))
         if cur.rowcount == 0:
             raise HTTPException(404, "記録が見つかりません")
         _register_year(db, _ach_values(a)[-1])
@@ -555,7 +560,7 @@ def export_csv() -> Response:
                                 (g["id"],)):
                 goal = db.execute("SELECT title FROM team_goals WHERE id = ? AND group_id = ?", (a["goal_id"], g["id"])).fetchone()
                 add(種別="達成したこと", グループ名=g["name"], 年度=a["fiscal_year"] or "", 達成したこと=a["title"],
-                    関連タスク=goal["title"] if goal else "", 担当者=a["owner"], 達成日=a["achieved_on"] or "", メモ=a["note"], リンク=a["url"])
+                    関連タスク=goal["title"] if goal else "", 進捗=a["progress"], 担当者=a["owner"], 達成日=a["achieved_on"] or "", メモ=a["note"], リンク=a["url"])
             for k in db.execute("SELECT * FROM team_kpis WHERE group_id = ? ORDER BY sort_order, id", (g["id"],)):
                 add(種別="指標", グループ名=g["name"], 指標=k["title"], 担当者=k["owner"], 進捗=k["progress"])
         for r in db.execute("SELECT year FROM team_years ORDER BY year"):
@@ -641,8 +646,9 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                 try:
                     on = parse_date(r["達成日"], line, "達成日") if r.get("達成日") else None
                     a = AchievementIn(fiscal_year=year, title=r.get("達成したこと", ""), owner=r.get("担当者", ""),
-                                      achieved_on=on, note=r.get("メモ", ""), url=r.get("リンク", ""))
-                except ValidationError as e:
+                                      achieved_on=on, note=r.get("メモ", ""), url=r.get("リンク", ""),
+                                      progress=int(r["進捗"]) if r.get("進捗") else 100)
+                except (ValueError, ValidationError) as e:
                     raise _err(line, e)
                 vals = _ach_values(a)
                 gl = None
@@ -656,10 +662,10 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                                  (gid, vals[-1], vals[0])).fetchone()
                 if hit:
                     db.execute("UPDATE team_achievements SET title=?, owner=?, achieved_on=?, note=?, url=?, fiscal_year=?,"
-                               " goal_id=?, updated_at=datetime('now','localtime') WHERE id=?", (*vals, goal_id, hit["id"]))
+                               " goal_id=?, progress=?, updated_at=datetime('now','localtime') WHERE id=?", (*vals, goal_id, a.progress, hit["id"]))
                 else:
-                    db.execute("INSERT INTO team_achievements(group_id, title, owner, achieved_on, note, url, fiscal_year, goal_id)"
-                               " VALUES (?,?,?,?,?,?,?,?)", (gid, *vals, goal_id))
+                    db.execute("INSERT INTO team_achievements(group_id, title, owner, achieved_on, note, url, fiscal_year, goal_id, progress)"
+                               " VALUES (?,?,?,?,?,?,?,?,?)", (gid, *vals, goal_id, a.progress))
                 _register_year(db, vals[-1])
                 result["achievements"] += 1
             else:  # 指標
