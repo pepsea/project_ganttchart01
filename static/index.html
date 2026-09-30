@@ -56,9 +56,20 @@
       </span>
   </header>
 
-  <main id="scroller" class="scroller">
-    <div id="gantt" class="gantt"></div>
-  </main>
+  <div class="g-body">
+    <main id="scroller" class="scroller">
+      <div id="gantt" class="gantt"></div>
+    </main>
+    <!-- 右: 個人ごとのタスク状況（折りたためる） -->
+    <aside id="side" class="side" aria-label="個人ごとのタスク状況">
+      <button type="button" id="side-toggle" class="side-toggle" title="個人ごとのタスク状況を開閉">◀ 個人別</button>
+      <div class="side-panel" id="side-panel">
+        <div class="side-head"><b>個人ごとのタスク状況</b>
+          <span class="side-legend"><i class="c-act">実施中</i><i class="c-soon">3日以内</i><i class="c-over">超過</i></span></div>
+        <div id="side-list"></div>
+      </div>
+    </aside>
+  </div>
 
   <div id="toast" class="toast" role="status"></div>
 

@@ -258,6 +258,7 @@ function refreshAssigneeFilter() {
 // ------------------------------------------------------------ 描画
 function render() {
   refreshAssigneeFilter();
+  renderSide();
   computeRange();
   const trackW = state.days * state.dayW;
   gantt.classList.toggle("compact", state.compact);
@@ -276,6 +277,69 @@ function render() {
   for (const t of tasks) frag.append(renderRow(t, trackW));
   gantt.append(frag);
 }
+
+// ------------------------------------------------------------ 個人ごとのタスク状況（右の折りたたみ窓）
+const sideOpen = new Set(); // 開いている人
+const NO_PERSON = "（担当者未設定）";
+function renderSide() {
+  const today = todayMs();
+  const people = new Map();
+  for (const t of state.tasks) {
+    const left = Math.round((parseDate(t.end_date) - today) / DAY_MS);
+    const kinds = [];
+    if (left < 0) kinds.push("over");
+    else if (left <= SOON_DAYS) kinds.push("soon");
+    if (isActive(t)) kinds.push("act");
+    if (!kinds.length) continue;
+    for (const p of assigneesOf(t).length ? assigneesOf(t) : [NO_PERSON]) {
+      if (!people.has(p)) people.set(p, { over: 0, soon: 0, act: 0, tasks: [] });
+      const e = people.get(p);
+      for (const k of kinds) e[k]++;
+      e.tasks.push({ t, left, kind: kinds.includes("over") ? "overdue" : kinds.includes("soon") ? "soon" : "act" });
+    }
+  }
+  const list = $("#side-list");
+  list.innerHTML = "";
+  if (!people.size) return list.append(el("p", "hint", "該当するタスクはありません。"));
+  const rank = { overdue: 0, soon: 1, act: 2 };
+  const sorted = [...people].sort((a, b) => b[1].over - a[1].over || b[1].soon - a[1].soon || b[1].act - a[1].act || nameCollator.compare(a[0], b[0]));
+  for (const [name, e] of sorted) {
+    const box = el("div", "sp-person");
+    const head = el("button", "sp-head");
+    head.type = "button";
+    head.append(el("span", "sp-name", (sideOpen.has(name) ? "▾ " : "▸ ") + name));
+    for (const [k, cls] of [["act", "c-act"], ["soon", "c-soon"], ["over", "c-over"]])
+      head.append(el("span", `sp-n ${e[k] ? cls : "zero"}`, String(e[k])));
+    head.title = `${name}: 実施中 ${e.act}・3日以内 ${e.soon}・超過 ${e.over}（クリックでタスクを表示）`;
+    head.addEventListener("click", () => {
+      sideOpen.has(name) ? sideOpen.delete(name) : sideOpen.add(name);
+      renderSide();
+    });
+    box.append(head);
+    if (sideOpen.has(name)) {
+      const wrap = el("div", "sp-tasks");
+      e.tasks.sort((a, b) => rank[a.kind] - rank[b.kind] || a.left - b.left);
+      for (const { t, left, kind } of e.tasks) {
+        const b = el("button", `sp-task ${kind}`);
+        b.type = "button";
+        b.append(document.createTextNode(t.task));
+        b.append(el("small", "", `${pjText(t.project) || "PJ名なし"}｜〜${shortDate(t.end_date)}（${left < 0 ? `${-left}日超過` : left === 0 ? "今日" : `あと${left}日`}）`));
+        b.addEventListener("click", () => { scrollToDate(parseDate(t.end_date), true); openTaskDialog(t); });
+        wrap.append(b);
+      }
+      box.append(wrap);
+    }
+    list.append(box);
+  }
+}
+const sideEl = $("#side");
+const setSide = (open) => {
+  sideEl.classList.toggle("collapsed", !open);
+  $("#side-toggle").textContent = open ? "▶ 閉じる" : "◀ 個人別";
+  try { localStorage.setItem("gantt.side", open ? "1" : "0"); } catch {}
+};
+$("#side-toggle").addEventListener("click", () => setSide(sideEl.classList.contains("collapsed")));
+(() => { let v = "1"; try { v = localStorage.getItem("gantt.side") ?? "1"; } catch {} setSide(v === "1"); })();
 
 function renderHeader(trackW) {
   const W = state.dayW;
