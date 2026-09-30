@@ -547,3 +547,9 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 .sp-head.on { background: #e8efff; font-weight: 600; }
 #filter-projects { max-width: 120px; }
 .assignee-chip { background: #e8efff; border-color: var(--accent); color: var(--accent); white-space: nowrap; }
+/* 個人別の窓: 1 人ずつ枠線で区切る */
+.side-panel { background: var(--bg); }
+.side-head { padding-bottom: 6px; border-bottom: 2px solid var(--line-strong); }
+.sp-person { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 6px; margin-bottom: 6px; overflow: hidden; }
+.sp-head { padding: 7px 8px; border-radius: 0; }
+.sp-head.on { box-shadow: inset 3px 0 0 var(--accent); }
