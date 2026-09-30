@@ -251,3 +251,9 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .ach-cards .fy-tag, .ach-cards .g-link { display: inline-block; margin: 0 4px 4px 0; }
 .ach-cards .a-owner { white-space: normal; margin-top: 2px; }
 .ach-cards .a-note { display: block; white-space: normal; overflow: visible; margin-top: 2px; line-height: 1.6; }
+
+/* 達成したこと（目標達成に必要なタスクの中の小見出し） */
+.ach-block { margin-top: 16px; padding-top: 10px; border-top: 1px dashed var(--line-strong); }
+.ach-block > h4 { margin: 0 0 8px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.ach-block > h4 .hint { font-weight: 400; font-size: 12px; }
+.ach-block > h4 .right { margin-left: auto; padding: 3px 10px; font-size: 12px; }

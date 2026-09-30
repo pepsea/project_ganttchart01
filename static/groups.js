@@ -177,7 +177,9 @@ function renderDetail() {
   vs.append(vh, el("div", `vision-text${g.vision ? "" : " hint"}`, g.vision || "未記入（「✎ 編集」から入力）"));
   root.append(vs);
 
-  root.append(renderGoals(g), renderAchievements(g), renderPlatformRelations(g), renderServiceRelations(g));
+  const goalSec = renderGoals(g);
+  goalSec.append(renderAchievements(g)); // 達成したことは「目標達成に必要なタスク」の中に記載
+  root.append(goalSec, renderPlatformRelations(g), renderServiceRelations(g));
 }
 
 // ---- 目標（達成基準・時期）: クリックで編集
@@ -238,15 +240,15 @@ function renderGoals(g) {
 
 // ---- 達成したこと（内容・担当者・達成日）: クリックで編集
 function renderAchievements(g) {
-  const sec = el("section", "gp-section");
-  const h = el("h3", "", state.year ? `${state.year}年度に達成したこと` : "達成したこと（すべての年度）");
-  h.append(el("span", "hint", "達成したことと担当者を追記"));
-  const add = el("button", "primary right", "＋ 追記");
+  const sec = el("div", "ach-block");
+  const h = el("h4", "", state.year ? `${state.year}年度に達成したこと` : "達成したこと（すべての年度）");
+  h.append(el("span", "count-badge", `${state.achievements.length} 件`), el("span", "hint", "達成したことと担当者を追記"));
+  const add = el("button", "right", "＋ 達成したことを追記");
   add.addEventListener("click", () => openAchievementDialog(g, null));
   h.append(add);
   sec.append(h);
   if (!state.achievements.length) {
-    sec.append(el("p", "hint", `${yearLabel(state.year)}の記録はまだありません。「＋ 追記」から登録してください。`));
+    sec.append(el("p", "hint", `${yearLabel(state.year)}の記録はまだありません。「＋ 達成したことを追記」から登録してください。`));
     return sec;
   }
   const ul = el("ul", "ach-list ach-cards"); // 目標達成に必要なタスクと同じカード（最大 4 列で折り返し）
