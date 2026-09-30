@@ -180,33 +180,10 @@ const byBoard = (status) => (a, b) => {
 
 // ------------------------------------------------------------ 描画
 function render() {
-  renderSummary();
   view.innerHTML = "";
   if (state.view === "board") renderBoard();
   else if (state.view === "list") renderList();
   else renderTimeline();
-}
-
-function renderSummary() {
-  const bar = $("#summary");
-  bar.innerHTML = "";
-  const base = filtered({ ignoreStatus: true });
-  state.statuses.forEach((s, i) => {
-    if (s === "キャンセル" && !state.showCancel) return;
-    const n = base.filter((c) => c.status === s).length;
-    if (i > 0) bar.append(el("span", "sum-arrow", "›"));
-    const pill = el("button", "sum-pill");
-    pill.style.setProperty("--c", STATUS_COLOR[s]);
-    pill.append(el("span", "dot"), el("span", "", s), el("b", "", n));
-    pill.classList.toggle("on", state.status === s);
-    pill.classList.toggle("zero", n === 0);
-    pill.title = state.status === s ? "クリックで絞り込み解除" : `「${s}」で絞り込み`;
-    pill.addEventListener("click", () => {
-      state.status = state.status === s ? "" : s;
-      render();
-    });
-    bar.append(pill);
-  });
 }
 
 function areaChips(c) {
