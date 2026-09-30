@@ -224,3 +224,18 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .pf-rel-goals .g-due { font-size: 11.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pf-rel-goals .g-due.overdue { color: var(--today); font-weight: 700; }
 .pf-rel-goals .g-due.soon { color: #b56d00; font-weight: 700; }
+
+/* 目標達成に必要なタスク: カードを横に並べ、4 項目で折り返す */
+.goal-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(210px, calc((100% - 30px) / 4)), 1fr)); gap: 10px; } /* 最大 4 列。文字が大きい環境（Windows）では自動で列を減らして折り返す */
+.goal-list li { overflow-wrap: anywhere; min-width: 0; }
+.goal-list li { display: block; border: 1px solid var(--line-strong); border-left: 4px solid var(--accent); border-radius: 8px; padding: 8px 10px; background: var(--panel); margin-top: 0; }
+.goal-list li:last-child { border-bottom: 1px solid var(--line-strong); }
+.goal-list li.done { border-left-color: #30a46c; background: #f7faf8; }
+.goal-list li.soon { border-left-color: #e08a00; }
+.goal-list li.overdue { border-left-color: var(--today); }
+.goal-list .g-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 4px; }
+.goal-list .g-main { display: block; white-space: normal; overflow: visible; }
+.goal-list .g-title { display: block; max-width: none; white-space: normal; overflow: visible; margin-bottom: 4px; }
+.goal-list .fy-tag, .goal-list .g-link { display: inline-block; margin: 0 4px 4px 0; }
+.goal-list .fact { display: flex; max-width: none; margin-top: 2px; align-items: flex-start; }
+.goal-list .fact .fv { overflow: visible; white-space: normal; }

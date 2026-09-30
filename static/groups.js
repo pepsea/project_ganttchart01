@@ -163,8 +163,8 @@ function renderDetail() {
   };
   const stats = el("div", "stats");
   stats.append(
-    stat("目標の達成", `${g.goal_done}<small> / ${g.goal_total}</small>`),
-    stat("期限超過の目標", `${overdue}<small> 件</small>`, overdue ? "warn" : ""),
+    stat("タスクの達成", `${g.goal_done}<small> / ${g.goal_total}</small>`),
+    stat("期限超過のタスク", `${overdue}<small> 件</small>`, overdue ? "warn" : ""),
     stat(`${state.year ? `${state.year}年度に` : ""}達成したこと`, `${state.achievements.length}<small> 件</small>`),
   );
   head.append(stats);
@@ -183,13 +183,13 @@ function renderDetail() {
 // ---- 目標（達成基準・時期）: クリックで編集
 function renderGoals(g) {
   const gs = el("section", "gp-section");
-  const gh = el("h3", "", state.year ? `${state.year}年度の目標` : "目標（すべての年度）");
-  gh.append(el("span", "count-badge", `${g.goal_done} / ${g.goal_total} 達成`), el("span", "hint", "目標をクリックすると編集できます"));
-  const add = el("button", "primary right", "＋ 目標を追加");
+  const gh = el("h3", "", state.year ? `${state.year}年度の目標達成に必要なタスク` : "目標達成に必要なタスク（すべての年度）");
+  gh.append(el("span", "count-badge", `${g.goal_done} / ${g.goal_total} 達成`), el("span", "hint", "大目標を達成するための項目です。クリックすると編集できます"));
+  const add = el("button", "primary right", "＋ タスクを追加");
   add.addEventListener("click", () => openGoalDialog(g, null));
   gh.append(add);
   gs.append(gh);
-  if (!state.goals.length) gs.append(el("p", "hint", `${yearLabel(state.year)}の目標はまだありません。「＋ 目標を追加」から登録してください。`));
+  if (!state.goals.length) gs.append(el("p", "hint", `${yearLabel(state.year)}の項目はまだありません。「＋ タスクを追加」から登録してください。`));
   const ul = el("ul", "goal-list");
   for (const t of state.goals) {
     const li = el("li");
@@ -224,7 +224,9 @@ function renderGoals(g) {
     if (t.note) li.title = `メモ: ${t.note}\n（クリックして編集）`;
     const d = el("span", `g-due ${due}`, t.due_date ? `期限 ${slashDate(t.due_date)}` : "");
     if (due) d.title = due === "overdue" ? `期限超過（${-daysLeft(t.due_date)} 日経過）` : `期限まであと ${daysLeft(t.due_date)} 日`;
-    li.append(st, main, d, el("span", "g-edit", "編集 ›"));
+    const top = el("div", "g-top");
+    top.append(st, d);
+    li.append(top, main);
     const openIt = () => openGoalDialog(g, t);
     li.addEventListener("click", openIt);
     li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openIt(); } });
@@ -484,7 +486,7 @@ function openGoalDialog(g, t) {
   f.note.value = t?.note || "";
   f.url.value = t?.url || "";
   yearOptions(f.fiscal_year, t?.fiscal_year || state.year || state.currentYear);
-  $("#goal-title").textContent = t ? "目標の編集" : "目標の追加";
+  $("#goal-title").textContent = t ? "タスクの編集" : "タスクの追加";
   $("#goal-meta").textContent = t ? `${g.name}　／　最終更新 ${t.updated_at.slice(0, 16)}` : g.name;
   $("#goal-submit").textContent = t ? "保存" : "追加";
   $("#goal-delete").hidden = !t;
@@ -508,7 +510,7 @@ $("#form-goal").addEventListener("submit", async (e) => {
       { method: goal ? "PUT" : "POST", body: JSON.stringify(body) });
     $("#dlg-goal").close();
     await reload(group.id);
-    toast(goal ? "目標を保存しました" : "目標を追加しました");
+    toast(goal ? "保存しました" : "追加しました");
   } catch (err) {
     $("#goal-error").textContent = err.message;
   }
@@ -516,7 +518,7 @@ $("#form-goal").addEventListener("submit", async (e) => {
 $("#goal-delete").addEventListener("click", () => {
   const { group, goal } = goalEditing;
   $("#dlg-goal").close();
-  openDelete("目標", `目標: ${goal.title}`, `/api/groups/${group.id}/goals/${goal.id}`, () => reload(group.id));
+  openDelete("タスク", `項目: ${goal.title}`, `/api/groups/${group.id}/goals/${goal.id}`, () => reload(group.id));
 });
 
 // ------------------------------------------------------------ 削除（パスワード必須）

@@ -602,3 +602,13 @@ table.pf-table td.order { width: 40px; text-align: center; }
 .goal-list .g-note { white-space: normal; overflow-wrap: anywhere; }
 .pf-backbar .spacer { flex: 1; }
 .pf-backbar #btn-copy-link { font-weight: 400; }
+
+/* 目標達成に必要なタスク: カードを横に並べ、4 項目で折り返す */
+.goal-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(210px, calc((100% - 30px) / 4)), 1fr)); gap: 10px; } /* 最大 4 列。文字が大きい環境（Windows）では自動で列を減らして折り返す */
+.goal-list li { overflow-wrap: anywhere; min-width: 0; }
+.goal-list li { display: block; border: 1px solid var(--line-strong); border-left: 4px solid var(--accent); border-radius: 8px; padding: 8px 10px; background: var(--panel); }
+.goal-list li.done { border-left-color: #30a46c; background: #f7faf8; }
+.goal-list li.soon { border-left-color: #f5a524; }
+.goal-list li.overdue { border-left-color: #e5484d; }
+.goal-list li:last-child { border-bottom: 1px solid var(--line-strong); }
+.goal-list .g-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 4px; }

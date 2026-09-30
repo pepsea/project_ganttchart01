@@ -380,7 +380,7 @@ function renderDetail() {
     btns.append(done, save);
     modeBar.append(btns);
   } else {
-    modeBar.append(el("span", "hint", `基本情報・全体目標の修正は「編集する」から${p.updated_at ? `（最終更新 ${p.updated_at.slice(0, 16)}）` : ""}。目標・ディスカッション・月報はいつでも編集できます`));
+    modeBar.append(el("span", "hint", `基本情報・全体目標の修正は「編集する」から${p.updated_at ? `（最終更新 ${p.updated_at.slice(0, 16)}）` : ""}。目標達成に必要なタスク・ディスカッション・月報はいつでも編集できます`));
     const edit = el("button", "", "✎ 編集する");
     edit.title = "基盤名・領域・PL・メンバー・全体目標を修正します";
     edit.addEventListener("click", () => setEditing(true));
@@ -445,8 +445,8 @@ function renderDetail() {
   };
   const summary = el("div", "pf-summary");
   summary.append(
-    stat("目標の達成", `${p.goal_done}<small> / ${p.goal_total}</small>`),
-    stat("期限超過の目標", `${overdue}<small> 件</small>`, overdue ? "warn" : ""),
+    stat("タスクの達成", `${p.goal_done}<small> / ${p.goal_total}</small>`),
+    stat("期限超過のタスク", `${overdue}<small> 件</small>`, overdue ? "warn" : ""),
     stat("次の期限", p.next_due ? `${p.next_due.slice(5).replace("-", "/")}<small> （あと ${daysLeft(p.next_due)} 日）</small>` : "—"),
   );
   head.append(summary);
@@ -538,7 +538,7 @@ function renderDetail() {
     });
   }
 
-  // 並び: 目標 → ガントチャートのタスク → ディスカッション・月報（タブ）
+  // 並び: 目標達成に必要なタスク → ガントチャートのタスク → ディスカッション・月報（タブ）
   root.append(renderGoals(p));
   root.append(renderTasks(p, tasks));
 
@@ -646,18 +646,18 @@ async function refreshAfterChange(kind) {
 // ---- 目標: 一覧で読みやすく表示し、目標をクリックすると編集画面を開く
 function renderGoals(p) {
   const sec = el("section", "pf-section pf-goals");
-  const h = el("h3", "", "目標");
+  const h = el("h3", "", "目標達成に必要なタスク");
   const done = state.goals.filter((g) => g.status === "達成").length;
   h.append(el("span", "count-badge", `${done} / ${state.goals.length} 達成`));
-  h.append(el("span", "hint", "目標をクリックすると編集できます"));
-  const add = el("button", "primary right", "＋ 目標を追加");
+  h.append(el("span", "hint", "全体目標を達成するための項目です。クリックすると編集できます"));
+  const add = el("button", "primary right", "＋ タスクを追加");
   add.type = "button";
   add.addEventListener("click", () => openGoalDialog(p, null));
   h.append(add);
   sec.append(h);
 
   if (!state.goals.length) {
-    sec.append(el("p", "hint", "まだ目標がありません。「＋ 目標を追加」から登録してください。"));
+    sec.append(el("p", "hint", "まだ項目がありません。「＋ タスクを追加」から登録してください。"));
     return sec;
   }
   const ul = el("ul", "goal-list");
@@ -683,7 +683,9 @@ function renderGoals(p) {
     }
     const d = el("span", `g-due ${due}`, g.due_date ? slashDate(g.due_date) : "期限なし");
     if (due) d.title = due === "overdue" ? `期限超過（${-daysLeft(g.due_date)} 日経過）` : `期限まであと ${daysLeft(g.due_date)} 日`;
-    li.append(st, main, d, el("span", "g-edit", "編集 ›"));
+    const top = el("div", "g-top");
+    top.append(st, d);
+    li.append(top, main);
     const open = () => openGoalDialog(p, g);
     li.addEventListener("click", open);
     li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
@@ -706,7 +708,7 @@ function openGoalDialog(p, g) {
   f.due_date.value = g?.due_date || "";
   f.note.value = g?.note || "";
   f.url.value = g?.url || "";
-  $("#goal-title").textContent = g ? "目標の編集" : "目標の追加";
+  $("#goal-title").textContent = g ? "タスクの編集" : "タスクの追加";
   $("#goal-meta").textContent = g ? `${p.name} ${p.title}　／　最終更新 ${g.updated_at.slice(0, 16)}` : `${p.name} ${p.title}`;
   $("#goal-submit").textContent = g ? "保存" : "追加";
   $("#goal-delete").hidden = !g;
@@ -721,13 +723,13 @@ $("#form-goal").addEventListener("submit", async (e) => {
   const { platform, goal } = goalEditing;
   const body = { title: f.title.value.trim(), status: f.status.value, due_date: f.due_date.value || null, note: f.note.value, url: f.url.value.trim() };
   if (body.url && !safeUrl(body.url)) { $("#goal-error").textContent = "リンクは http:// または https:// で始まる URL を入力してください"; return; }
-  if (!body.title) { $("#goal-error").textContent = "目標を入力してください"; return; }
+  if (!body.title) { $("#goal-error").textContent = "項目を入力してください"; return; }
   const url = `/api/platforms/${enc(platform)}/goals`;
   try {
     await api(goal ? `${url}/${goal.id}` : url, { method: goal ? "PUT" : "POST", body: JSON.stringify(body) });
     $("#dlg-goal").close();
     await refreshAfterChange("goals");
-    toast(goal ? "目標を保存しました" : "目標を追加しました");
+    toast(goal ? "保存しました" : "追加しました");
   } catch (err) {
     $("#goal-error").textContent = err.message;
   }
@@ -736,7 +738,7 @@ $("#goal-delete").addEventListener("click", () => {
   const { platform, goal } = goalEditing;
   if (!goal) return;
   $("#dlg-goal").close();
-  confirmPasswordDelete(`/api/platforms/${enc(platform)}/goals/${goal.id}`, "目標", `目標: ${goal.title}`, "goals");
+  confirmPasswordDelete(`/api/platforms/${enc(platform)}/goals/${goal.id}`, "タスク", `項目: ${goal.title}`, "goals");
 });
 
 // 目標・月報の削除: パスワードを入力して確認（サーバー側でも検証）

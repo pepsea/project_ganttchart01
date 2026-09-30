@@ -55,13 +55,13 @@
   <!-- 目標の追加・編集（目標をクリックで開く） -->
   <dialog id="dlg-goal">
     <form id="form-goal" method="dialog">
-      <h2 id="goal-title">目標の編集</h2>
+      <h2 id="goal-title">タスクの編集</h2>
       <p id="goal-meta" class="hint"></p>
       <div class="goal-form-grid">
         <label><span>状態</span><select name="status"></select></label>
         <label><span>期限</span><input type="date" name="due_date"></label>
       </div>
-      <label><span>目標 <span class="req">*</span></span><input name="title" required placeholder="例: プロテオーム解析の自動化"></label>
+      <label><span>項目 <span class="req">*</span></span><input name="title" required placeholder="例: プロテオーム解析の自動化"></label>
       <label><span>メモ</span><textarea name="note" rows="4" placeholder="補足、達成条件、関連情報など"></textarea></label>
       <label><span>リンク</span><input name="url" type="url" placeholder="https://（資料・報告書など）"></label>
       <p class="error" id="goal-error"></p>
@@ -77,7 +77,7 @@
   <!-- 目標・月報の削除（パスワードで確認） -->
   <dialog id="dlg-goal-delete">
     <form id="form-goal-delete" method="dialog">
-      <h2 class="danger" id="goal-delete-title">目標の削除</h2>
+      <h2 class="danger" id="goal-delete-title">タスクの削除</h2>
       <p><span id="goal-delete-lead">次の目標を削除します。</span><strong>この操作は元に戻せません。</strong></p>
       <p id="goal-delete-name" class="summary"></p>
       <label><span>確認のため、パスワードを入力してください</span>
