@@ -23,13 +23,13 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const scroller = $("#scroller");
 const gantt = $("#gantt");
 // 左側の列幅。領域・PJ名・タスク・担当者・終了日は見出しの右端をドラッグして変更でき、ブラウザに記憶する
-const COL_W_DEFAULT = { area: 190, pj: 240, task: 200, assignee: 80, end: 96 };
+const COL_W_DEFAULT = { area: 6, pj: 240, task: 200, assignee: 80, end: 96 };
 const COL_W_MIN_OF = { area: 60, pj: 80, task: 80, assignee: 44, end: 56 };
 const COL_W_MAX = 640;
 const colW = (() => {
   try {
     const saved = JSON.parse(localStorage.getItem("gantt.colW") || "{}");
-    return { ...COL_W_DEFAULT, ...saved };
+    return { ...COL_W_DEFAULT, ...saved, area: COL_W_DEFAULT.area }; // 領域は色の帯だけ（幅は固定）
   } catch (_) {
     return { ...COL_W_DEFAULT };
   }
@@ -331,12 +331,12 @@ function renderHeader(trackW) {
   const W = state.dayW;
   const row = el("div", "g-row g-head");
   const left = el("div", "g-left");
-  const heads = [["領域"], ["PJ名"], ["タスク"], ["担当者", 1], ["優先度", 1], ["開始", 1], ["終了日", 1], [""]];
+  const heads = [[""], ["PJ名"], ["タスク"], ["担当者", 1], ["優先度", 1], ["開始", 1], ["終了日", 1], [""]];
   heads.forEach(([h, detail], i) => {
     const cell = el("div", detail ? "col-detail" : "", h);
-    const key = ["area", "pj", "task", "assignee", null, null, "end"][i] || null;
+    const key = [null, "pj", "task", "assignee", null, null, "end"][i] || null;
     // 見出しをクリックで並び替え（▲昇順 ▼降順。3 回目で初期の並びに戻る）
-    const sortKey = ["area", "pj", "task", "assignee", "priority", "start", "end"][i] || null;
+    const sortKey = [null, "pj", "task", "assignee", "priority", "start", "end"][i] || null;
     if (sortKey) {
       cell.classList.add("sortable");
       cell.title = "クリックで並び替え（もう一度で逆順、3 回目で元の並び＝終了日順）";
@@ -539,7 +539,7 @@ function syncReadonlyCells(row, task, areaCell, projCell, assigneeCell) {
   assigneeCell.classList.toggle("empty", !task.assignee);
   assigneeCell.title = `担当者: ${assigneeText(task) || "未設定"}（修正はクリックしてタスク詳細で）`;
   areaCell.textContent = task.area;
-  areaCell.title = `領域: ${task.area}（修正はクリックしてタスク詳細で）`;
+  areaCell.parentElement.title = `領域: ${task.area}`;
   projCell.textContent = pjText(task.project) || "—";
   projCell.classList.toggle("empty", !task.project);
   projCell.title = `PJ名: ${pjText(task.project) || "なし"}（修正はクリックしてタスク詳細で）`;

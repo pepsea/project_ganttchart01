@@ -134,7 +134,7 @@ button.primary:hover { filter: brightness(1.08); }
 .area-chip { display: flex; align-items: center; height: 100%; border-right: 1px solid var(--line); }
 .area-chip::before {
   content: "";
-  flex: 0 0 4px;
+  flex: 0 0 6px;
   align-self: stretch;
   background: var(--area-color, #999);
 }
@@ -553,3 +553,4 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 .sp-person { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 6px; margin-bottom: 6px; overflow: hidden; }
 .sp-head { padding: 7px 8px; border-radius: 0; }
 .sp-head.on { box-shadow: inset 3px 0 0 var(--accent); }
+.area-chip .ro-cell { display: none; } /* 領域の文字は出さず、色の帯だけ残す */
