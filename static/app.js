@@ -871,7 +871,9 @@ function openTaskDialog(task = null) {
     $("#task-title").textContent = "タスク追加";
     $("#task-submit").textContent = "追加";
     meta.hidden = true;
+    // 領域: 絞り込み中ならその領域、案件管理から来たときはその案件の領域
     if (state.filter.areas) form.area.value = state.filter.areas;
+    else if (state.defaultArea && state.masters.areas.includes(state.defaultArea)) form.area.value = state.defaultArea;
     if (state.filter.projects) form.project.value = state.filter.projects;
     if (state.filter.assignees && state.filter.assignees !== NO_ASSIGNEE) form.assignee.value = state.filter.assignees;
     const t = todayMs();
@@ -1262,6 +1264,7 @@ $("#btn-cal").addEventListener("click", () => setCalendar(!cal.on));
     state.filter.projects = params.get("pj") || "";
     if (params.get("back") && params.get("pj")) backCase = { pj: params.get("pj"), id: params.get("back") };
     state.q = params.get("q") || "";
+    state.defaultArea = params.get("area") || ""; // 案件管理から来たとき: 「タスク追加」の領域の初期値
     if (params.get("from") === "people" && params.get("person")) {
       // 個人の画面から来たとき: 同じ画面のまま個人に戻れる
       const b = $("#person-back");
