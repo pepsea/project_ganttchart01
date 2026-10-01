@@ -291,29 +291,30 @@ function renderSide() {
     if (left < 0) kinds.push("over");
     else if (left <= SOON_DAYS) kinds.push("soon");
     if (isActive(t)) kinds.push("act");
+    if (!kinds.length && parseDate(t.start_date) > today) kinds.push("wait"); // 予定あり・実施前（開始日がまだ先）
     if (!kinds.length) continue;
     for (const p of assigneesOf(t).length ? assigneesOf(t) : [NO_PERSON]) {
-      if (!people.has(p)) people.set(p, { over: 0, soon: 0, act: 0, tasks: [] });
+      if (!people.has(p)) people.set(p, { over: 0, soon: 0, act: 0, wait: 0, tasks: [] });
       const e = people.get(p);
       for (const k of kinds) e[k]++;
-      e.tasks.push({ t, left, kind: kinds.includes("over") ? "overdue" : kinds.includes("soon") ? "soon" : "act" });
+      e.tasks.push({ t, left, kind: kinds.includes("over") ? "overdue" : kinds.includes("soon") ? "soon" : kinds.includes("act") ? "act" : "wait" });
     }
   }
   const list = $("#side-list");
   list.innerHTML = "";
   if (!people.size) return list.append(el("p", "hint", "該当するタスクはありません。"));
-  const sorted = [...people].sort((a, b) => b[1].over - a[1].over || b[1].soon - a[1].soon || b[1].act - a[1].act || nameCollator.compare(a[0], b[0]));
+  const sorted = [...people].sort((a, b) => b[1].over - a[1].over || b[1].soon - a[1].soon || b[1].act - a[1].act || b[1].wait - a[1].wait || nameCollator.compare(a[0], b[0]));
   for (const [name, e] of sorted) {
     const box = el("div", "sp-person");
     const head = el("button", "sp-head");
     head.type = "button";
     head.append(el("span", "sp-name", name));
-    for (const [k, cls] of [["act", "c-act"], ["soon", "c-soon"], ["over", "c-over"]])
+    for (const [k, cls] of [["wait", "c-wait"], ["act", "c-act"], ["soon", "c-soon"], ["over", "c-over"]])
       head.append(el("span", `sp-n ${e[k] ? cls : "zero"}`, String(e[k])));
     const key = name === NO_PERSON ? NO_ASSIGNEE : name;
     const on = state.filter.assignees === key;
     head.classList.toggle("on", on);
-    head.title = `${name}: 実施中 ${e.act}・3日以内 ${e.soon}・超過 ${e.over}（クリックでガントチャートを${on ? "全員表示に戻す" : "この人に絞る"}）`;
+    head.title = `${name}: 予定（実施前） ${e.wait}・実施中 ${e.act}・3日以内 ${e.soon}・超過 ${e.over}（クリックでガントチャートを${on ? "全員表示に戻す" : "この人に絞る"}）`;
     head.addEventListener("click", () => setAssigneeFilter(on ? "" : key));
     box.append(head);
     list.append(box);

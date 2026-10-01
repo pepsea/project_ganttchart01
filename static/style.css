@@ -591,3 +591,4 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 @media (max-width: 1000px) { .cal-months { width: 100%; } }
 .cal-head .spacer { flex: 1; }
 .cal-copy { white-space: nowrap; }
+.c-wait { background: #eceff3; color: #4b5563; }
