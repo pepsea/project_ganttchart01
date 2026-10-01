@@ -686,7 +686,7 @@ function fillCustomerSelect(current = "") {
 
 // リンク: 有効な URL が入力されたら「開く」をアクティブにする
 function syncLinks() {
-  document.querySelectorAll("#links-section .open-link").forEach((a) => {
+  document.querySelectorAll("#links-section .open-link[data-for]").forEach((a) => {
     const url = safeUrl(form[a.dataset.for].value.trim());
     form[a.dataset.for].classList.toggle("missing", !url && !("free" in a.dataset)); // リンクが無い欄は赤背景（自由リンクは除く）
     if (url) {
