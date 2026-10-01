@@ -115,6 +115,8 @@
 | | services | 関連サービス（サービス番号の JSON 配列。`services.service_no`） |
 | | sort_order / created_at / updated_at | 表示順 / 作成・更新日時 |
 
+| `service_links` | id, kind, ref_id, label, url, sort_order, created_at | 追加リンク（名前つき。何個でも）。kind = `service`（ref_id = `services.id`。サービス紹介資料の追加リンク）/ `package`（ref_id = `service_packages.id`。パッケージ資料の追加リンク）。サービス・パッケージの削除時に一緒に削除 |
+
 サービスのタスクは、ガントチャートの `tasks`（`project` = 関連する基盤番号）を表示する。
 サービス番号を変更・削除すると、`service_packages.services` も書き換わる。
 

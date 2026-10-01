@@ -54,6 +54,16 @@ def init_db() -> None:
                           key   TEXT PRIMARY KEY,
                           value TEXT NOT NULL DEFAULT ''
                       )""")
+        # 追加リンク（サービス紹介資料・パッケージ資料に、名前つきで何個でも）。kind = 'service' / 'package'、ref_id = services.id / service_packages.id
+        db.execute("""CREATE TABLE IF NOT EXISTS service_links (
+                          id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                          kind       TEXT NOT NULL,
+                          ref_id     INTEGER NOT NULL,
+                          label      TEXT NOT NULL DEFAULT '',  -- リンクの名前
+                          url        TEXT NOT NULL,
+                          sort_order INTEGER NOT NULL DEFAULT 0,
+                          created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+                      )""")
         db.execute(
             """CREATE TABLE IF NOT EXISTS service_packages (
                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,7 +92,46 @@ def _list(v: list[str]) -> list[str]:
     return list(dict.fromkeys(x.strip() for x in v if x and x.strip()))
 
 
+class ExtraLink(BaseModel):
+    label: str = ""
+    url: str = ""
+
+    @field_validator("label", mode="before")
+    @classmethod
+    def strip_label(cls, v):
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("url", mode="before")
+    @classmethod
+    def check_url(cls, v):
+        return _url(v)
+
+
+def attach_links(db: sqlite3.Connection, kind: str, items: list[dict]) -> list[dict]:
+    """各項目に追加リンク（extra_links: [{label, url}]。並び順）を付ける"""
+    by_ref: dict[int, list[dict]] = {}
+    for r in db.execute("SELECT ref_id, label, url FROM service_links WHERE kind = ? ORDER BY ref_id, sort_order, id", (kind,)):
+        by_ref.setdefault(r["ref_id"], []).append({"label": r["label"], "url": r["url"]})
+    for it in items:
+        it["extra_links"] = by_ref.get(it["id"], [])
+    return items
+
+
+def save_links(db: sqlite3.Connection, kind: str, ref_id: int, links: list[ExtraLink] | None) -> None:
+    """追加リンクを入力どおりに置き換える（None なら変更しない。URL が空の行は除く）"""
+    if links is None:
+        return
+    db.execute("DELETE FROM service_links WHERE kind = ? AND ref_id = ?", (kind, ref_id))
+    n = 0
+    for lk in links:
+        if lk.url:
+            n += 1
+            db.execute("INSERT INTO service_links(kind, ref_id, label, url, sort_order) VALUES (?,?,?,?,?)",
+                       (kind, ref_id, lk.label, lk.url, n))
+
+
 class ServiceIn(BaseModel):
+    extra_links: list[ExtraLink] | None = None  # サービス紹介資料の追加リンク（何個でも）。None なら変更しない
     service_no: str = Field(min_length=1)
     name: str = Field(min_length=1)
     pl: str = ""
@@ -138,7 +187,7 @@ def fetch(db: sqlite3.Connection, sid: int) -> dict:
     row = db.execute("SELECT * FROM services WHERE id = ?", (sid,)).fetchone()
     if row is None:
         raise HTTPException(404, "サービスが見つかりません")
-    return to_service(row)
+    return attach_links(db, "service", [to_service(row)])[0]
 
 
 def check_platforms(db: sqlite3.Connection, s: ServiceIn) -> None:
@@ -159,7 +208,7 @@ def write(db: sqlite3.Connection, sql: str, params: tuple, no: str):
 @router.get("")
 def list_services() -> list[dict]:
     with get_db() as db:
-        return [to_service(r) for r in db.execute("SELECT * FROM services ORDER BY service_no, id")]
+        return attach_links(db, "service", [to_service(r) for r in db.execute("SELECT * FROM services ORDER BY service_no, id")])
 
 
 # ---------------------------------------------------------------- 親リンク（サービス画面の一番上）
@@ -194,6 +243,7 @@ def set_parent_link(p: ParentLinkIn) -> dict:
 # ---------------------------------------------------------------- 主要サービスパッケージ
 
 class PackageIn(BaseModel):
+    extra_links: list[ExtraLink] | None = None  # パッケージ資料の追加リンク（何個でも）。None なら変更しない
     name: str = Field(min_length=1)
     intro_ja_url: str = ""
     intro_en_url: str = ""
@@ -241,7 +291,7 @@ def _fetch_package(db: sqlite3.Connection, pid: int) -> dict:
     row = db.execute("SELECT * FROM service_packages WHERE id = ?", (pid,)).fetchone()
     if row is None:
         raise HTTPException(404, "パッケージが見つかりません")
-    return to_package(row)
+    return attach_links(db, "package", [to_package(row)])[0]
 
 
 PKG_COLS = ("name", "intro_ja_url", "intro_en_url", "box_url", "services")
@@ -254,7 +304,7 @@ def _pkg_values(p: PackageIn) -> tuple:
 @router.get("/packages")
 def list_packages() -> list[dict]:
     with get_db() as db:
-        return [to_package(r) for r in db.execute("SELECT * FROM service_packages ORDER BY sort_order, id")]
+        return attach_links(db, "package", [to_package(r) for r in db.execute("SELECT * FROM service_packages ORDER BY sort_order, id")])
 
 
 @router.post("/packages", status_code=201)
@@ -264,6 +314,7 @@ def create_package(p: PackageIn) -> dict:
         order = db.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM service_packages").fetchone()[0]
         cur = db.execute(f"INSERT INTO service_packages({', '.join(PKG_COLS)}, sort_order) VALUES (?,?,?,?,?,?)",
                          (*_pkg_values(p), order))
+        save_links(db, "package", cur.lastrowid, p.extra_links)
         return _fetch_package(db, cur.lastrowid)
 
 
@@ -274,6 +325,7 @@ def update_package(pid: int, p: PackageIn) -> dict:
         _check_services(db, p)
         db.execute(f"UPDATE service_packages SET {', '.join(c + '=?' for c in PKG_COLS)},"
                    " updated_at=datetime('now','localtime') WHERE id=?", (*_pkg_values(p), pid))
+        save_links(db, "package", pid, p.extra_links)
         return _fetch_package(db, pid)
 
 
@@ -286,6 +338,7 @@ async def delete_package(pid: int, body: PasswordIn) -> Response:
     with get_db() as db:
         _fetch_package(db, pid)
         db.execute("DELETE FROM service_packages WHERE id = ?", (pid,))
+        db.execute("DELETE FROM service_links WHERE kind = 'package' AND ref_id = ?", (pid,))
     return Response(status_code=204)
 
 
@@ -387,6 +440,7 @@ def create_service(s: ServiceIn) -> dict:
             ensure_master(db, "areas", a)
         cur = write(db, f"INSERT INTO services({', '.join(COLS)}) VALUES ({', '.join('?' * len(COLS))})",
                     s.values(), s.service_no)
+        save_links(db, "service", cur.lastrowid, s.extra_links)
         return fetch(db, cur.lastrowid)
 
 
@@ -399,6 +453,7 @@ def update_service(sid: int, s: ServiceIn) -> dict:
             ensure_master(db, "areas", a)
         write(db, f"UPDATE services SET {', '.join(c + '=?' for c in COLS)}, updated_at=datetime('now','localtime')"
                   " WHERE id=?", (*s.values(), sid), s.service_no)
+        save_links(db, "service", sid, s.extra_links)
         if old_no != s.service_no:  # パッケージの関連サービスも新しい番号に
             _replace_in_packages(db, old_no, s.service_no)
             groups.replace_service_no(db, old_no, s.service_no)  # グループ目標の関連サービスも
@@ -414,6 +469,7 @@ async def delete_service(sid: int, body: PasswordIn) -> Response:
     with get_db() as db:
         no = fetch(db, sid)["service_no"]
         db.execute("DELETE FROM services WHERE id = ?", (sid,))
+        db.execute("DELETE FROM service_links WHERE kind = 'service' AND ref_id = ?", (sid,))
         _replace_in_packages(db, no, None)  # パッケージの関連サービスからも外す
         groups.replace_service_no(db, no, None)  # グループ目標の関連サービスからも外す
     return Response(status_code=204)

@@ -277,3 +277,12 @@ body { overflow: hidden; }
 .area-chip.on { background: var(--text); border-color: var(--text); color: #fff; font-weight: 700; }
 .area-chip[style].on { background: var(--c); border-color: var(--c); color: #fff; }
 .area-chip.on .n { color: rgba(255, 255, 255, .85); }
+
+/* 追加リンク（小さめのボタンで 1 つずつ追加） */
+.extra-links { display: grid; gap: 4px; margin: 4px 0 8px; }
+.extra-rows { display: grid; gap: 4px; }
+.extra-row { display: grid; grid-template-columns: 34% minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.extra-row input { width: 100%; }
+.extra-del { border: 0; background: none; color: var(--muted); padding: 2px 8px; }
+.extra-del:hover { color: var(--today); }
+.mini-add { justify-self: start; padding: 1px 8px; font-size: 11px; line-height: 18px; }

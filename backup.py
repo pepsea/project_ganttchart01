@@ -51,6 +51,7 @@ TABLE_LABELS = {
     "platform_monthly": "基盤の月報",
     "services": "サービス",
     "service_packages": "主要サービスパッケージ",
+    "service_links": "サービス・パッケージの追加リンク",
     "app_settings": "画面の設定（親リンクなど）",
     "documents": "共有資料",
     "ref_links": "参考リンク",

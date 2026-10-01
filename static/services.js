@@ -129,6 +129,36 @@ function render() {
 const expanded = new Set(); // 詳細を開いているサービス番号
 
 // 1 行目の小さなリンク（BOX / 日 / 英）
+// 追加リンクの入力欄（名前 + URL。1 つずつ追加・✕ で削除）
+function extraEditor(sel) {
+  const box = $(sel);
+  const rows = $(".extra-rows", box);
+  const add = (label = "", url = "") => {
+    const row = el("div", "extra-row");
+    const n = el("input");
+    n.placeholder = "名前（例: 英語版）";
+    n.value = label;
+    const u = el("input");
+    u.type = "url";
+    u.placeholder = "https://";
+    u.value = url;
+    const d = el("button", "extra-del", "✕");
+    d.type = "button";
+    d.title = "このリンクを削除（保存で確定）";
+    d.addEventListener("click", () => row.remove());
+    row.append(n, u, d);
+    row._get = () => ({ label: n.value.trim(), url: u.value.trim() });
+    rows.append(row);
+    return n;
+  };
+  $(".mini-add", box).addEventListener("click", () => add().focus());
+  return {
+    set(links) { rows.innerHTML = ""; for (const l of links || []) add(l.label, l.url); },
+    get() { return [...rows.children].map((r) => r._get()).filter((l) => l.url); },
+    bad() { return [...rows.children].map((r) => r._get()).find((l) => l.url && !safeUrl(l.url)); },
+  };
+}
+
 function miniLink(label, url, title) {
   const u = safeUrl(url);
   if (!u) {
@@ -196,6 +226,7 @@ function renderRow(s) {
     const links = el("span", "mini-links");
     links.append(miniLink("BOX", s.box_url, "BOX"), miniLink("サービス資料（日）", s.intro_ja_url, "サービス資料（日本語）"),
       miniLink("サービス資料（英）", s.intro_en_url, "サービス資料（英語）"));
+    for (const lk of s.extra_links || []) links.append(miniLink(lk.label || "リンク", lk.url, lk.label || "追加リンク"));
     d.append(block("リンク", links));
     let pfBox = null;
     if (s.platforms.length) {
@@ -289,9 +320,13 @@ function chips(boxSel, items, selected, name, labelOf, colorOf) {
   if (!items.length) box.append(el("span", "hint", name === "platforms" ? "基盤番号が未登録です（管理サイトで登録）" : "未登録"));
 }
 
+const svcExtra = extraEditor("#svc-extra");
+const pkgExtra = extraEditor("#pkg-extra");
+
 function openDialog(s = null) {
   state.editing = s;
   form.reset();
+  svcExtra.set(s?.extra_links);
   for (const k of ["service_no", "name", "pl", "members", "box_url", "intro_ja_url", "intro_en_url", "goal", "issues"]) {
     form[k].value = s?.[k] || "";
   }
@@ -319,6 +354,8 @@ form.addEventListener("submit", async (e) => {
   for (const k of ["service_no", "name", "pl", "members", "box_url", "intro_ja_url", "intro_en_url", "goal", "issues"]) {
     body[k] = form[k].value.trim();
   }
+  body.extra_links = svcExtra.get();
+  if (svcExtra.bad()) { $("#svc-error").textContent = "リンクは http:// または https:// で始まる URL を入力してください"; return; }
   body.areas = [...form.querySelectorAll('input[name="areas"]:checked')].map((i) => i.value);
   body.platforms = [...form.querySelectorAll('input[name="platforms"]:checked')].map((i) => i.value);
   for (const k of ["box_url", "intro_ja_url", "intro_en_url"]) {
@@ -400,6 +437,7 @@ function renderPackages() {
     const links = el("div", "mini-links");
     links.append(miniLink("パッケージ資料（日）", pkg.intro_ja_url, "パッケージ資料（日本語）"),
       miniLink("パッケージ資料（英）", pkg.intro_en_url, "パッケージ資料（英語）"), miniLink("BOX", pkg.box_url, "BOX"));
+    for (const lk of pkg.extra_links || []) links.append(miniLink(lk.label || "リンク", lk.url, lk.label || "追加リンク"));
     card.append(links);
     // 関連サービスは登録したときだけ表示（未登録なら行ごと出さない）
     const svcs = el("div", "pkg-svcs");
@@ -460,6 +498,7 @@ function openPackageDialog(pkg = null) {
   const f = $("#form-pkg");
   f.reset();
   for (const k of ["name", "intro_ja_url", "intro_en_url", "box_url"]) f[k].value = pkg?.[k] || "";
+  pkgExtra.set(pkg?.extra_links);
   const nos = [...state.services.map((x) => x.service_no), ...(pkg?.services || []).filter((n) => !state.services.some((x) => x.service_no === n))];
   chips("#pkg-services", nos, pkg?.services || [], "services", (lab, v) => {
     lab.append(v);
@@ -480,6 +519,8 @@ $("#form-pkg").addEventListener("submit", async (e) => {
   const f = e.target;
   const body = {};
   for (const k of ["name", "intro_ja_url", "intro_en_url", "box_url"]) body[k] = f[k].value.trim();
+  body.extra_links = pkgExtra.get();
+  if (pkgExtra.bad()) { $("#pkg-error").textContent = "リンクは http:// または https:// で始まる URL を入力してください"; return; }
   body.services = [...f.querySelectorAll('input[name="services"]:checked')].map((i) => i.value);
   for (const k of ["intro_ja_url", "intro_en_url", "box_url"]) {
     if (body[k] && !safeUrl(body[k])) { $("#pkg-error").textContent = "リンクは http:// または https:// で始まる URL を入力してください"; return; }
