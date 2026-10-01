@@ -794,7 +794,7 @@ function startDrag(e, bar, task) {
 function scrollToDate(ms, center = false) {
   const x = ((ms - state.rangeStart) / DAY_MS) * state.dayW;
   const visible = scroller.clientWidth - leftW();
-  scroller.scrollLeft = Math.max(0, center ? x - visible / 2 : x - state.dayW * 7);
+  scroller.scrollLeft = Math.max(0, center ? x - visible / 2 : x - state.dayW * 5); // 初期表示は日付の 5 日前が左端
 }
 
 // ------------------------------------------------------------ データ読み込み
