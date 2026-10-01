@@ -684,3 +684,22 @@ a.back-group:hover { filter: brightness(1.1); color: #fff; }
 .pf-goal-rows li.dragging { opacity: .45; }
 .pf-goal-rows li.drop-before { box-shadow: inset 0 3px 0 var(--accent); }
 .pf-goal-rows li.drop-after { box-shadow: inset 0 -3px 0 var(--accent); }
+
+/* Markdown の表示 */
+.vision-text.md { white-space: normal; }
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { margin: 12px 0 6px; line-height: 1.4; }
+.md h1 { font-size: 20px; } .md h2 { font-size: 17px; } .md h3 { font-size: 15px; } .md h4, .md h5, .md h6 { font-size: 14px; }
+.md p { margin: 6px 0; }
+.md ul, .md ol { margin: 6px 0; padding-left: 1.6em; }
+.md blockquote { margin: 8px 0; padding: 2px 12px; border-left: 4px solid var(--line-strong); color: var(--muted); }
+.md code { background: #eef0f4; border-radius: 4px; padding: 0 5px; font-size: .92em; }
+.md pre { background: #f3f4f7; border-radius: 6px; padding: 8px 10px; overflow: auto; }
+.md pre code { background: none; padding: 0; }
+.md table { border-collapse: collapse; margin: 8px 0; }
+.md th, .md td { border: 1px solid var(--line-strong); padding: 4px 10px; }
+.md th { background: #f3f4f7; }
+.md hr { border: 0; border-top: 1px solid var(--line-strong); margin: 12px 0; }
+.md a { color: var(--accent); }
+

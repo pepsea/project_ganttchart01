@@ -527,16 +527,19 @@ function renderDetail() {
   // 全体目標
   const visionSec = el("section", "pf-section");
   const vh = el("h3", "", "全体目標");
-  vh.append(el("span", "hint", "この基盤で最終的に実現したいこと・目指す姿"));
+  vh.append(el("span", "hint", "この基盤で最終的に実現したいこと・目指す姿（Markdown で書けます）"));
   visionSec.append(vh);
   if (state.editing) {
     const vision = el("textarea", "vision");
     vision.name = "vision";
     vision.value = p.vision;
-    vision.placeholder = "例: 受託解析の共通パイプラインを整備し、納期を 30% 短縮する";
+    vision.placeholder = "例: 受託解析の共通パイプラインを整備し、納期を 30% 短縮する（Markdown で書けます。例: **強調**、- 箇条書き、# 見出し）";
     visionSec.append(vision);
   } else {
-    visionSec.append(el("div", `vision-text${p.vision ? "" : " hint"}`, p.vision || "未記入"));
+    const vbody = el("div", `vision-text${p.vision ? " md" : " hint"}`);
+    if (p.vision) vbody.innerHTML = window.mdToHtml(p.vision); // Markdown で書いた全体目標を表示用に変換（HTML はエスケープ済み）
+    else vbody.textContent = "未記入";
+    visionSec.append(vbody);
   }
   root.append(visionSec);
 
