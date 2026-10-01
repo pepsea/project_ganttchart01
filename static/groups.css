@@ -301,3 +301,11 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .md th { background: #f3f4f7; }
 .md hr { border: 0; border-top: 1px solid var(--line-strong); margin: 12px 0; }
 .md a { color: var(--accent); }
+
+/* 項目の並び替え（つまみ ⠿） */
+.goal-list li { grid-template-columns: auto auto minmax(0, 1fr) auto auto; }
+.goal-list .drag-handle { cursor: grab; color: #8a90a3; font-size: 15px; line-height: 1; padding: 2px 4px; border-radius: 4px; user-select: none; }
+.goal-list .drag-handle:hover { background: #eef0f4; color: var(--text); }
+.goal-list li.dragging { opacity: .45; }
+.goal-list li.drop-before { box-shadow: inset 0 3px 0 var(--accent); }
+.goal-list li.drop-after { box-shadow: inset 0 -3px 0 var(--accent); }

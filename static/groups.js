@@ -240,7 +240,14 @@ function renderGoals(g) {
     li.title = t.note ? `メモ: ${t.note}\n（クリックで詳細）` : "クリックで詳細";
     const d = el("span", `g-due ${due}`, t.due_date ? `期限 ${slashDate(t.due_date)}` : "");
     if (due) d.title = due === "overdue" ? `期限超過（${-daysLeft(t.due_date)} 日経過）` : `期限まであと ${daysLeft(t.due_date)} 日`;
-    li.append(st, main, box, d);
+    // 並び替え: 行の左のつまみ（⠿）をドラッグして好きな位置へ
+    const handle = dragHandle(true);
+    handle.title = "ドラッグして順番を入れ替え";
+    enableDragSort(li, handle, {
+      group: "goals", id: t.id, ids: () => state.goals.map((x) => x.id),
+      onDrop: (ids) => reorderGoals(g, ids),
+    });
+    li.append(handle, st, main, box, d);
     const openIt = () => openGoalPanel(t.id);
     li.classList.toggle("sel", state.panelGoal === t.id);
     li.addEventListener("click", openIt);
@@ -469,6 +476,16 @@ function renderPanel() {
       item.append(d);
     }
     panel.append(item);
+  }
+}
+
+async function reorderGoals(g, ids) {
+  try {
+    await api(`/api/groups/${g.id}/goals/reorder`, { method: "POST", body: JSON.stringify({ ids }) });
+    await select(g.id);
+  } catch (err) {
+    toast(err.message, true);
+    await select(g.id);
   }
 }
 

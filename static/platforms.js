@@ -773,7 +773,14 @@ function renderGoals(p) {
     if (tasks.length) sum.append(progBar(avgProgress(tasks)));
     const d = el("span", `g-due ${due}`, g.due_date ? `期限 ${slashDate(g.due_date)}` : "");
     if (due) d.title = due === "overdue" ? `期限超過（${-daysLeft(g.due_date)} 日経過）` : `期限まであと ${daysLeft(g.due_date)} 日`;
-    li.append(st, main, sum, d);
+    // 並び替え: 行の左のつまみ（⠿）をドラッグして好きな位置へ
+    const handle = dragHandle(true);
+    handle.title = "ドラッグして順番を入れ替え";
+    enableDragSort(li, handle, {
+      group: "goals", id: g.id, ids: () => state.goals.map((x) => x.id),
+      onDrop: (ids) => reorderGoals(p, ids),
+    });
+    li.append(handle, st, main, sum, d);
     const open = () => { state.panelGoal = g.id; state.openTask = null; renderDetail(); };
     li.addEventListener("click", open);
     li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
@@ -781,6 +788,15 @@ function renderGoals(p) {
   }
   sec.append(ul);
   return sec;
+}
+
+async function reorderGoals(p, ids) {
+  try {
+    await api(`/api/platforms/${enc(p.name)}/goals/reorder`, { method: "POST", body: JSON.stringify({ ids }) });
+  } catch (err) {
+    toast(err.message, true);
+  }
+  await refreshAfterChange("goals");
 }
 
 // 項目の詳細（右の窓）: 項目の内容と、実施内容のリスト（バー = 進捗率。％で色が変わる。クリックで詳細）

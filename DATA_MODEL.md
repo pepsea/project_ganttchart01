@@ -64,7 +64,7 @@
 | `platform_links` | id, platform, label, url, sort_order, created_at | 基盤の自由リンク（何個でも。platform = 基盤番号）。`platform_links` を含まない古いバックアップを復元したときは、復元した platforms の旧列から作り直す |
 | | updated_at | 基本情報の更新日時 |
 | | area | （未使用。旧・単一領域。起動時に areas へ引き継ぎ） |
-| `platform_goals` | id, platform, title, due_date, status, note, url, created_at, updated_at | 目標（状態: 未着手・取組中・達成・保留。url は目標のリンク） |
+| `platform_goals` | id, platform, title, due_date, status, note, url, sort_order, created_at, updated_at | 目標（状態: 未着手・取組中・達成・保留。url は目標のリンク。sort_order は項目の並び順 = ドラッグ＆ドロップで入れ替え。0 = 未設定） |
 | `platform_goal_tasks` | id, platform, goal_id, title, progress, owner, due_date, note, created_at, updated_at | 目標達成に必要な項目（`platform_goals`）の中の実施内容（リスト）。goal_id = `platform_goals.id`、progress = 進捗率（％。0〜100）。項目の削除時に一緒に削除 |
 | `platform_topics` | id, platform, meeting_date, title, body, created_at, updated_at | ディスカッション |
 | `platform_monthly` | id, platform, month, body, updated_at | 基盤の月報（基盤×月で一意） |
@@ -87,6 +87,7 @@
 | `team_goals` | id, group_id | 目標（`team_groups.id` を参照。グループの削除時に一緒に削除） |
 | | title / due_date / status / note / url | 目標 / 期限 / 状態（未着手・取組中・達成・保留）/ メモ / リンク |
 | | criteria / period | 達成基準 / 時期（自由記述。例: 2026 年度下期） |
+| | sort_order | 項目の並び順（ドラッグ＆ドロップで入れ替え。0 = 未設定 → 状態・期限の順で並び、新しい項目は一番下） |
 | | fiscal_year | 年度（4 月始まり。例: 2026 = 2026/4〜2027/3）。未設定の行は起動時に期限（無ければ作成日）から設定 |
 | `team_achievements` | id, group_id | 年度ごとの達成したこと（`team_groups.id` を参照。グループの削除時に一緒に削除） |
 | | title / owner / achieved_on / note / url | 達成したこと / 担当者（半角スペース区切り）/ 達成日 / メモ / リンク |

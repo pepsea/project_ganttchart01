@@ -92,6 +92,8 @@ def init_db() -> None:
         ach_cols = {r["name"] for r in db.execute("PRAGMA table_info(team_achievements)")}
         if "url" not in ach_cols:
             db.execute("ALTER TABLE team_achievements ADD COLUMN url TEXT NOT NULL DEFAULT ''")  # 関連リンク
+        if "sort_order" not in goal_cols:  # 項目の並び順（ドラッグで入れ替え。0 = 未設定）
+            db.execute("ALTER TABLE team_goals ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
         if "progress" not in ach_cols:
             # 達成項目の達成度（％）。これまでの「達成したこと」は達成済みなので 100
             db.execute("ALTER TABLE team_achievements ADD COLUMN progress INTEGER NOT NULL DEFAULT 100")
@@ -239,7 +241,9 @@ GROUP_SELECT = """
            (SELECT ROUND(AVG(progress)) FROM team_kpis k WHERE k.group_id = g.id) AS kpi_avg
     FROM team_groups g
 """
-GOAL_ORDER = "ORDER BY CASE status WHEN '達成' THEN 1 WHEN '保留' THEN 2 ELSE 0 END, COALESCE(due_date, '9999'), id"
+# 並び: 手で入れ替えた順（sort_order）→ 入れ替えていない項目は 状態・期限の順（新しく追加した項目は一番下）
+GOAL_ORDER = ("ORDER BY (sort_order = 0), sort_order,"
+              " CASE status WHEN '達成' THEN 1 WHEN '保留' THEN 2 ELSE 0 END, COALESCE(due_date, '9999'), id")
 
 
 def _to_group(row: sqlite3.Row) -> dict:
@@ -396,6 +400,26 @@ def list_goals(gid: int, year: int | None = None) -> list[dict]:
         return [dict(r) for r in db.execute(
             f"SELECT * FROM team_goals WHERE group_id = :gid AND (:y IS NULL OR fiscal_year = :y) {GOAL_ORDER}",
             {"gid": gid, "y": year})]
+
+
+class GoalReorderIn(BaseModel):
+    ids: list[int]
+
+
+@router.post("/{gid}/goals/reorder")
+def reorder_goals(gid: int, r: GoalReorderIn) -> list[dict]:
+    """項目の順番を保存（ドラッグ＆ドロップ）。画面に出ている項目（年度で絞っていれば、その年度の項目）の並びだけを入れ替え、
+    ほかの項目の位置は動かさない"""
+    with get_db() as db:
+        _fetch(db, gid)
+        full = [row["id"] for row in db.execute(f"SELECT id FROM team_goals WHERE group_id = ? {GOAL_ORDER}", (gid,))]
+        if len(set(r.ids)) != len(r.ids) or not set(r.ids) <= set(full):
+            raise HTTPException(409, "項目の一覧が変わっています。画面を読み込み直してから並べ替えてください")
+        it = iter(r.ids)
+        merged = [next(it) if x in set(r.ids) else x for x in full]  # 入れ替える項目が占めていた位置に、新しい順で入れる
+        for n, tid in enumerate(merged, start=1):
+            db.execute("UPDATE team_goals SET sort_order = ? WHERE id = ?", (n, tid))
+        return [dict(x) for x in db.execute(f"SELECT * FROM team_goals WHERE group_id = ? {GOAL_ORDER}", (gid,))]
 
 
 @router.post("/{gid}/goals", status_code=201)

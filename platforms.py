@@ -71,6 +71,8 @@ def init_db() -> None:
         goal_cols = {r["name"] for r in db.execute("PRAGMA table_info(platform_goals)")}
         if "url" not in goal_cols:  # 目標のリンク
             db.execute("ALTER TABLE platform_goals ADD COLUMN url TEXT NOT NULL DEFAULT ''")
+        if "sort_order" not in goal_cols:  # 項目の並び順（ドラッグで入れ替え。0 = 未設定）
+            db.execute("ALTER TABLE platform_goals ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
         # 目標達成に必要な項目（platform_goals）の中のタスク（リスト。進捗率 0〜100 ％）
         db.execute(
             """CREATE TABLE IF NOT EXISTS platform_goal_tasks (
@@ -713,7 +715,9 @@ def update_platform(name: str, p: PlatformIn) -> dict:
 
 # ---------------------------------------------------------------- 目標
 
-GOAL_ORDER = "ORDER BY CASE status WHEN '達成' THEN 1 WHEN '保留' THEN 2 ELSE 0 END, COALESCE(due_date, '9999'), id"
+# 並び: 手で入れ替えた順（sort_order）→ 入れ替えていない項目は 状態・期限の順（新しく追加した項目は一番下）
+GOAL_ORDER = ("ORDER BY (sort_order = 0), sort_order,"
+              " CASE status WHEN '達成' THEN 1 WHEN '保留' THEN 2 ELSE 0 END, COALESCE(due_date, '9999'), id")
 
 
 @router.get("/{name}/goals")
@@ -725,6 +729,23 @@ def list_goals(name: str) -> list[dict]:
 
 def goal_values(g: GoalIn) -> tuple:
     return (g.title.strip(), g.due_date.isoformat() if g.due_date else None, g.status, g.note.strip(), g.url)
+
+
+class GoalReorderIn(BaseModel):
+    ids: list[int]
+
+
+@router.post("/{name}/goals/reorder")
+def reorder_goals(name: str, r: GoalReorderIn) -> list[dict]:
+    """項目の順番を保存（ドラッグ＆ドロップ）"""
+    with get_db() as db:
+        fetch_platform(db, name)
+        full = [row["id"] for row in db.execute(f"SELECT id FROM platform_goals WHERE platform = ? {GOAL_ORDER}", (name,))]
+        if sorted(r.ids) != sorted(full):
+            raise HTTPException(409, "項目の一覧が変わっています。画面を読み込み直してから並べ替えてください")
+        for n, gid in enumerate(r.ids, start=1):
+            db.execute("UPDATE platform_goals SET sort_order = ? WHERE id = ?", (n, gid))
+        return [dict(x) for x in db.execute(f"SELECT * FROM platform_goals WHERE platform = ? {GOAL_ORDER}", (name,))]
 
 
 @router.post("/{name}/goals", status_code=201)
