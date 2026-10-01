@@ -76,10 +76,10 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 
 /* 資料リンク（最大 4 つ） */
 .link-rows { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; }
-.link-row { display: grid; grid-template-columns: 20px 1fr 2fr; gap: 8px; align-items: center; }
+.link-row { display: grid; grid-template-columns: 1fr 2fr auto; gap: 8px; align-items: center; }
 .link-row .no { font-size: 12px; font-weight: 700; color: var(--muted); text-align: center; }
 .link-row input { padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; min-width: 0; }
-@media (max-width: 640px) { .link-row { grid-template-columns: 20px 1fr; } .link-row input[type=url] { grid-column: 2; } }
+@media (max-width: 640px) { .link-row { grid-template-columns: 1fr auto; } .link-row input:nth-child(2) { grid-column: 1; } }
 
 /* ---- 左右 2 分割: 左 = グループ資料、右 = その他参考資料 */
 .doc-main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
@@ -126,18 +126,18 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .doc-row .area-tags { flex: 0 1 auto; display: flex; flex-wrap: nowrap; gap: 3px; overflow: hidden; min-width: 0; }
 .doc-row .area-tag { font-size: 10.5px; padding: 0 6px; }
 .doc-row .doc-links { flex: 0 1 auto; display: flex; flex-wrap: nowrap; gap: 4px; margin: 0; overflow: hidden; min-width: 0; }
-.doc-row .doc-link { max-width: 110px; font-size: 11.5px; padding: 0 8px; line-height: 20px; }
+.doc-row .doc-link { max-width: 14em; font-size: 11.5px; padding: 0 8px; line-height: 20px; }
 .doc-row .doc-date { flex: 0 0 auto; font-size: 11.5px; }
 .doc-row .edit-btn { flex: 0 0 auto; padding: 0 7px; }
 /* 1 行に収めるときの優先順位: リンク・日付・編集は縮めず、資料名 → 領域の順に省略 */
 .doc-row .doc-name { flex: 1 1 60px; min-width: 40px; }
 .doc-row .area-tags { flex: 0 3 auto; min-width: 0; }
 .doc-row .doc-links { flex: 0 0 auto; overflow: visible; }
-.doc-row .doc-link { flex: 0 0 auto; max-width: 96px; }
+.doc-row .doc-link { flex: 0 0 auto; max-width: 14em; }
 /* 資料名は最低 8 文字程度を確保。領域は必要なら先頭のタグだけに縮む */
 .doc-row .doc-name { flex: 1 1 140px; min-width: 120px; }
 .doc-row .area-tags { flex: 0 6 auto; }
-.doc-row .doc-link { max-width: 84px; }
+.doc-row .doc-link { max-width: 14em; }
 
 /* 資料ごとに細い線で区切る（1 行おきに薄い背景） */
 .doc-list > li { border-bottom: 1px solid #d3d8e0; }
@@ -152,3 +152,9 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 li.dragging { opacity: .45; }
 li.drop-before { box-shadow: inset 0 3px 0 var(--accent); }
 li.drop-after { box-shadow: inset 0 -3px 0 var(--accent); }
+
+/* 資料リンクの追加（小さめのボタン）・フォルダのパス */
+.link-del { border: 0; background: none; color: var(--muted); padding: 2px 8px; }
+.link-del:hover { color: var(--today); }
+.mini-add { padding: 1px 8px; font-size: 11px; line-height: 18px; }
+button.doc-link.path { border: 0; cursor: pointer; background: #6b7280; color: #fff; }

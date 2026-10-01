@@ -62,6 +62,7 @@ TABLE_LABELS = {
     "team_years": "グループ目標の年度（選択肢）",
     "person_notes": "個人のメモ",
     "case_links": "案件の自由リンク",
+    "document_links": "共有資料のリンク",
     "platform_links": "基盤の自由リンク",
     "areas": "領域",
     "case_nos": "案件番号",

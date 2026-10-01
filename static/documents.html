@@ -65,21 +65,10 @@
         <div id="doc-areas" class="chips-select"></div>
       </div>
       <fieldset>
-        <legend>資料リンク（最大 4 つ）</legend>
-        <div class="link-rows">
-          <div class="link-row"><span class="no">1</span>
-            <input name="link1_label" placeholder="表示名（例: 日本語版）">
-            <input name="link1_url" type="url" placeholder="https://"></div>
-          <div class="link-row"><span class="no">2</span>
-            <input name="link2_label" placeholder="表示名（例: 英語版）">
-            <input name="link2_url" type="url" placeholder="https://"></div>
-          <div class="link-row"><span class="no">3</span>
-            <input name="link3_label" placeholder="表示名（例: スライド）">
-            <input name="link3_url" type="url" placeholder="https://"></div>
-          <div class="link-row"><span class="no">4</span>
-            <input name="link4_label" placeholder="表示名（例: 補足資料）">
-            <input name="link4_url" type="url" placeholder="https://"></div>
-        </div>
+        <legend>資料リンク（URL またはフォルダのパス。1 つずつ追加）</legend>
+        <div class="link-rows" id="doc-link-rows"></div>
+        <button type="button" id="btn-add-link" class="mini-add" title="資料リンクを 1 つ追加">＋ リンクを追加</button>
+        <p class="hint">フォルダのパスも入力できます（例: \\サーバー\共有\資料、C:\資料、/Volumes/共有/資料）。パスはブラウザからは開けないため、クリックでコピーします。</p>
       </fieldset>
       <p class="error" id="doc-error"></p>
       <div class="actions doc-actions">

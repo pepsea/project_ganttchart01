@@ -1,6 +1,6 @@
 "use strict";
 
-// 共有資料: 資料名・目的・作成日時・資料リンク 2 つ
+// 共有資料: 資料名・目的・作成日時・資料リンク（何個でも。URL またはフォルダのパス）
 const $ = (sel, root = document) => root.querySelector(sel);
 const state = { docs: [], areas: [], q: "", area: "", editing: null };
 // 領域の色（ほかの画面と同じ）
@@ -17,6 +17,9 @@ function el(tag, cls = "", text) {
   return e;
 }
 const safeUrl = (u) => (/^https?:\/\//i.test(u || "") ? u : "");
+// フォルダのパス（\\サーバー\共有、C:\…、/…、~/…、file://…）。ブラウザからは開けないので、クリックでパスをコピーする
+const isPath = (u) => /^(file:\/\/|\\\\|[A-Za-z]:[\\/]|\/|~\/)/i.test(u || "");
+const pathLabel = (u, n) => (u.replace(/^file:\/\//i, "").split(/[\\/]+/).filter(Boolean).pop() || `リンク${n}`);
 const pad = (n) => String(n).padStart(2, "0");
 const nowLocal = () => {
   const d = new Date();
@@ -59,7 +62,7 @@ function render() {
     const all = state.docs.filter((d) => (d.category || "group") === cat);
     const list = all.filter((d) =>
       (!state.area || d.areas.includes(state.area)) &&
-      (!q || [d.title, d.purpose, ...d.areas, ...LINKS.map((n) => d[`link${n}_label`])].some((v) => (v || "").toLowerCase().includes(q))));
+      (!q || [d.title, d.purpose, ...d.areas, ...(d.links || []).map((l) => l.label)].some((v) => (v || "").toLowerCase().includes(q))));
     $(`#count-${cat}`).textContent = `${list.length} 件${list.length !== all.length ? ` / ${all.length}` : ""}`;
     const ul = $(`#list-${cat}`);
     ul.innerHTML = "";
@@ -105,16 +108,31 @@ function renderDoc(d) {
   }
   li.append(tags);
   const links = el("span", "doc-links");
-  for (const n of LINKS) {
-    const u = safeUrl(d[`link${n}_url`]);
-    if (!u) continue;
-    const a = el("a", "doc-link", `${d[`link${n}_label`] || `リンク${n}`} ↗`);
-    a.href = u;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    a.title = `${d[`link${n}_label`] || `リンク${n}`}: ${u}`;
-    links.append(a);
-  }
+  (d.links || []).forEach((lk, i) => {
+    const u = safeUrl(lk.url);
+    const name = lk.label || (isPath(lk.url) ? pathLabel(lk.url, i + 1) : `リンク${i + 1}`);
+    if (u) {
+      const a = el("a", "doc-link", `${name} ↗`);
+      a.href = u;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.title = `${name}: ${u}`;
+      links.append(a);
+    } else if (isPath(lk.url)) {
+      const b = el("button", "doc-link path", `📁 ${name}`);
+      b.type = "button";
+      b.title = `${name}: ${lk.url}\n（クリックでパスをコピー）`;
+      b.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(lk.url);
+          toast(`パスをコピーしました: ${lk.url}`);
+        } catch (_) {
+          prompt("このパスをコピーしてください", lk.url);
+        }
+      });
+      links.append(b);
+    }
+  });
   if (!links.children.length) links.append(el("span", "none", "リンクなし"));
   li.append(links);
   li.append(el("span", "doc-date", d.created_date.slice(0, 10).replaceAll("-", "/")));
@@ -128,14 +146,37 @@ function renderDoc(d) {
 
 // ------------------------------------------------------------ 追加・編集
 const form = $("#form-doc");
-const LINKS = [1, 2, 3, 4]; // 資料リンクは最大 4 つ
-const FIELDS = ["title", "purpose", ...LINKS.flatMap((n) => [`link${n}_label`, `link${n}_url`])];
+const FIELDS = ["title", "purpose"];
+
+// 資料リンク: 1 つずつ追加（表示名 + URL またはフォルダのパス。✕ で削除）
+function addLinkRow(label = "", url = "") {
+  const row = el("div", "link-row");
+  const n = el("input");
+  n.placeholder = "表示名（例: 日本語版）";
+  n.value = label;
+  const u = el("input");
+  u.placeholder = "https://… またはフォルダのパス";
+  u.value = url;
+  const del = el("button", "link-del", "✕");
+  del.type = "button";
+  del.title = "このリンクを削除（保存で確定）";
+  del.addEventListener("click", () => row.remove());
+  row.append(n, u, del);
+  row._get = () => ({ label: n.value.trim(), url: u.value.trim() });
+  $("#doc-link-rows").append(row);
+  return n;
+}
+$("#btn-add-link").addEventListener("click", () => addLinkRow().focus());
+const docLinks = () => [...$("#doc-link-rows").children].map((r) => r._get()).filter((l) => l.url);
+const linkOk = (u) => safeUrl(u) || isPath(u);
 
 function openDialog(d = null, category = "group") {
   state.editing = d;
   form.reset();
   form.category.value = d?.category || category;
   for (const k of FIELDS) form[k].value = d?.[k] || "";
+  $("#doc-link-rows").innerHTML = "";
+  for (const lk of d?.links || []) addLinkRow(lk.label, lk.url);
   // 領域（複数選択）
   const box = $("#doc-areas");
   box.innerHTML = "";
@@ -171,8 +212,10 @@ form.addEventListener("submit", async (e) => {
   body.created_date = form.created_date.value.replace("T", " ");
   body.areas = [...form.querySelectorAll('input[name="areas"]:checked')].map((i) => i.value);
   body.category = form.category.value;
-  for (const k of LINKS.map((n) => `link${n}_url`)) {
-    if (body[k] && !safeUrl(body[k])) { $("#doc-error").textContent = "リンクは http:// または https:// で始まる URL を入力してください"; return; }
+  body.links = docLinks();
+  if (body.links.some((l) => !linkOk(l.url))) {
+    $("#doc-error").textContent = "リンクは http:// https:// で始まる URL か、フォルダのパス（例: \\\\サーバー\\共有、C:\\資料、/Volumes/共有）で入力してください";
+    return;
   }
   const d = state.editing;
   try {

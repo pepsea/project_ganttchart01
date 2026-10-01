@@ -131,9 +131,9 @@
 | | sort_order | 手で入れ替えた順番（ドラッグ＆ドロップ。0 = 未設定。未設定の資料は上に、作成日時の新しい順で並ぶ） |
 | | title / purpose | 資料名 / 目的 |
 | | created_date | 作成日時（`YYYY-MM-DD HH:MM`。未入力なら登録時刻） |
-| | link1_label / link1_url | 資料リンク 1 の表示名 / URL |
-| | link2_label / link2_url | 資料リンク 2 の表示名 / URL |
-| | link3_label / link3_url, link4_label / link4_url | 資料リンク 3・4 の表示名 / URL（リンクは最大 4 つ） |
+| | link1_label / link1_url | （未使用）旧・資料リンク。`document_links` 作成時に 1 回だけ引き継ぎ済み |
+| | link2〜4_label / link2〜4_url | （未使用）旧・資料リンク 2〜4（同上） |
+| `document_links` | id, document_id, label, url, sort_order, created_at | 資料のリンク（何個でも。表示名と、URL またはフォルダのパス）。資料の削除時に一緒に削除。`document_links` を含まない古いバックアップを復元したときは、復元した documents の旧列から作り直す |
 | | areas | 領域（JSON 配列） |
 | | created_at / updated_at | 登録・更新日時 |
 
