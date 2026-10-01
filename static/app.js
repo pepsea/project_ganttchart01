@@ -35,7 +35,7 @@ const colW = (() => {
   }
 })();
 // 列: 領域 + PJ名 + タスク + (担当者 + 優先度 56 + 開始 40 + 終了日) + 削除 34
-const leftW = () => colW.area + colW.pj + colW.task + 34 + (state.compact ? 0 : colW.assignee + 56 + 40 + colW.end);
+const leftW = () => colW.area + colW.pj + colW.task + 64 + (state.compact ? 0 : colW.assignee + 56 + 40 + colW.end);
 const saveColW = () => {
   try { localStorage.setItem("gantt.colW", JSON.stringify(colW)); } catch (_) { /* 記憶できなくても幅は変わる */ }
 };
@@ -202,7 +202,10 @@ const savedSort = (() => {
 })();
 let taskSortState = savedSort; // 現在の並び { key, desc } または null（初期の並び = 終了日の早い順）
 const currentSort = () => taskSortState || { key: "end", desc: false }; // 初期の並びは「終了日 ▲」
-const sortTasks = (list) => {
+// 完了したタスクは、並び順に関係なく一番下に表示する
+const doneLast = (list) => [...list.filter((t) => !t.completed_at), ...list.filter((t) => t.completed_at)];
+const sortTasks = (list) => doneLast(sortTasksBase(list));
+const sortTasksBase = (list) => {
   if (!taskSortState) return list.sort(byDue);
   const taskSort = taskSortState;
   const get = SORT_COLS[taskSort.key];
@@ -286,6 +289,7 @@ function renderSide() {
   const today = todayMs();
   const people = new Map();
   for (const t of state.tasks) {
+    if (t.completed_at) continue; // 完了したタスクは数えない
     const left = Math.round((parseDate(t.end_date) - today) / DAY_MS);
     const kinds = [];
     if (left < 0) kinds.push("over");
@@ -433,6 +437,23 @@ function renderBackground(trackW) {
   return layer;
 }
 
+const doneDeleteLabel = (t) => {
+  const d = new Date(t.completed_at.replace(" ", "T"));
+  d.setDate(d.getDate() + 7);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+};
+async function toggleDone(task) {
+  const done = !task.completed_at;
+  try {
+    const saved = await api(`/api/tasks/${task.id}/done`, { method: "POST", body: JSON.stringify({ done }) });
+    task.completed_at = saved.completed_at;
+    toast(done ? "完了にしました（一番下に移ります。1 週間後に自動で削除されます）" : "完了を取り消しました");
+    rerenderKeepScroll();
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
 function renderRow(task, trackW) {
   const row = el("div", "g-row");
   row.dataset.id = task.id;
@@ -482,7 +503,18 @@ function renderRow(task, trackW) {
   del.title = "削除";
   del.addEventListener("click", () => deleteTask(task));
 
-  left.append(areaCell, projCell, name, assignee, prio, start, end, del);
+  // 完了ボタン: 完了にするとグレーアウトして一番下へ。1 週間後に自動で削除（もう一度押すと完了を取り消す）
+  const done = el("button", "done-btn", task.completed_at ? "↩" : "✓");
+  done.type = "button";
+  done.title = task.completed_at
+    ? `完了を取り消す（完了 ${task.completed_at.slice(0, 16)}。${doneDeleteLabel(task)}に自動で削除）`
+    : "完了にする（グレーアウトして一番下へ。1 週間後に自動で削除）";
+  done.addEventListener("click", () => toggleDone(task));
+  const tail = el("div", "row-actions");
+  tail.append(done, del);
+  row.classList.toggle("done", !!task.completed_at);
+
+  left.append(areaCell, projCell, name, assignee, prio, start, end, tail);
 
   const track = el("div", "g-track");
   track.style.width = `${trackW}px`;
@@ -529,6 +561,7 @@ function shortDate(str) {
 
 // 期限状態: overdue = 終了日を過ぎた / soon = 終了日まで 3 日以内
 function deadlineStatus(task) {
+  if (task.completed_at) return ""; // 完了したタスクは期限の色をつけない
   const left = Math.round((parseDate(task.end_date) - todayMs()) / DAY_MS);
   if (left < 0) return "overdue";
   if (left <= SOON_DAYS) return "soon";
@@ -548,7 +581,7 @@ function syncReadonlyCells(row, task, areaCell, projCell, assigneeCell) {
 }
 
 // 実施中 = 今日が開始日〜終了日の間（期限超過・3 日以内の色を優先）
-const isActive = (task) => parseDate(task.start_date) <= todayMs() && todayMs() <= parseDate(task.end_date);
+const isActive = (task) => !task.completed_at && parseDate(task.start_date) <= todayMs() && todayMs() <= parseDate(task.end_date);
 
 function syncPrioCell(cell, task) {
   cell.textContent = task.priority;
@@ -1088,6 +1121,7 @@ function calMonth(y, m, tasks) {
       bar.style.setProperty("--c", areaColor(t.area));
       const st = deadlineStatus(t);
       if (st) bar.classList.add(st);
+      if (t.completed_at) bar.classList.add("done");
       if (parseDate(t.start_date) < ws) bar.classList.add("cont-l");
       if (parseDate(t.end_date) > we) bar.classList.add("cont-r");
       bar.textContent = `${t.task}${t.assignee ? `（${assigneeText(t)}）` : ""}`;

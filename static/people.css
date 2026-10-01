@@ -17,6 +17,8 @@
 .st-soon { --bg: #ffe2b3; --bd: #f5a524; --fg: #8a5100; }
 .st-active { --bg: #dbe8ff; --bd: #3b6fe0; --fg: #1f4fbf; }
 .st-waiting { --bg: #f1f2f5; --bd: #b8bdc7; --fg: #5b6270; }
+.st-done { --bg: #e5e7eb; --bd: #9ca3af; --fg: #6b7280; }
+.task-list li.st-done { opacity: .55; }
 .st-counts { display: inline-flex; gap: 3px; }
 .st-count { min-width: 20px; text-align: center; font-size: 11px; font-weight: 700; border-radius: 4px; padding: 0 4px;
   background: var(--bg); border: 1px solid var(--bd); color: var(--fg); font-variant-numeric: tabular-nums; }

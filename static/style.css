@@ -98,7 +98,7 @@ button.primary:hover { filter: brightness(1.08); }
   width: var(--left-w);
   flex: 0 0 var(--left-w);
   display: grid;
-  grid-template-columns: var(--w-area, 190px) var(--w-pj, 240px) var(--w-task, 200px) var(--w-assignee, 80px) 56px 40px var(--w-end, 96px) 34px;
+  grid-template-columns: var(--w-area, 190px) var(--w-pj, 240px) var(--w-task, 200px) var(--w-assignee, 80px) 56px 40px var(--w-end, 96px) 64px;
   align-items: center;
   background: var(--panel);
   border-right: 1px solid var(--line-strong);
@@ -318,7 +318,7 @@ dialog label.radio { flex-direction: row; align-items: flex-start; gap: 6px; col
 .toast.err { background: var(--today); }
 
 /* 列を折りたたむ */
-.gantt.compact .g-left { grid-template-columns: var(--w-area, 190px) var(--w-pj, 240px) var(--w-task, 200px) 34px; }
+.gantt.compact .g-left { grid-template-columns: var(--w-area, 190px) var(--w-pj, 240px) var(--w-task, 200px) 64px; }
 .gantt.compact .g-left > .col-detail { display: none; }
 .proj-cell { height: 100%; }
 .proj-cell select { border-right: 1px solid var(--line); }
@@ -592,3 +592,12 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 .cal-head .spacer { flex: 1; }
 .cal-copy { white-space: nowrap; }
 .c-wait { background: #eceff3; color: #4b5563; }
+
+/* 完了ボタン・完了したタスク（グレーアウトして一番下） */
+.row-actions { display: flex; align-items: center; justify-content: center; gap: 2px; }
+.done-btn { border: 0; background: none; color: #2fa36b; font-weight: 700; padding: 2px 6px; font-size: 14px; }
+.done-btn:hover { background: #e3f5ec; border-radius: 4px; }
+.g-row.done { opacity: .45; filter: grayscale(1); }
+.g-row.done .t-name { text-decoration: line-through; }
+.g-row.done:hover { opacity: .7; }
+.cal-bar.done { background: #e5e7eb !important; border-left-color: #9ca3af; color: #6b7280; text-decoration: line-through; }

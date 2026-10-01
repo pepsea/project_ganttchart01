@@ -4,7 +4,7 @@
 const $ = (sel, root = document) => root.querySelector(sel);
 const state = { people: [], current: null, q: "", areas: [] };
 // タスクの状態（ガントチャートと同じ色）: 期限超過 = 赤、期限 3 日以内 = オレンジ、実施中 = 青、開始前 = 灰
-const TASK_STATES = [["overdue", "期限超過"], ["soon", "期限3日以内"], ["active", "実施中"], ["waiting", "開始前"]];
+const TASK_STATES = [["overdue", "期限超過"], ["soon", "期限3日以内"], ["active", "実施中"], ["waiting", "開始前"], ["done", "完了"]];
 const stateLabel = (k) => TASK_STATES.find(([x]) => x === k)?.[1] || "";
 
 // ------------------------------------------------------------ utils

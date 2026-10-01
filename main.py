@@ -64,7 +64,7 @@ MASTERS = {
 }
 MasterKind = Literal["areas", "platforms", "customers", "case_nos"]
 
-CSV_HEADERS = ["id", "領域", "PJ名", "タスク", "担当者", "優先度", "開始日", "終了日", "詳細"]
+CSV_HEADERS = ["id", "領域", "PJ名", "タスク", "担当者", "優先度", "開始日", "終了日", "詳細", "完了日時"]
 # CSV インポート時に受け付ける列名（日本語 / 英語）
 HEADER_ALIASES = {
     "id": "id", "ID": "id",
@@ -76,6 +76,7 @@ HEADER_ALIASES = {
     "開始日": "start_date", "start_date": "start_date", "start": "start_date",
     "終了日": "end_date", "end_date": "end_date", "end": "end_date",
     "詳細": "detail", "説明": "detail", "detail": "detail", "description": "detail",
+    "完了日時": "completed_at", "completed_at": "completed_at",
 }
 
 Priority = Literal["高", "中", "低"]
@@ -84,6 +85,15 @@ TASK_COLS = ("area", "project", "task", "assignee", "priority", "start_date", "e
 
 
 # ---------------------------------------------------------------- DB
+
+DONE_KEEP_DAYS = 7  # 完了にしたタスクは、この日数がたつと自動で削除する
+
+
+def purge_done_tasks(db: sqlite3.Connection) -> int:
+    """完了から DONE_KEEP_DAYS 日たったタスクを削除（起動時・一覧の取得時）"""
+    return db.execute("DELETE FROM tasks WHERE completed_at <> ''"
+                      " AND completed_at <= datetime('now', 'localtime', ?)", (f"-{DONE_KEEP_DAYS} days",)).rowcount
+
 
 def init_db() -> None:
     with get_db() as db:
@@ -115,6 +125,9 @@ def init_db() -> None:
         for col in ("project", "detail"):
             if col not in cols:
                 db.execute(f"ALTER TABLE tasks ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
+        if "completed_at" not in cols:  # 完了にした日時（空 = 未完了）。完了から 1 週間たつと自動で削除する
+            db.execute("ALTER TABLE tasks ADD COLUMN completed_at TEXT NOT NULL DEFAULT ''")
+        purge_done_tasks(db)
 
         if dbmod.is_fresh_install() and db.execute("SELECT COUNT(*) FROM areas").fetchone()[0] == 0:
             db.executemany("INSERT INTO areas(name) VALUES (?)", [(a,) for a in DEFAULT_AREAS])
@@ -404,6 +417,7 @@ TASK_ORDER = "ORDER BY (t.assignee = ''), t.assignee, t.end_date, t.start_date, 
 @app.get("/api/tasks")
 def list_tasks() -> list[dict]:
     with get_db() as db:
+        purge_done_tasks(db)
         return [dict(r) for r in db.execute(f"SELECT t.* FROM tasks t {TASK_ORDER}")]
 
 
@@ -428,6 +442,21 @@ def update_task(task_id: int, task: TaskIn) -> dict:
     with get_db() as db:
         save_masters(db, task)
         cur = db.execute(UPDATE_SQL, (*task.values(), task_id))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "タスクが見つかりません")
+        return get_task(db, task_id)
+
+
+class DoneIn(BaseModel):
+    done: bool = True
+
+
+@app.post("/api/tasks/{task_id}/done")
+def set_task_done(task_id: int, body: DoneIn) -> dict:
+    """完了にする / 完了を取り消す。完了にした日時を記録し、1 週間たつと自動で削除される"""
+    with get_db() as db:
+        cur = db.execute("UPDATE tasks SET completed_at = ? WHERE id = ?",
+                         ("" if not body.done else datetime.now().strftime("%Y-%m-%d %H:%M:%S"), task_id))
         if cur.rowcount == 0:
             raise HTTPException(404, "タスクが見つかりません")
         return get_task(db, task_id)
@@ -460,7 +489,7 @@ def export_csv() -> Response:
     writer = csv.writer(buf)
     writer.writerow(CSV_HEADERS)
     for t in list_tasks():
-        writer.writerow([t["id"], *(t[c] for c in TASK_COLS)])
+        writer.writerow([t["id"], *(t[c] for c in TASK_COLS), (t["completed_at"] or "")[:16]])
     # Excel で文字化けしないよう BOM 付き UTF-8
     body = buf.getvalue().encode("utf-8-sig")
     filename = f"tasks_{datetime.now():%Y%m%d_%H%M%S}.csv"
@@ -495,7 +524,8 @@ async def import_csv(
         labels = {"area": "領域", "task": "タスク", "start_date": "開始日", "end_date": "終了日"}
         raise HTTPException(422, "必須列がありません: " + ", ".join(labels[m] for m in sorted(missing)))
 
-    rows: list[tuple[int | None, TaskIn]] = []
+    has_done = "completed_at" in colmap.values()  # 「完了日時」列があるときだけ、完了の状態も取り込む
+    rows: list[tuple[int | None, TaskIn, str]] = []
     for line, raw in enumerate(reader, start=2):
         rec = {colmap[k]: (v or "").strip() for k, v in raw.items() if k in colmap and colmap[k]}
         if not any(rec.values()):
@@ -510,21 +540,36 @@ async def import_csv(
         if end < start:
             raise HTTPException(422, f"{line} 行目: 終了日が開始日より前です")
         task_id = int(rec["id"]) if rec.get("id", "").isdigit() else None
+        done = ""
+        if has_done and rec.get("completed_at"):
+            v = rec["completed_at"].replace("/", "-").replace("T", " ")
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+                try:
+                    done = datetime.strptime(v, fmt).strftime("%Y-%m-%d %H:%M:%S")
+                    break
+                except ValueError:
+                    pass
+            else:
+                raise HTTPException(422, f"{line} 行目: 完了日時「{rec['completed_at']}」を日時として解釈できません")
         rows.append((task_id, TaskIn(area=rec["area"], project=rec.get("project", ""), task=rec["task"],
                                      assignee=rec.get("assignee", ""), priority=priority,
-                                     start_date=start, end_date=end, detail=rec.get("detail", ""))))
+                                     start_date=start, end_date=end, detail=rec.get("detail", "")), done))
 
     added = updated = 0
     with get_db() as db:
         if mode == "replace":
             db.execute("DELETE FROM tasks")
-        for task_id, t in rows:
+        for task_id, t, done in rows:
             save_masters(db, t)
             if task_id is not None and mode == "append":
                 if db.execute(UPDATE_SQL, (*t.values(), task_id)).rowcount:
+                    if has_done:
+                        db.execute("UPDATE tasks SET completed_at = ? WHERE id = ?", (done, task_id))
                     updated += 1
                     continue
-            db.execute(INSERT_SQL, t.values())
+            new_id = db.execute(INSERT_SQL, t.values()).lastrowid
+            if has_done and done:
+                db.execute("UPDATE tasks SET completed_at = ? WHERE id = ?", (done, new_id))
             added += 1
     return {"added": added, "updated": updated, "mode": mode}
 

@@ -81,8 +81,10 @@ def _role(name: str, pl: str, members: str) -> str | None:
     return None
 
 
-def task_state(start: str, end: str, today: date | None = None) -> str:
-    """overdue = 期限超過 / soon = 期限 3 日以内 / active = 実施中 / waiting = 開始前"""
+def task_state(start: str, end: str, today: date | None = None, completed: str = "") -> str:
+    """done = 完了 / overdue = 期限超過 / soon = 期限 3 日以内 / active = 実施中 / waiting = 開始前"""
+    if completed:
+        return "done"
     today = today or date.today()
     s, e = date.fromisoformat(start), date.fromisoformat(end)
     if e < today:
@@ -135,7 +137,7 @@ def person(name: str) -> dict:
                 "id": r["id"], "task": r["task"], "area": r["area"], "project": proj,
                 "project_name": case_names.get(proj) or pf_titles.get(proj) or "",
                 "priority": r["priority"], "start_date": r["start_date"], "end_date": r["end_date"],
-                "state": task_state(r["start_date"], r["end_date"]),
+                "state": task_state(r["start_date"], r["end_date"], completed=r["completed_at"]),
             })
             add_areas([r["area"]])
 
