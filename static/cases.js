@@ -859,12 +859,7 @@ $("#btn-copy-link").addEventListener("click", async () => {
   const c = state.current;
   if (!c) return;
   const url = caseUrl(c);
-  try {
-    await navigator.clipboard.writeText(url);
-    toast(`リンクをコピーしました: ${url}`);
-  } catch (_) {
-    prompt("このリンクをコピーしてください", url); // クリップボードが使えないとき
-  }
+  if (await copyText(url)) toast(`リンクをコピーしました: ${url}`);
 });
 drawer.addEventListener("click", (e) => { if (e.target === drawer) drawer.close(); }); // 背景クリックで閉じる
 

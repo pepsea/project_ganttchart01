@@ -970,12 +970,7 @@ $("#task-copy").addEventListener("click", async () => {
     t.detail ? `詳細：${t.detail}` : "",
     `リンク：${url}`,
   ].filter(Boolean).join("\n");
-  try {
-    await navigator.clipboard.writeText(text);
-    toast("タスクの内容とリンクをコピーしました");
-  } catch (_) {
-    prompt("この内容をコピーしてください", text); // クリップボードが使えないとき（http でのアクセスなど）
-  }
+  if (await copyText(text)) toast("タスクの内容とリンクをコピーしました");
 });
 
 // ツールバー: PJ を選んだら「← 案件に戻る」（青）/「← 基盤に戻る」（緑）を出す

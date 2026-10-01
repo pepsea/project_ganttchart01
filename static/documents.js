@@ -123,12 +123,7 @@ function renderDoc(d) {
       b.type = "button";
       b.title = `${name}: ${lk.url}\n（クリックでパスをコピー）`;
       b.addEventListener("click", async () => {
-        try {
-          await navigator.clipboard.writeText(lk.url);
-          toast(`パスをコピーしました: ${lk.url}`);
-        } catch (_) {
-          prompt("このパスをコピーしてください", lk.url);
-        }
+        if (await copyText(lk.url)) toast(`パスをコピーしました: ${lk.url}`);
       });
       links.append(b);
     }

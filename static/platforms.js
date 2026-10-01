@@ -399,12 +399,7 @@ if (backGroup) {
 $("#btn-copy-link").addEventListener("click", async () => {
   if (!state.current) return;
   const url = `${location.origin}/platforms?id=${enc(state.current)}`;
-  try {
-    await navigator.clipboard.writeText(url);
-    toast(`リンクをコピーしました: ${url}`, false);
-  } catch (_) {
-    prompt("このリンクをコピーしてください", url); // クリップボードが使えないとき（http でのアクセスなど）
-  }
+  if (await copyText(url)) toast(`リンクをコピーしました: ${url}`, false);
 });
 // ブラウザの「戻る」「進む」
 window.addEventListener("popstate", async () => {
