@@ -202,7 +202,7 @@ class AchievementIn(BaseModel):
     note: str = ""
     url: str = ""
     goal_id: int = 0  # 関連する「目標達成に必要な項目」（team_goals.id。0 = なし）
-    progress: int = Field(default=100, ge=0, le=100)  # 達成度（％）
+    progress: int = Field(default=0, ge=0, le=100)  # 達成度（％。新しい達成項目の初期値は 0）
 
     @field_validator("title", "owner", mode="before")
     @classmethod
@@ -647,7 +647,7 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                     on = parse_date(r["達成日"], line, "達成日") if r.get("達成日") else None
                     a = AchievementIn(fiscal_year=year, title=r.get("達成したこと", ""), owner=r.get("担当者", ""),
                                       achieved_on=on, note=r.get("メモ", ""), url=r.get("リンク", ""),
-                                      progress=int(r["進捗"]) if r.get("進捗") else 100)
+                                      progress=int(r["進捗"]) if r.get("進捗") else 0)
                 except (ValueError, ValidationError) as e:
                     raise _err(line, e)
                 vals = _ach_values(a)
@@ -659,9 +659,11 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                     if gl is None:
                         raise HTTPException(422, f"{line} 行目: 関連項目「{rel}」が見つかりません（先にその項目の行を登録してください）")
                 goal_id = gl["id"] if gl else 0
-                hit = db.execute("SELECT id FROM team_achievements WHERE group_id = ? AND fiscal_year = ? AND title = ?",
+                hit = db.execute("SELECT id, progress FROM team_achievements WHERE group_id = ? AND fiscal_year = ? AND title = ?",
                                  (gid, vals[-1], vals[0])).fetchone()
                 if hit:
+                    if not r.get("進捗"):
+                        a.progress = hit["progress"]  # CSV に進捗が無い・空欄なら、今の達成度のまま
                     db.execute("UPDATE team_achievements SET title=?, owner=?, achieved_on=?, note=?, url=?, fiscal_year=?,"
                                " goal_id=?, progress=?, updated_at=datetime('now','localtime') WHERE id=?", (*vals, goal_id, a.progress, hit["id"]))
                 else:

@@ -483,7 +483,7 @@ function openAchievementDialog(g, a, goalId = 0) {
   achForm.achieved_on.value = a?.achieved_on || "";
   achForm.note.value = a?.note || "";
   achForm.url.value = a?.url || "";
-  achForm.progress.value = a ? a.progress : 100;
+  achForm.progress.value = a ? a.progress : 0; // 新しい達成項目の初期値は 0%
   $("#ach-pc").textContent = `${achForm.progress.value}%`;
   // 関連項目（目標達成に必要な項目）。選択中の年度に限らず、このグループの全項目から選ぶ
   const sel = achForm.goal_id;
