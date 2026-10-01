@@ -176,8 +176,11 @@ function renderDetail() {
   // 大目標
   const vs = el("section", "gp-section");
   const vh = el("h3", "", "大目標");
-  vh.append(el("span", "hint", "中長期的に目指すこと（「✎ 編集」から変更）"));
-  vs.append(vh, el("div", `vision-text${g.vision ? "" : " hint"}`, g.vision || "未記入（「✎ 編集」から入力）"));
+  vh.append(el("span", "hint", "中長期的に目指すこと（Markdown で書けます。「✎ 編集」から変更）"));
+  const vbody = el("div", `vision-text${g.vision ? " md" : " hint"}`);
+  if (g.vision) vbody.innerHTML = window.mdToHtml(g.vision); // Markdown で書いた大目標を表示用に変換（HTML はエスケープ済み）
+  else vbody.textContent = "未記入（「✎ 編集」から入力）";
+  vs.append(vh, vbody);
   root.append(vs);
 
   const goalSec = renderGoals(g);
