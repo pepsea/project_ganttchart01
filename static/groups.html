@@ -88,7 +88,7 @@
       <label><span>達成度 <b id="ach-pc">0%</b></span><input type="range" name="progress" min="0" max="100" step="5" value="0"></label>
       <div class="two">
         <label><span>担当者（複数はスペース区切り）</span><input name="owner" placeholder="例: 高橋 鈴木"></label>
-        <label><span>達成日</span><input type="date" name="achieved_on"></label>
+        <label><span>達成時期（年度の四半期）</span><select name="quarter"><option value="">（未設定）</option><option value="Q1">Q1（4〜6月）</option><option value="Q2">Q2（7〜9月）</option><option value="Q3">Q3（10〜12月）</option><option value="Q4">Q4（1〜3月）</option></select></label>
       </div>
       <label><span>年度 <span class="req">*</span></span><select name="fiscal_year" required></select></label>
       <label><span>メモ</span><textarea name="note" rows="3" placeholder="成果の詳細など"></textarea></label>

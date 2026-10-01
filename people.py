@@ -174,11 +174,11 @@ def person(name: str) -> dict:
         # 達成したいこと: グループ目標の「達成したいこと」で担当者にこの人が入っているもの（新しい順）
         achievements = [{"id": r["id"], "group_id": r["group_id"], "group": r["group_name"], "title": r["title"],
                          "goal": r["goal_title"] or "", "progress": r["progress"],
-                         "achieved_on": r["achieved_on"], "fiscal_year": r["fiscal_year"], "note": r["note"], "url": r["url"]}
+                         "quarter": r["quarter"], "fiscal_year": r["fiscal_year"], "note": r["note"], "url": r["url"]}
                         for r in db.execute("SELECT a.*, g.name AS group_name, tg.title AS goal_title FROM team_achievements a"
                                             " JOIN team_groups g ON g.id = a.group_id"
                                             " LEFT JOIN team_goals tg ON tg.id = a.goal_id AND tg.group_id = a.group_id"
-                                            " ORDER BY COALESCE(NULLIF(a.achieved_on, ''), a.created_at) DESC, a.id DESC")
+                                            " ORDER BY a.fiscal_year DESC, a.quarter DESC, a.id DESC")
                         if name in _names(r["owner"])]
 
         memo = db.execute("SELECT body, areas, updated_at FROM person_notes WHERE name = ?", (name,)).fetchone()

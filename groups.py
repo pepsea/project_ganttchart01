@@ -97,6 +97,15 @@ def init_db() -> None:
         if "progress" not in ach_cols:
             # 達成項目の達成度（％）。これまでの「達成したこと」（旧名）は達成済みなので 100
             db.execute("ALTER TABLE team_achievements ADD COLUMN progress INTEGER NOT NULL DEFAULT 100")
+        if "quarter" not in ach_cols:
+            # 達成時期（Q1〜Q4。年度は 4 月始まり: Q1 = 4〜6 月、Q2 = 7〜9 月、Q3 = 10〜12 月、Q4 = 1〜3 月。空 = 未設定）。
+            # 旧・達成日（achieved_on）は未使用として残し、入っている日付から四半期を引き継ぐ
+            db.execute("ALTER TABLE team_achievements ADD COLUMN quarter TEXT NOT NULL DEFAULT ''")
+            db.execute("""UPDATE team_achievements SET quarter = 'Q' || (
+                              CASE WHEN CAST(strftime('%m', achieved_on) AS INTEGER) BETWEEN 4 AND 6 THEN 1
+                                   WHEN CAST(strftime('%m', achieved_on) AS INTEGER) BETWEEN 7 AND 9 THEN 2
+                                   WHEN CAST(strftime('%m', achieved_on) AS INTEGER) BETWEEN 10 AND 12 THEN 3 ELSE 4 END)
+                          WHERE achieved_on IS NOT NULL AND achieved_on <> ''""")
         if "goal_id" not in ach_cols:
             # 関連する「目標達成に必要な項目」（team_goals.id。0 = どの項目にも結びつけていない）
             db.execute("ALTER TABLE team_achievements ADD COLUMN goal_id INTEGER NOT NULL DEFAULT 0")
@@ -127,6 +136,11 @@ def init_db() -> None:
 
 
 # ---------------------------------------------------------------- Models
+
+def quarter_of(d: date | None) -> str:
+    """年度（4 月始まり）の四半期: 4〜6 月 = Q1、7〜9 月 = Q2、10〜12 月 = Q3、1〜3 月 = Q4"""
+    return "" if d is None else f"Q{((d.month - 4) % 12) // 3 + 1}"
+
 
 def fiscal_year_of(d: date | None = None) -> int:
     """年度（4 月始まり）: 2026/4/1〜2027/3/31 は 2026 年度"""
@@ -200,7 +214,8 @@ class AchievementIn(BaseModel):
     fiscal_year: int | None = FiscalYear  # 年度（省略時は達成日、無ければ今日から決める）
     title: str = Field(min_length=1)
     owner: str = ""
-    achieved_on: date | None = None
+    achieved_on: date | None = None  # （未使用）旧・達成日。入っていれば達成時期（quarter）の初期値に使う
+    quarter: Literal["", "Q1", "Q2", "Q3", "Q4"] = ""  # 達成時期（年度の四半期）
     note: str = ""
     url: str = ""
     goal_id: int = 0  # 関連する「目標達成に必要な項目」（team_goals.id。0 = なし）
@@ -506,13 +521,17 @@ def _ach_values(a: AchievementIn) -> tuple:
             a.fiscal_year or fiscal_year_of(a.achieved_on))
 
 
+def _set_quarter(db, aid: int, a: AchievementIn) -> None:
+    db.execute("UPDATE team_achievements SET quarter = ? WHERE id = ?", (a.quarter or quarter_of(a.achieved_on), aid))
+
+
 @router.get("/{gid}/achievements")
 def list_achievements(gid: int, year: int | None = None) -> list[dict]:
     with get_db() as db:
         _fetch(db, gid)
         return [dict(r) for r in db.execute(
             "SELECT * FROM team_achievements WHERE group_id = :gid AND (:y IS NULL OR fiscal_year = :y)"
-            " ORDER BY COALESCE(achieved_on, '0000') DESC, id DESC", {"gid": gid, "y": year})]
+            " ORDER BY fiscal_year DESC, quarter DESC, id DESC", {"gid": gid, "y": year})]
 
 
 @router.post("/{gid}/achievements", status_code=201)
@@ -523,6 +542,7 @@ def add_achievement(gid: int, a: AchievementIn) -> dict:
         cur = db.execute("INSERT INTO team_achievements(group_id, title, owner, achieved_on, note, url, fiscal_year, goal_id)"
                          " VALUES (?,?,?,?,?,?,?,?)", (gid, *_ach_values(a), a.goal_id))
         db.execute("UPDATE team_achievements SET progress = ? WHERE id = ?", (a.progress, cur.lastrowid))
+        _set_quarter(db, cur.lastrowid, a)
         _register_year(db, _ach_values(a)[-1])
         return dict(db.execute("SELECT * FROM team_achievements WHERE id = ?", (cur.lastrowid,)).fetchone())
 
@@ -535,6 +555,7 @@ def update_achievement(gid: int, aid: int, a: AchievementIn) -> dict:
                          " updated_at=datetime('now','localtime') WHERE id=? AND group_id=?", (*_ach_values(a), a.goal_id, a.progress, aid, gid))
         if cur.rowcount == 0:
             raise HTTPException(404, "記録が見つかりません")
+        _set_quarter(db, aid, a)
         _register_year(db, _ach_values(a)[-1])
         return dict(db.execute("SELECT * FROM team_achievements WHERE id = ?", (aid,)).fetchone())
 
@@ -555,7 +576,7 @@ async def delete_achievement(gid: int, aid: int, body: PasswordIn) -> Response:
 
 EXPORT_HEADERS = ["種別", "グループ名", "リーダー", "メンバー", "大目標", "関連サービス", "関連基盤技術",
                   "年度", "状態", "目標", "達成基準", "時期", "期限",
-                  "達成したいこと", "関連項目", "担当者", "達成日", "指標", "進捗", "メモ", "リンク"]
+                  "達成したいこと", "関連項目", "担当者", "達成時期", "指標", "進捗", "メモ", "リンク"]
 
 
 def _err(line: int, e: Exception) -> HTTPException:
@@ -580,11 +601,11 @@ def export_csv() -> Response:
             for t in db.execute(f"SELECT * FROM team_goals WHERE group_id = ? ORDER BY fiscal_year, id", (g["id"],)):
                 add(種別="目標", グループ名=g["name"], 年度=t["fiscal_year"] or "", 状態=t["status"], 目標=t["title"],
                     達成基準=t["criteria"], 時期=t["period"], 期限=t["due_date"] or "", メモ=t["note"], リンク=t["url"])
-            for a in db.execute("SELECT * FROM team_achievements WHERE group_id = ? ORDER BY fiscal_year, achieved_on, id",
+            for a in db.execute("SELECT * FROM team_achievements WHERE group_id = ? ORDER BY fiscal_year, quarter, id",
                                 (g["id"],)):
                 goal = db.execute("SELECT title FROM team_goals WHERE id = ? AND group_id = ?", (a["goal_id"], g["id"])).fetchone()
                 add(種別="達成したいこと", グループ名=g["name"], 年度=a["fiscal_year"] or "", 達成したいこと=a["title"],
-                    関連項目=goal["title"] if goal else "", 進捗=a["progress"], 担当者=a["owner"], 達成日=a["achieved_on"] or "", メモ=a["note"], リンク=a["url"])
+                    関連項目=goal["title"] if goal else "", 進捗=a["progress"], 担当者=a["owner"], 達成時期=a["quarter"] or "", メモ=a["note"], リンク=a["url"])
             for k in db.execute("SELECT * FROM team_kpis WHERE group_id = ? ORDER BY sort_order, id", (g["id"],)):
                 add(種別="指標", グループ名=g["name"], 指標=k["title"], 担当者=k["owner"], 進捗=k["progress"])
         for r in db.execute("SELECT year FROM team_years ORDER BY year"):
@@ -669,9 +690,12 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                 result["goals"] += 1
             elif kind == "達成したいこと":
                 try:
-                    on = parse_date(r["達成日"], line, "達成日") if r.get("達成日") else None
+                    on = parse_date(r["達成日"], line, "達成日") if r.get("達成日") else None  # 旧列「達成日」→ 四半期に変換
+                    q = (r.get("達成時期") or "").strip().upper().replace("Ｑ", "Q")
+                    if q and q not in ("Q1", "Q2", "Q3", "Q4"):
+                        raise HTTPException(422, f"{line} 行目: 達成時期「{r['達成時期']}」は Q1〜Q4 のいずれかにしてください")
                     a = AchievementIn(fiscal_year=year, title=r.get("達成したいこと") or r.get("達成したこと", ""), owner=r.get("担当者", ""),
-                                      achieved_on=on, note=r.get("メモ", ""), url=r.get("リンク", ""),
+                                      achieved_on=on, quarter=q, note=r.get("メモ", ""), url=r.get("リンク", ""),
                                       progress=int(r["進捗"]) if r.get("進捗") else 0)
                 except (ValueError, ValidationError) as e:
                     raise _err(line, e)
@@ -691,9 +715,12 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                         a.progress = hit["progress"]  # CSV に進捗が無い・空欄なら、今の達成度のまま
                     db.execute("UPDATE team_achievements SET title=?, owner=?, achieved_on=?, note=?, url=?, fiscal_year=?,"
                                " goal_id=?, progress=?, updated_at=datetime('now','localtime') WHERE id=?", (*vals, goal_id, a.progress, hit["id"]))
+                    if r.get("達成時期") or r.get("達成日"):
+                        _set_quarter(db, hit["id"], a)  # CSV に達成時期が無い・空欄なら、今の時期のまま
                 else:
-                    db.execute("INSERT INTO team_achievements(group_id, title, owner, achieved_on, note, url, fiscal_year, goal_id, progress)"
-                               " VALUES (?,?,?,?,?,?,?,?,?)", (gid, *vals, goal_id, a.progress))
+                    new_id = db.execute("INSERT INTO team_achievements(group_id, title, owner, achieved_on, note, url, fiscal_year, goal_id, progress)"
+                                        " VALUES (?,?,?,?,?,?,?,?,?)", (gid, *vals, goal_id, a.progress)).lastrowid
+                    _set_quarter(db, new_id, a)
                 _register_year(db, vals[-1])
                 result["achievements"] += 1
             else:  # 指標

@@ -303,7 +303,7 @@ function renderDetail(d) {
   for (const a of d.achievements) {
     const li = el("li");
     const top = el("div", "a-top");
-    top.append(el("span", "status-badge", `達成度 ${a.progress}%`), el("span", "a-date", a.achieved_on ? slashDate(a.achieved_on) : `${a.fiscal_year}年度`));
+    top.append(el("span", "status-badge", `達成度 ${a.progress}%`), el("span", "a-date", `${a.fiscal_year}年度${a.quarter ? ` ${a.quarter}` : ""}`));
     li.append(top, el("div", "a-title", a.title));
     if (a.goal) li.append(el("div", "a-goal", `関連項目: ${a.goal}`));
     const meta = el("div", "a-meta");

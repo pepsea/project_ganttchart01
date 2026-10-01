@@ -258,7 +258,7 @@ function renderGoals(g) {
   return gs;
 }
 
-// ---- 達成したいこと（内容・担当者・達成日）: クリックで編集
+// ---- 達成したいこと（内容・担当者・達成時期）: クリックで編集
 function renderAchievements(g) {
   const list = state.achievements.filter((a) => !a.goal_id); // どのタスクにも結びついていないもの
   if (!list.length) return null;
@@ -272,7 +272,7 @@ function renderAchievements(g) {
     li.tabIndex = 0;
     li.title = a.note ? `メモ: ${a.note}\n（クリックして編集）` : "クリックして編集";
     const top = el("div", "g-top");
-    top.append(el("span", "status-badge", "達成"), el("span", "a-date", a.achieved_on ? `達成日 ${slashDate(a.achieved_on)}` : ""));
+    top.append(el("span", "status-badge", "達成"), el("span", "a-date", `${a.fiscal_year}年度${a.quarter ? ` ${a.quarter}` : ""}`));
     li.append(top);
     const main = el("div", "a-main");
     if (!state.year) main.append(el("span", "fy-tag", `${a.fiscal_year}年度`));
@@ -460,7 +460,7 @@ function renderPanel() {
       const f2 = (k, v, cls = "") => { if (v) dl.append(el("dt", "", k), el("dd", cls, v)); };
       f2("達成度", `${x.progress}%`);
       f2("担当者", x.owner ? x.owner.split(" ").join("・") : "");
-      f2("達成日", x.achieved_on ? slashDate(x.achieved_on) : "");
+      f2("達成時期", `${x.fiscal_year}年度${x.quarter ? ` ${x.quarter}` : "（四半期は未設定）"}`);
       f2("年度", `${x.fiscal_year}年度`);
       f2("メモ", x.note, "pre");
       d.append(dl);
@@ -497,7 +497,7 @@ function openAchievementDialog(g, a, goalId = 0) {
   achForm.reset();
   achForm.title.value = a?.title || "";
   achForm.owner.value = a?.owner || "";
-  achForm.achieved_on.value = a?.achieved_on || "";
+  achForm.quarter.value = a?.quarter || "";
   achForm.note.value = a?.note || "";
   achForm.url.value = a?.url || "";
   achForm.progress.value = a ? a.progress : 0; // 新しい達成項目の初期値は 0%
@@ -517,19 +517,12 @@ function openAchievementDialog(g, a, goalId = 0) {
   $("#dlg-ach").showModal();
   achForm.title.focus();
 }
-// 達成日を入れたら年度を合わせる
 achForm.progress.addEventListener("input", () => { $("#ach-pc").textContent = `${achForm.progress.value}%`; });
-achForm.achieved_on.addEventListener("change", () => {
-  const y = fiscalYearOf(achForm.achieved_on.value);
-  if (!y) return;
-  if (![...achForm.fiscal_year.options].some((o) => Number(o.value) === y)) yearOptions(achForm.fiscal_year, y);
-  achForm.fiscal_year.value = y;
-});
 $("#dlg-ach [data-close]").addEventListener("click", () => $("#dlg-ach").close());
 achForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const { group, item } = achEditing;
-  const body = { title: achForm.title.value.trim(), owner: achForm.owner.value.trim(), achieved_on: achForm.achieved_on.value || null, note: achForm.note.value, url: achForm.url.value.trim(),
+  const body = { title: achForm.title.value.trim(), owner: achForm.owner.value.trim(), quarter: achForm.quarter.value, note: achForm.note.value, url: achForm.url.value.trim(),
     fiscal_year: Number(achForm.fiscal_year.value), goal_id: Number(achForm.goal_id.value), progress: Number(achForm.progress.value) };
   try {
     await api(item ? `/api/groups/${group.id}/achievements/${item.id}` : `/api/groups/${group.id}/achievements`,
