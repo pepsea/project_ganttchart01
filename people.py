@@ -171,7 +171,7 @@ def person(name: str) -> dict:
                   for r in db.execute("SELECT id, name, pl, members FROM team_groups ORDER BY created_at DESC, id DESC")
                   if (role := _role(name, r["pl"], r["members"]))]
 
-        # 達成したこと: グループ目標の「達成したこと」で担当者にこの人が入っているもの（新しい順）
+        # 達成したいこと: グループ目標の「達成したいこと」で担当者にこの人が入っているもの（新しい順）
         achievements = [{"id": r["id"], "group_id": r["group_id"], "group": r["group_name"], "title": r["title"],
                          "goal": r["goal_title"] or "", "progress": r["progress"],
                          "achieved_on": r["achieved_on"], "fiscal_year": r["fiscal_year"], "note": r["note"], "url": r["url"]}

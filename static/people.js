@@ -293,10 +293,10 @@ function renderDetail(d) {
   ts.append(ul);
   root.append(ts);
 
-  // 達成したこと（グループ目標の「達成したこと」で担当者がこの人のもの。新しい順）
+  // 達成したいこと（グループ目標の「達成したいこと」で担当者がこの人のもの。新しい順）
   const as = el("section", "pp-section");
-  const ah = el("h3", "", "達成したこと");
-  ah.append(el("span", "count", `${d.achievements.length} 件`), el("span", "hint", "グループ目標の「達成したこと」から表示"));
+  const ah = el("h3", "", "達成したいこと");
+  ah.append(el("span", "count", `${d.achievements.length} 件`), el("span", "hint", "グループ目標の「達成したいこと」から表示"));
   as.append(ah);
   if (!d.achievements.length) as.append(el("p", "hint", "まだ記録がありません"));
   const al = el("ul", "ach-list ach-cards"); // 目標達成に必要な項目と同じカード表示（最大 4 列で折り返し）

@@ -1,8 +1,8 @@
 """グループ目標管理 API
 
 グループ（グループ名・PL・メンバー・大目標・関連サービス・関連基盤技術）と、
-グループごとの目標（達成基準・時期・状態・期限・メモ・リンク）、年度ごとの達成したこと（内容・担当者・達成日・リンク）を管理する。
-目標と達成したことは年度（4 月始まり、fiscal_year）ごとに表示する。
+グループごとの目標（達成基準・時期・状態・期限・メモ・リンク）、年度ごとの達成したいこと（内容・担当者・達成日・リンク）を管理する。
+目標と達成したいことは年度（4 月始まり、fiscal_year）ごとに表示する。
 今年度の達成指標（team_kpis）は画面からは外したが、データと API は残している。
 """
 
@@ -76,12 +76,12 @@ def init_db() -> None:
         for col in ("criteria", "period"):
             if col not in goal_cols:
                 db.execute(f"ALTER TABLE team_goals ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
-        # 今年度達成したこと（内容・担当者・達成日）
+        # 今年度達成したいこと（内容・担当者・達成日）
         db.execute(
             """CREATE TABLE IF NOT EXISTS team_achievements (
                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
                    group_id    INTEGER NOT NULL REFERENCES team_groups(id) ON DELETE CASCADE,
-                   title       TEXT NOT NULL,               -- 達成したこと
+                   title       TEXT NOT NULL,               -- 達成したいこと
                    owner       TEXT NOT NULL DEFAULT '',    -- 担当者
                    achieved_on TEXT,                        -- 達成日（任意）
                    note        TEXT NOT NULL DEFAULT '',
@@ -95,7 +95,7 @@ def init_db() -> None:
         if "sort_order" not in goal_cols:  # 項目の並び順（ドラッグで入れ替え。0 = 未設定）
             db.execute("ALTER TABLE team_goals ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
         if "progress" not in ach_cols:
-            # 達成項目の達成度（％）。これまでの「達成したこと」は達成済みなので 100
+            # 達成項目の達成度（％）。これまでの「達成したこと」（旧名）は達成済みなので 100
             db.execute("ALTER TABLE team_achievements ADD COLUMN progress INTEGER NOT NULL DEFAULT 100")
         if "goal_id" not in ach_cols:
             # 関連する「目標達成に必要な項目」（team_goals.id。0 = どの項目にも結びつけていない）
@@ -340,12 +340,12 @@ def add_year(y: YearIn) -> dict:
 
 @router.delete("/years/{year}", status_code=204)
 def delete_year(year: int) -> Response:
-    """年度の登録を外す（その年度の目標・達成したことが残っている間は外せない）"""
+    """年度の登録を外す（その年度の目標・達成したいことが残っている間は外せない）"""
     with get_db() as db:
         n = db.execute("SELECT (SELECT COUNT(*) FROM team_goals WHERE fiscal_year = :y)"
                        " + (SELECT COUNT(*) FROM team_achievements WHERE fiscal_year = :y)", {"y": year}).fetchone()[0]
         if n:
-            raise HTTPException(409, f"{year}年度には目標・達成したことが {n} 件あるため削除できません")
+            raise HTTPException(409, f"{year}年度には目標・達成したいことが {n} 件あるため削除できません")
         if db.execute("DELETE FROM team_years WHERE year = ?", (year,)).rowcount == 0:
             raise HTTPException(404, f"{year}年度は登録されていません")
     return Response(status_code=204)
@@ -450,7 +450,7 @@ async def delete_goal(gid: int, tid: int, body: PasswordIn) -> Response:
     with get_db() as db:
         if db.execute("DELETE FROM team_goals WHERE id=? AND group_id=?", (tid, gid)).rowcount == 0:
             raise HTTPException(404, "目標が見つかりません")
-        # その項目に結びついていた達成したことは残し、「項目なし」に戻す
+        # その項目に結びついていた達成したいことは残し、「項目なし」に戻す
         db.execute("UPDATE team_achievements SET goal_id = 0 WHERE goal_id = ? AND group_id = ?", (tid, gid))
     return Response(status_code=204)
 
@@ -494,7 +494,7 @@ async def delete_kpi(gid: int, kid: int, body: PasswordIn) -> Response:
     return Response(status_code=204)
 
 
-# ---------------------------------------------------------------- 今年度達成したこと（内容・担当者・達成日）
+# ---------------------------------------------------------------- 今年度達成したいこと（内容・担当者・達成日）
 
 def _check_goal(db, gid: int, goal_id: int) -> None:
     if goal_id and not db.execute("SELECT 1 FROM team_goals WHERE id = ? AND group_id = ?", (goal_id, gid)).fetchone():
@@ -541,7 +541,7 @@ def update_achievement(gid: int, aid: int, a: AchievementIn) -> dict:
 
 @router.delete("/{gid}/achievements/{aid}", status_code=204)
 async def delete_achievement(gid: int, aid: int, body: PasswordIn) -> Response:
-    """今年度達成したことの削除（パスワード必須）"""
+    """今年度達成したいことの削除（パスワード必須）"""
     await _require_password(body)
     with get_db() as db:
         if db.execute("DELETE FROM team_achievements WHERE id=? AND group_id=?", (aid, gid)).rowcount == 0:
@@ -550,12 +550,12 @@ async def delete_achievement(gid: int, aid: int, body: PasswordIn) -> Response:
 
 
 # ---------------------------------------------------------------- CSV（エクスポート・インポート）
-# 1 ファイルに「種別」列（グループ / 目標 / 達成したこと / 指標 / 年度）の行を並べる。
+# 1 ファイルに「種別」列（グループ / 目標 / 達成したいこと / 指標 / 年度。旧名「達成したこと」も読める）の行を並べる。
 # このファイルをインポートすれば、データが空の状態からでも元に戻せる。
 
 EXPORT_HEADERS = ["種別", "グループ名", "リーダー", "メンバー", "大目標", "関連サービス", "関連基盤技術",
                   "年度", "状態", "目標", "達成基準", "時期", "期限",
-                  "達成したこと", "関連項目", "担当者", "達成日", "指標", "進捗", "メモ", "リンク"]
+                  "達成したいこと", "関連項目", "担当者", "達成日", "指標", "進捗", "メモ", "リンク"]
 
 
 def _err(line: int, e: Exception) -> HTTPException:
@@ -583,7 +583,7 @@ def export_csv() -> Response:
             for a in db.execute("SELECT * FROM team_achievements WHERE group_id = ? ORDER BY fiscal_year, achieved_on, id",
                                 (g["id"],)):
                 goal = db.execute("SELECT title FROM team_goals WHERE id = ? AND group_id = ?", (a["goal_id"], g["id"])).fetchone()
-                add(種別="達成したこと", グループ名=g["name"], 年度=a["fiscal_year"] or "", 達成したこと=a["title"],
+                add(種別="達成したいこと", グループ名=g["name"], 年度=a["fiscal_year"] or "", 達成したいこと=a["title"],
                     関連項目=goal["title"] if goal else "", 進捗=a["progress"], 担当者=a["owner"], 達成日=a["achieved_on"] or "", メモ=a["note"], リンク=a["url"])
             for k in db.execute("SELECT * FROM team_kpis WHERE group_id = ? ORDER BY sort_order, id", (g["id"],)):
                 add(種別="指標", グループ名=g["name"], 指標=k["title"], 担当者=k["owner"], 進捗=k["progress"])
@@ -596,16 +596,17 @@ def export_csv() -> Response:
 async def import_csv(file: UploadFile = File(...)) -> dict:
     """グループ目標 CSV を取り込む（1 行でもエラーがあれば何も取り込まない）。
     - グループ: グループ名が同じなら更新（空欄のセルは今の値のまま）、無ければ追加
-    - 目標: 同じグループ・年度・目標なら更新、無ければ追加 / 達成したこと: 同じグループ・年度・内容なら更新、無ければ追加
+    - 目標: 同じグループ・年度・目標なら更新、無ければ追加 / 達成したいこと: 同じグループ・年度・内容なら更新、無ければ追加
     - 指標（画面では非表示）: 同じグループ・指標なら更新 / 年度: 登録
     """
     rows = read_csv(await file.read(), ["種別", "グループ名"])
     result = dict.fromkeys(("groups_added", "groups_updated", "goals", "achievements", "kpis", "years"), 0)
-    kinds = ("グループ", "目標", "達成したこと", "指標", "年度")
+    kinds = ("グループ", "目標", "達成したいこと", "指標", "年度")
+    OLD_KINDS = {"達成したこと": "達成したいこと"}  # 旧名
     with get_db() as db:
         # グループの行を先に取り込む（目標などが同じファイルの後ろのグループを参照してもよいように）
         for line, r in sorted(rows, key=lambda x: x[1].get("種別") != "グループ"):
-            kind = r.get("種別") or "グループ"
+            kind = OLD_KINDS.get(r.get("種別"), r.get("種別")) or "グループ"
             if kind not in kinds:
                 raise HTTPException(422, f"{line} 行目: 種別は {' / '.join(kinds)} のいずれかにしてください")
             if kind == "年度":
@@ -666,10 +667,10 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                                " fiscal_year) VALUES (?,?,?,?,?,?,?,?,?)", (gid, *vals))
                 _register_year(db, vals[-1])
                 result["goals"] += 1
-            elif kind == "達成したこと":
+            elif kind == "達成したいこと":
                 try:
                     on = parse_date(r["達成日"], line, "達成日") if r.get("達成日") else None
-                    a = AchievementIn(fiscal_year=year, title=r.get("達成したこと", ""), owner=r.get("担当者", ""),
+                    a = AchievementIn(fiscal_year=year, title=r.get("達成したいこと") or r.get("達成したこと", ""), owner=r.get("担当者", ""),
                                       achieved_on=on, note=r.get("メモ", ""), url=r.get("リンク", ""),
                                       progress=int(r["進捗"]) if r.get("進捗") else 0)
                 except (ValueError, ValidationError) as e:

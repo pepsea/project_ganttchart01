@@ -253,12 +253,12 @@ const DATASETS = [
     },
   },
   {
-    name: "グループ目標", desc: "グループ・目標・達成したこと・年度（「種別」列で区別）",
+    name: "グループ目標", desc: "グループ・目標・達成したいこと・年度（「種別」列で区別）",
     exports: [{ label: "CSV エクスポート", url: "/api/groups/export.csv" }],
     importUrl: "/api/groups/import",
     notes: ["グループ名が同じグループは更新、無ければ追加します",
-      "目標と達成したことは、同じグループ・年度・内容なら更新、無ければ追加します。エクスポートしたファイルを取り込めば、空の状態からでも元に戻せます"],
-    summary: (d) => `グループ 追加 ${d.groups_added} / 更新 ${d.groups_updated}・目標 ${d.goals}・達成したこと ${d.achievements}・年度 ${d.years}`,
+      "目標と達成したいことは、同じグループ・年度・内容なら更新、無ければ追加します。エクスポートしたファイルを取り込めば、空の状態からでも元に戻せます"],
+    summary: (d) => `グループ 追加 ${d.groups_added} / 更新 ${d.groups_updated}・目標 ${d.goals}・達成したいこと ${d.achievements}・年度 ${d.years}`,
   },
   {
     name: "サービス", desc: "サービス（サービス名・番号・PL・担当者・領域・リンク・関連基盤技術・ゴール・課題）",
