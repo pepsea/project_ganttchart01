@@ -298,6 +298,13 @@
     } catch (err) { say(err.message); }
   });
 
+  // コピー: メモ全体（見出しにしたタイトル + 本文）を Markdown のままコピー。編集中の内容がそのまま入る
+  $("#rec-copy").addEventListener("click", async () => {
+    if (selectedId === null) return;
+    const text = `# ${titleInput.value.trim()}\n\n${body.value.replace(/\s+$/, "")}\n`;
+    if (await copyText(text)) say("メモ全体を Markdown のままコピーしました", false);
+  });
+
   // タスク化: ガントチャートでタスクの追加画面を開く（タスク名 = 記録のタイトル）
   $("#rec-to-task").addEventListener("click", async () => {
     if (selectedId === null) return;
