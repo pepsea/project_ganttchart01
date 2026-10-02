@@ -250,7 +250,7 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .goal-list li { grid-template-columns: auto minmax(0, 1fr) auto auto; }
 
 /* タスク詳細の右の窓 */
-.goal-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 92vw); z-index: 40; background: var(--panel); border-left: 1px solid var(--line-strong); box-shadow: -6px 0 18px rgba(0,0,0,.12); overflow-y: auto; padding: 14px 16px 24px; }
+.goal-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 92vw); z-index: 40; background: var(--panel); border-left: 1px solid var(--line-strong); box-shadow: -6px 0 18px rgba(0,0,0,.12); overflow-y: auto; padding: 14px 16px 24px; }
 .goal-panel[hidden] { display: none; }
 .gpn-head { display: flex; align-items: center; gap: 8px; }
 .gpn-head .spacer { flex: 1; }
@@ -309,3 +309,7 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .goal-list li.dragging { opacity: .45; }
 .goal-list li.drop-before { box-shadow: inset 0 3px 0 var(--accent); }
 .goal-list li.drop-after { box-shadow: inset 0 -3px 0 var(--accent); }
+
+/* 項目に結びついていない達成したいこと: その場で編集するカードは横いっぱいに */
+.ach-cards li.editing { grid-column: 1 / -1; cursor: default; padding: 0; border: 0; background: none; box-shadow: none; }
+.ach-cards li.editing .gpn-form { margin: 0; }

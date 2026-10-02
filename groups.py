@@ -116,6 +116,16 @@ def init_db() -> None:
             d = f"COALESCE({date_col}, created_at)"
             db.execute(f"UPDATE {table} SET fiscal_year = CAST(strftime('%Y', {d}) AS INTEGER)"
                        f" - (CAST(strftime('%m', {d}) AS INTEGER) < 4) WHERE fiscal_year IS NULL")
+        # 目標達成に必要な項目（team_goals）ごとの定期的な議論の記録（日付つき。同じ日に複数可）
+        db.execute("""CREATE TABLE IF NOT EXISTS team_goal_notes (
+                          id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                          group_id   INTEGER NOT NULL REFERENCES team_groups(id) ON DELETE CASCADE,
+                          goal_id    INTEGER NOT NULL REFERENCES team_goals(id) ON DELETE CASCADE,  -- 項目
+                          note_date  TEXT NOT NULL,   -- 議論の日付
+                          body       TEXT NOT NULL,   -- 議論の内容・決定事項・宿題
+                          created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                          updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+                      )""")
         # 登録した年度（選択肢）。初回だけ、今年度と登録済みデータの年度を入れる
         exists = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='team_years'").fetchone()
         db.execute("""CREATE TABLE IF NOT EXISTS team_years (
@@ -230,6 +240,16 @@ class AchievementIn(BaseModel):
     @classmethod
     def check_url(cls, v):
         return _url(v)
+
+
+class GoalNoteIn(BaseModel):
+    note_date: date
+    body: str = Field(min_length=1)
+
+    @field_validator("body", mode="before")
+    @classmethod
+    def strip(cls, v):
+        return v.strip() if isinstance(v, str) else v
 
 
 class PasswordIn(BaseModel):
@@ -467,6 +487,48 @@ async def delete_goal(gid: int, tid: int, body: PasswordIn) -> Response:
             raise HTTPException(404, "目標が見つかりません")
         # その項目に結びついていた達成したいことは残し、「項目なし」に戻す
         db.execute("UPDATE team_achievements SET goal_id = 0 WHERE goal_id = ? AND group_id = ?", (tid, gid))
+        db.execute("DELETE FROM team_goal_notes WHERE goal_id = ? AND group_id = ?", (tid, gid))  # 議論の記録は一緒に削除
+    return Response(status_code=204)
+
+
+# ---------------------------------------------------------------- 項目ごとの定期的な議論の記録
+
+@router.get("/{gid}/goal-notes")
+def list_goal_notes(gid: int) -> list[dict]:
+    """グループの全項目の議論の記録（新しい日付が上）"""
+    with get_db() as db:
+        _fetch(db, gid)
+        return [dict(r) for r in db.execute(
+            "SELECT * FROM team_goal_notes WHERE group_id = ? ORDER BY goal_id, note_date DESC, id DESC", (gid,))]
+
+
+@router.post("/{gid}/goals/{tid}/notes", status_code=201)
+def add_goal_note(gid: int, tid: int, n: GoalNoteIn) -> dict:
+    with get_db() as db:
+        if not db.execute("SELECT 1 FROM team_goals WHERE id = ? AND group_id = ?", (tid, gid)).fetchone():
+            raise HTTPException(404, "項目が見つかりません")
+        cur = db.execute("INSERT INTO team_goal_notes(group_id, goal_id, note_date, body) VALUES (?,?,?,?)",
+                         (gid, tid, n.note_date.isoformat(), n.body))
+        return dict(db.execute("SELECT * FROM team_goal_notes WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+
+@router.put("/{gid}/goal-notes/{nid}")
+def update_goal_note(gid: int, nid: int, n: GoalNoteIn) -> dict:
+    with get_db() as db:
+        cur = db.execute("UPDATE team_goal_notes SET note_date = ?, body = ?, updated_at = datetime('now','localtime')"
+                         " WHERE id = ? AND group_id = ?", (n.note_date.isoformat(), n.body, nid, gid))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "議論の記録が見つかりません")
+        return dict(db.execute("SELECT * FROM team_goal_notes WHERE id = ?", (nid,)).fetchone())
+
+
+@router.delete("/{gid}/goal-notes/{nid}", status_code=204)
+async def delete_goal_note(gid: int, nid: int, body: PasswordIn) -> Response:
+    """議論の記録の削除（パスワード必須）"""
+    await _require_password(body)
+    with get_db() as db:
+        if db.execute("DELETE FROM team_goal_notes WHERE id = ? AND group_id = ?", (nid, gid)).rowcount == 0:
+            raise HTTPException(404, "議論の記録が見つかりません")
     return Response(status_code=204)
 
 

@@ -60,6 +60,7 @@ TABLE_LABELS = {
     "ref_links": "参考リンク",
     "team_groups": "グループ",
     "team_goals": "グループの目標",
+    "team_goal_notes": "グループの項目の議論の記録",
     "team_kpis": "グループの今年度の達成指標（画面では非表示）",
     "team_achievements": "グループの達成したこと（年度ごと）",
     "team_years": "グループ目標の年度（選択肢）",

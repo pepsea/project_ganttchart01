@@ -102,6 +102,7 @@
 | | criteria / period | 達成基準 / 時期（自由記述。例: 2026 年度下期） |
 | | sort_order | 項目の並び順（ドラッグ＆ドロップで入れ替え。0 = 未設定 → 状態・期限の順で並び、新しい項目は一番下） |
 | | fiscal_year | 年度（4 月始まり。例: 2026 = 2026/4〜2027/3）。未設定の行は起動時に期限（無ければ作成日）から設定 |
+| `team_goal_notes` | id, group_id, goal_id, note_date, body, created_at, updated_at | 目標達成に必要な項目（`team_goals`）ごとの定期的な議論の記録（画面: 項目の詳細の「議論の記録」）。group_id = `team_groups.id`、goal_id = `team_goals.id`、note_date = 議論の日付（同じ日に複数可）。項目・グループの削除時に一緒に削除 |
 | `team_achievements` | id, group_id | 年度ごとの達成したいこと（`team_groups.id` を参照。グループの削除時に一緒に削除） |
 | | title / owner / note / url | 達成したいこと / 担当者（半角スペース区切り）/ メモ / リンク |
 | | achieved_on | （未使用）旧・達成日。`quarter` 追加時に 1 回だけ、入っていた日付から達成時期を引き継ぎ済み |
