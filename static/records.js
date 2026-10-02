@@ -103,7 +103,7 @@
       star.type = "button";
       star.title = r.prioritized ? "優先を外す" : "優先にする（先頭に並びます）";
       star.addEventListener("click", (e) => { e.stopPropagation(); togglePriority(r); });
-      const canDrag = sortMode === "manual"; // 更新日順のときは、手動の並べ替えはしない（現在・アーカイブとも同じ）
+      const canDrag = sortMode === "manual"; // 日付のときは、手動の並べ替えはしない（現在・アーカイブとも同じ）
       handle.classList.toggle("off", !canDrag);
       if (!canDrag) handle.title = "「並び順」を「手動」にすると、ドラッグで入れ替えられます";
       li.append(handle, star);
@@ -236,7 +236,7 @@
   $("#rec-close").addEventListener("click", close);
   editor.addEventListener("keydown", (e) => { if (e.key === "Escape" && !e.isComposing) close(); });
   tagFilter.addEventListener("change", refresh);
-  // 並び順: クリックで切り替え（手動 / 更新日順）。「現在」「アーカイブ」の隣
+  // 並び順: クリックで切り替え（手動 / 日付）。「現在」「アーカイブ」の隣
   function syncSortButtons() {
     $("#rec-sort-manual").classList.toggle("on", sortMode === "manual");
     $("#rec-sort-updated").classList.toggle("on", sortMode === "updated");
