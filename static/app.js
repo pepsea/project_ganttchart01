@@ -1282,6 +1282,11 @@ $("#btn-cal").addEventListener("click", () => setCalendar(!cal.on));
     syncPjActions();
     render();
     scrollToDate(todayMs());
+    // 「記録」から「タスク化」したとき: タスク名を入れた「タスク追加」を開く
+    if (params.get("newtask")) {
+      openTaskDialog();
+      $("#form-task").task.value = params.get("newtask");
+    }
     const shared = openTaskId && state.tasks.find((t) => String(t.id) === openTaskId);
     if (shared) {
       scrollToDate(parseDate(shared.end_date));

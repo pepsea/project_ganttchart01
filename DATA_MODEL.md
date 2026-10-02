@@ -176,6 +176,12 @@
 |---|---|---|
 | `person_notes` | name (主キー), body, areas, updated_at | 個人の画面のメモ（body）と、自分で設定する担当領域（areas = JSON 配列。管理サイトの領域から選ぶ）。人ごとに 1 件。name は担当者・PL・メンバーの名前 |
 
+## 記録（records.py）
+
+| テーブル | 列 | 内容 |
+|---|---|---|
+| `records` | id, title, body, tags, prioritized, position, created_at, updated_at | 「記録」タブ（アイディア・メモの保管庫）。body = Markdown、tags = タグの JSON 配列、prioritized = 優先（★。先頭にまとまる）、position = 手で入れ替えた並び順（小さいほど上。新しい記録は一番上） |
+
 ## 変更のルール（アップデートでデータを失わないために）
 
 1. **既存のテーブル・列は削除しない・名前を変えない・意味を変えない。** 使わなくなった列は「未使用」として残す。

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PJ管理</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/records.css">
+</head>
+<body>
+  <header class="toolbar">
+    <nav class="nav">
+      <a href="/">ガントチャート</a>
+      <a href="/cases">案件管理</a>
+      <a href="/platforms">基盤技術</a>
+      <a href="/groups">グループ</a>
+      <a href="/people">個人</a>
+      <a href="/records" class="active">記録</a>
+      <a href="/services">サービス</a>
+      <a href="/documents">共有資料</a>
+      <a href="/links">参考リンク</a>
+      <a href="/admin">管理</a>
+      <a href="/backup">バックアップ</a>
+    </nav>
+    <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
+  </header>
+
+  <!-- 記録: アイディア・メモの保管庫（左: 登録と一覧、右: 開いた記録の編集） -->
+  <main class="rec-layout">
+    <section class="rec-card rec-list-card">
+      <form id="rec-add" class="rec-add">
+        <input name="title" placeholder="新しい記録のタイトル" aria-label="新しい記録のタイトル" required>
+        <button type="submit" class="primary">登録</button>
+      </form>
+      <div class="rec-filters">
+        <input id="rec-search" type="search" placeholder="検索（タイトル・本文）">
+        <select id="rec-tag-filter" aria-label="タグで絞り込み"><option value="">すべてのタグ</option></select>
+      </div>
+      <ul id="rec-list" class="rec-list"></ul>
+    </section>
+
+    <section class="rec-card rec-editor-card">
+      <p id="rec-placeholder" class="hint rec-placeholder">左の一覧から記録を選ぶか、新しく登録してください。</p>
+      <div id="rec-editor" class="rec-editor" hidden>
+        <div class="rec-editor-head">
+          <input id="rec-title" aria-label="タイトル">
+          <button id="rec-close" type="button" title="閉じる（Esc）" aria-label="閉じる">×</button>
+        </div>
+        <div class="rec-actions">
+          <button id="rec-save" type="button" title="今すぐ保存（入力は自動でも保存されます）">保存</button>
+          <button id="rec-to-task" type="button" class="primary" title="ガントチャートでタスクの追加画面を開く">タスク化</button>
+          <button id="rec-preview" type="button" title="Markdown の表示と編集を切り替え">表示</button>
+          <span class="spacer"></span>
+          <button id="rec-delete" type="button" class="danger-outline">削除…</button>
+        </div>
+        <div class="rec-tags">
+          <span id="rec-tag-chips" class="rec-chips"></span>
+          <input id="rec-tag-input" list="rec-tag-options" placeholder="＋タグ（Enter）" aria-label="タグを追加">
+          <datalist id="rec-tag-options"></datalist>
+        </div>
+        <textarea id="rec-body" class="rec-body" placeholder="本文（Markdown で書けます。例: **強調**、- 箇条書き、# 見出し）"></textarea>
+        <div id="rec-rendered" class="rec-rendered md" hidden></div>
+        <div class="rec-meta"><span id="rec-stamp" class="hint"></span><span class="spacer"></span><span id="rec-status" class="hint"></span></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <!-- 記録の削除（パスワードで確認） -->
+  <dialog id="dlg-rec-delete">
+    <form id="form-rec-delete" method="dialog">
+      <h2 class="danger">記録の削除</h2>
+      <p>次の記録を削除します。<strong>この操作は元に戻せません。</strong></p>
+      <p id="rec-delete-target" class="summary"></p>
+      <label><span>確認のため、パスワードを入力してください</span>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </label>
+      <p class="error" id="rec-delete-error"></p>
+      <div class="actions">
+        <button type="button" data-close>キャンセル</button>
+        <button type="submit" class="danger-btn">削除する</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/markdown.js"></script>
+  <script src="/static/dragsort.js"></script>
+  <script src="/static/records.js"></script>
+</body>
+</html>

@@ -1,0 +1,294 @@
+"use strict";
+
+// 記録: アイディア・メモの保管庫。タグ・優先（★）・並べ替え・検索・自動保存つき
+// （別アプリ task_management01 の IDEA と同じ構造: 登録 → 一覧（⋮⋮ ★ タイトル タグ）→ 開くと編集欄・自動保存）
+(() => {
+  const $ = (sel) => document.querySelector(sel);
+  const enc = encodeURIComponent;
+  const AUTOSAVE_MS = 800;
+  const SEARCH_MS = 300;
+
+  function h(tag, cls = "", text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  }
+  async function call(path, options = {}) {
+    const res = await fetch(path, { headers: options.body ? { "Content-Type": "application/json" } : {}, ...options });
+    if (res.status === 401) { location.href = `/login?next=${enc(location.pathname + location.search)}`; throw new Error("ログインが必要です"); }
+    if (!res.ok) {
+      let msg = `${res.status} ${res.statusText}`;
+      try { const j = await res.json(); if (j.detail) msg = typeof j.detail === "string" ? j.detail : msg; } catch (_) { /* そのまま */ }
+      throw new Error(msg);
+    }
+    return res.status === 204 ? null : res.json();
+  }
+  function say(msg, isErr = true) {
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.toggle("err", isErr);
+    t.classList.add("show");
+    clearTimeout(say._t);
+    say._t = setTimeout(() => t.classList.remove("show"), isErr ? 4000 : 2200);
+  }
+  const stamp = (s) => (s ? s.slice(0, 16).replaceAll("-", "/") : "");
+  // タグの色（名前から決める）
+  const tagColor = (name) => {
+    let n = 0;
+    for (const ch of name) n = (n * 31 + ch.codePointAt(0)) % 360;
+    return `hsl(${n} 55% 45%)`;
+  };
+
+  let records = [];
+  let selectedId = null;
+  let selectedTags = [];
+  let saveTimer = null;
+  let searchTimer = null;
+  let preview = false;
+
+  const list = $("#rec-list");
+  const editor = $("#rec-editor");
+  const placeholder = $("#rec-placeholder");
+  const titleInput = $("#rec-title");
+  const body = $("#rec-body");
+  const rendered = $("#rec-rendered");
+  const status = $("#rec-status");
+  const search = $("#rec-search");
+  const tagFilter = $("#rec-tag-filter");
+  const tagInput = $("#rec-tag-input");
+  const base = "/api/records";
+
+  function setEditorVisible(v) {
+    editor.hidden = !v;
+    placeholder.hidden = v;
+  }
+
+  function chip(name, onRemove) {
+    const c = h("span", "rec-chip", name);
+    c.style.setProperty("--c", tagColor(name));
+    if (onRemove) {
+      const x = h("button", "rec-chip-x", "×");
+      x.type = "button";
+      x.title = "タグを外す";
+      x.addEventListener("click", (e) => { e.stopPropagation(); onRemove(); });
+      c.append(x);
+    }
+    return c;
+  }
+
+  function renderList() {
+    list.innerHTML = "";
+    if (!records.length) {
+      const filtered = search.value.trim() || tagFilter.value;
+      list.append(h("li", "empty", filtered ? "該当なし" : "記録はまだありません"));
+      return;
+    }
+    for (const r of records) {
+      const li = h("li", `${r.id === selectedId ? "selected" : ""}${r.prioritized ? " prioritized" : ""}`);
+      li.title = r.id === selectedId ? "もう一度クリックで閉じる" : "";
+      li.addEventListener("click", () => (r.id === selectedId ? close() : select(r.id)));
+      const handle = dragHandle(true);
+      handle.title = "ドラッグで並べ替え（★ の付いたものと付いていないものの間はまたげません）";
+      const star = h("button", `rec-star${r.prioritized ? " on" : ""}`, r.prioritized ? "★" : "☆");
+      star.type = "button";
+      star.title = r.prioritized ? "優先を外す" : "優先にする（先頭に並びます）";
+      star.addEventListener("click", (e) => { e.stopPropagation(); togglePriority(r); });
+      li.append(handle, star, h("span", "rec-title-text", r.title));
+      if (r.tags.length) {
+        const tags = h("span", "rec-chips");
+        for (const t of r.tags) tags.append(chip(t));
+        li.append(tags);
+      }
+      li.querySelector(".rec-title-text").title = r.title;
+      const group = r.prioritized ? "rec-p1" : "rec-p0";
+      enableDragSort(li, handle, {
+        group, id: r.id,
+        ids: () => records.filter((x) => x.prioritized === r.prioritized).map((x) => x.id), // ★ の有無をまたがない
+        onDrop: async (ids) => {
+          try { await call(`${base}/reorder`, { method: "POST", body: JSON.stringify({ ids }) }); } catch (err) { say(err.message); }
+          await refresh();
+        },
+      });
+      list.append(li);
+    }
+  }
+
+  async function loadTags() {
+    const tags = await call(`${base}/tags`);
+    const cur = tagFilter.value;
+    tagFilter.innerHTML = "";
+    tagFilter.append(new Option("すべてのタグ", ""));
+    for (const t of tags) tagFilter.append(new Option(t, t));
+    tagFilter.value = tags.includes(cur) ? cur : "";
+    const dl = $("#rec-tag-options");
+    dl.innerHTML = "";
+    for (const t of tags) dl.append(new Option("", t)); // datalist の候補（値だけ）
+  }
+
+  async function refresh() {
+    try {
+      await loadTags();
+      const q = new URLSearchParams({ q: search.value.trim(), tag: tagFilter.value });
+      records = await call(`${base}?${q}`);
+      renderList();
+    } catch (err) { say(err.message); }
+  }
+
+  async function togglePriority(r) {
+    try {
+      await call(`${base}/${r.id}`, { method: "PUT", body: JSON.stringify({ prioritized: !r.prioritized }) });
+      await refresh();
+    } catch (err) { say(err.message); }
+  }
+
+  function renderTags() {
+    const box = $("#rec-tag-chips");
+    box.innerHTML = "";
+    for (const t of selectedTags) box.append(chip(t, () => saveTags(selectedTags.filter((x) => x !== t))));
+  }
+  async function saveTags(names) {
+    if (selectedId === null) return;
+    try {
+      const u = await call(`${base}/${selectedId}`, { method: "PUT", body: JSON.stringify({ tags: names }) });
+      selectedTags = u.tags;
+      renderTags();
+      await refresh();
+    } catch (err) { say(err.message); }
+  }
+
+  function renderPreview() {
+    rendered.innerHTML = window.mdToHtml(body.value);
+    rendered.hidden = !preview;
+    body.hidden = preview;
+    $("#rec-preview").textContent = preview ? "編集" : "表示";
+  }
+
+  async function save() {
+    saveTimer = null;
+    if (selectedId === null) return;
+    const title = titleInput.value.trim();
+    if (!title) { status.textContent = "タイトルは必須です（未保存）"; return; }
+    try {
+      const u = await call(`${base}/${selectedId}`, { method: "PUT", body: JSON.stringify({ title, body: body.value }) });
+      status.textContent = "保存済み";
+      $("#rec-stamp").textContent = `作成 ${stamp(u.created_at)} ・ 更新 ${stamp(u.updated_at)}`;
+      const i = records.findIndex((x) => x.id === u.id);
+      if (i >= 0) { records[i] = u; renderList(); }
+    } catch (_) {
+      status.textContent = "保存失敗（次の入力で再試行します）";
+    }
+  }
+  function scheduleSave() {
+    status.textContent = "編集中…";
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, AUTOSAVE_MS);
+  }
+  async function flush() {
+    if (saveTimer !== null) { clearTimeout(saveTimer); await save(); }
+  }
+
+  async function select(id) {
+    await flush();
+    try {
+      const r = await call(`${base}/${id}`);
+      selectedId = r.id;
+      titleInput.value = r.title;
+      body.value = r.body;
+      selectedTags = r.tags;
+      renderTags();
+      tagInput.value = "";
+      status.textContent = "";
+      $("#rec-stamp").textContent = `作成 ${stamp(r.created_at)} ・ 更新 ${stamp(r.updated_at)}`;
+      preview = !!r.body; // 本文があるときは、まず表示（Markdown 変換後）で開く
+      renderPreview();
+      setEditorVisible(true);
+      renderList();
+    } catch (err) { say(err.message); }
+  }
+  async function close() {
+    await flush();
+    selectedId = null;
+    setEditorVisible(false);
+    renderList();
+  }
+
+  titleInput.addEventListener("input", scheduleSave);
+  body.addEventListener("input", scheduleSave);
+  $("#rec-close").addEventListener("click", close);
+  editor.addEventListener("keydown", (e) => { if (e.key === "Escape" && !e.isComposing) close(); });
+  tagFilter.addEventListener("change", refresh);
+  search.addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(refresh, SEARCH_MS); });
+  $("#rec-preview").addEventListener("click", () => { preview = !preview; renderPreview(); if (!preview) body.focus(); });
+  $("#rec-save").addEventListener("click", async () => { clearTimeout(saveTimer); await save(); });
+  tagInput.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.isComposing || e.keyCode === 229) return; // 日本語入力の確定の Enter では追加しない
+    e.preventDefault();
+    const name = tagInput.value.trim();
+    if (!name) return;
+    tagInput.value = "";
+    if (selectedTags.includes(name)) return;
+    saveTags([...selectedTags, name]);
+  });
+
+  const addForm = $("#rec-add");
+  addForm.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.isComposing || e.keyCode === 229)) e.preventDefault(); });
+  addForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = addForm.elements.namedItem("title");
+    const title = input.value.trim();
+    if (!title) return;
+    try {
+      const r = await call(base, { method: "POST", body: JSON.stringify({ title, body: "" }) });
+      input.value = "";
+      search.value = "";
+      tagFilter.value = "";
+      await refresh();
+      await select(r.id);
+      preview = false;
+      renderPreview();
+      body.focus(); // 続けて本文を書けるように
+      say(`「${r.title}」を登録しました`, false);
+    } catch (err) { say(err.message); }
+  });
+
+  // タスク化: ガントチャートでタスクの追加画面を開く（タスク名 = 記録のタイトル）
+  $("#rec-to-task").addEventListener("click", async () => {
+    if (selectedId === null) return;
+    await flush();
+    const q = new URLSearchParams({ newtask: titleInput.value.trim() });
+    location.href = `/?${q}`;
+  });
+
+  // 削除（パスワードで確認）
+  const dlg = $("#dlg-rec-delete");
+  $("#rec-delete").addEventListener("click", () => {
+    if (selectedId === null) return;
+    const f = $("#form-rec-delete");
+    f.reset();
+    $("#rec-delete-target").textContent = titleInput.value;
+    $("#rec-delete-error").textContent = "";
+    dlg.showModal();
+    f.password.focus();
+  });
+  dlg.querySelector("[data-close]").addEventListener("click", () => dlg.close());
+  $("#form-rec-delete").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+      await call(`${base}/${selectedId}`, { method: "DELETE", body: JSON.stringify({ password: e.target.password.value }) });
+      dlg.close();
+      selectedId = null;
+      setEditorVisible(false);
+      await refresh();
+      say("記録を削除しました", false);
+    } catch (err) {
+      $("#rec-delete-error").textContent = err.message;
+      e.target.password.select();
+    }
+  });
+
+  window.addEventListener("beforeunload", () => { if (saveTimer !== null) save(); });
+  refresh();
+})();

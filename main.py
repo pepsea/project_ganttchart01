@@ -24,6 +24,7 @@ import groups
 import links
 import people
 import platforms
+import records
 import services
 from csvutil import csv_response, decode_csv, parse_date
 import db as dbmod
@@ -251,7 +252,7 @@ if not dbmod.FRESH_DB:
 
 # テーブルの作成・更新（列の追加など。既存データは消さない）
 MIGRATIONS = [init_db, cases.init_db, platforms.init_db, services.init_db, documents.init_db, links.init_db,
-              groups.init_db, people.init_db]
+              groups.init_db, people.init_db, records.init_db]
 for migrate in MIGRATIONS:
     migrate()
 dbmod.finish_startup()
@@ -279,6 +280,7 @@ app.include_router(documents.router)
 app.include_router(links.router)
 app.include_router(groups.router)
 app.include_router(people.router)
+app.include_router(records.router)
 app.include_router(auth.router)
 app.include_router(backup.router)
 # ログイン必須（/login と /static 以外。API は 401、画面はログイン画面へ転送）
@@ -332,6 +334,11 @@ def groups_page():
 @app.get("/people", include_in_schema=False)
 def people_page():
     return FileResponse(STATIC_DIR / "people.html")
+
+
+@app.get("/records", include_in_schema=False)
+def records_page():
+    return FileResponse(STATIC_DIR / "records.html")
 
 
 @app.get("/backup", include_in_schema=False)

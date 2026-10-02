@@ -67,6 +67,7 @@ TABLE_LABELS = {
     "person_notes": "個人のメモ",
     "case_links": "案件の自由リンク",
     "document_links": "共有資料のリンク",
+    "records": "記録（アイディア・メモ）",
     "platform_links": "基盤の自由リンク",
     "areas": "領域",
     "case_nos": "案件番号",

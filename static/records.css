@@ -1,0 +1,65 @@
+/* 記録（アイディア・メモの保管庫）。別アプリ IDEA と同じ構造: 左に登録と一覧、右に開いた記録の編集 */
+.rec-layout { flex: 1; display: flex; gap: 14px; padding: 14px 18px; min-height: 0; background: var(--bg); }
+.rec-card { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; }
+.rec-list-card { width: 400px; flex: 0 0 400px; }
+.rec-editor-card { flex: 1; }
+
+.rec-add { display: flex; gap: 6px; }
+.rec-add input { flex: 1; min-width: 0; }
+.rec-filters { display: flex; gap: 6px; }
+.rec-filters input { flex: 1; min-width: 0; }
+.rec-filters select { max-width: 40%; }
+.rec-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line-strong); border-radius: 6px; flex: 1; min-height: 0; overflow-y: auto; }
+.rec-list li { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.rec-list li:last-child { border-bottom: 0; }
+.rec-list li:hover { background: #f3f7ff; }
+.rec-list li.selected { background: #e8efff; }
+.rec-list li.prioritized { background: #fff6d6; box-shadow: inset 4px 0 0 #f5a524; }
+.rec-list li.prioritized.selected { background: #fde9a8; }
+.rec-list li.empty { color: var(--muted); cursor: default; justify-content: center; }
+.rec-list li.dragging { opacity: .4; }
+.rec-list li.drop-before { box-shadow: inset 0 3px 0 var(--accent); }
+.rec-list li.drop-after { box-shadow: inset 0 -3px 0 var(--accent); }
+.rec-list .drag-handle { cursor: grab; color: #b0b4bc; font-size: 15px; line-height: 1; padding: 0 2px; user-select: none; }
+.rec-list li:hover .drag-handle { color: var(--muted); }
+.rec-star { border: 0; background: none; padding: 0 2px; font-size: 15px; color: #b0b4bc; line-height: 1; }
+.rec-star.on { color: #e5a100; }
+.rec-title-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rec-chips { display: inline-flex; flex-wrap: wrap; gap: 3px; flex: none; }
+.rec-chip { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 600; color: #fff; background: var(--c, #6b7280); border-radius: 999px; padding: 0 7px; line-height: 18px; }
+.rec-chip-x { border: 0; background: none; color: #fff; padding: 0 0 0 2px; font-size: 12px; line-height: 1; cursor: pointer; }
+.rec-placeholder { margin: auto 0; text-align: center; }
+.rec-editor { flex: 1; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.rec-editor[hidden], .rec-rendered[hidden], .rec-body[hidden], .rec-placeholder[hidden] { display: none; }
+.rec-editor-head { display: flex; gap: 6px; }
+.rec-editor-head input { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; padding: 5px 8px; }
+#rec-close { padding: 2px 9px; color: var(--muted); }
+.rec-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rec-actions .spacer, .rec-meta .spacer { flex: 1; }
+.rec-actions button { padding: 3px 10px; font-size: 12px; }
+.rec-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rec-tags input { flex: 1; min-width: 8em; }
+.rec-body { flex: 1; min-height: 160px; resize: vertical; line-height: 1.7; font-size: 13.5px; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 6px; font-family: inherit; }
+.rec-rendered { flex: 1; min-height: 160px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; line-height: 1.7; font-size: 13.5px; }
+.rec-meta { display: flex; align-items: center; gap: 6px; font-size: 11.5px; }
+
+/* Markdown の表示 */
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { margin: 12px 0 6px; line-height: 1.4; }
+.md h1 { font-size: 20px; } .md h2 { font-size: 17px; } .md h3 { font-size: 15px; } .md h4, .md h5, .md h6 { font-size: 14px; }
+.md p { margin: 6px 0; }
+.md ul, .md ol { margin: 6px 0; padding-left: 1.6em; }
+.md blockquote { margin: 8px 0; padding: 2px 12px; border-left: 4px solid var(--line-strong); color: var(--muted); }
+.md code { background: #eef0f4; border-radius: 4px; padding: 0 5px; font-size: .92em; }
+.md pre { background: #f3f4f7; border-radius: 6px; padding: 8px 10px; overflow: auto; }
+.md pre code { background: none; padding: 0; }
+.md table { border-collapse: collapse; margin: 8px 0; }
+.md th, .md td { border: 1px solid var(--line-strong); padding: 4px 10px; }
+.md th { background: #f3f4f7; }
+.md hr { border: 0; border-top: 1px solid var(--line-strong); margin: 12px 0; }
+.md a { color: var(--accent); }
+
+
+.rec-editor-card .rec-editor { height: 100%; }
+@media (max-width: 900px) { .rec-layout { flex-direction: column; overflow-y: auto; } .rec-list-card { width: 100%; flex: none; max-height: 50vh; } .rec-editor-card { flex: none; } }
