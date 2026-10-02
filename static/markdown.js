@@ -10,13 +10,20 @@
   function inline(text) {
     const codes = [];
     let s = esc(text).replace(/``([^`](?:[\s\S]*?[^`])?)``(?!`)|`([^`]+)`/g, (_, c2, c1) => { codes.push((c2 ?? c1).trim()); return `\u0000${codes.length - 1}\u0000`; });
+    // 画像: ![説明](https://…)。アドレスは http / https のみ（画像そのものは保管せず、アドレスから表示する）
+    const imgs = [];
+    s = s.replace(/!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g, (_, alt, u) => {
+      imgs.push(`<img src="${u}" alt="${alt}" title="${alt}" loading="lazy" referrerpolicy="no-referrer">`);
+      return `\u0001${imgs.length - 1}\u0001`;
+    });
     s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, t, u) => `<a href="${safeHref(u.replace(/&amp;/g, "&"))}" target="_blank" rel="noopener noreferrer">${t}</a>`);
     s = s.replace(/(^|[\s(（])(https?:\/\/[^\s<)）]+)/g, (m, pre, u) => `${pre}<a href="${u.replace(/&amp;/g, "&")}" target="_blank" rel="noopener noreferrer">${u}</a>`);
     s = s.replace(/\*\*([^*]+)\*\*|__([^_]+)__/g, (_, a, b) => `<strong>${a || b}</strong>`)
       .replace(/(^|[^*\w])\*([^*\s][^*]*)\*(?!\*)/g, "$1<em>$2</em>")
       .replace(/(^|[^_\w])_([^_\s][^_]*)_(?![_\w])/g, "$1<em>$2</em>")
       .replace(/~~([^~]+)~~/g, "<del>$1</del>");
-    return s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[Number(i)]}</code>`);
+    return s.replace(/\u0001(\d+)\u0001/g, (_, i) => imgs[Number(i)])
+      .replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[Number(i)]}</code>`);
   }
 
   const cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());

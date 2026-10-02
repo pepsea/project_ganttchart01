@@ -116,3 +116,4 @@
 .md .md-check { margin: 0 4px 0 0; vertical-align: -1px; width: 15px; height: 15px; accent-color: var(--accent); }
 .md .md-check:not(:disabled) { cursor: pointer; }
 .md .md-done { color: var(--muted); text-decoration: line-through; }
+.md img { max-width: 100%; height: auto; border-radius: 4px; vertical-align: middle; }
