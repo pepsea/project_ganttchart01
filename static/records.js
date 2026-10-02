@@ -236,12 +236,21 @@
   $("#rec-close").addEventListener("click", close);
   editor.addEventListener("keydown", (e) => { if (e.key === "Escape" && !e.isComposing) close(); });
   tagFilter.addEventListener("change", refresh);
-  $("#rec-sort").value = sortMode;
-  $("#rec-sort").addEventListener("change", (e) => {
-    sortMode = e.target.value;
-    try { localStorage.setItem("records.sort", sortMode); } catch (_) { /* 記憶できなくても並びは変わる */ }
-    refresh();
-  });
+  // 並び順: クリックで切り替え（手動 / 更新日順）。「現在」「アーカイブ」の隣
+  function syncSortButtons() {
+    $("#rec-sort-manual").classList.toggle("on", sortMode === "manual");
+    $("#rec-sort-updated").classList.toggle("on", sortMode === "updated");
+  }
+  for (const [id, mode] of [["#rec-sort-manual", "manual"], ["#rec-sort-updated", "updated"]]) {
+    $(id).addEventListener("click", () => {
+      if (sortMode === mode) return;
+      sortMode = mode;
+      try { localStorage.setItem("records.sort", sortMode); } catch (_) { /* 記憶できなくても並びは変わる */ }
+      syncSortButtons();
+      refresh();
+    });
+  }
+  syncSortButtons();
   search.addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(refresh, SEARCH_MS); });
   $("#rec-preview").addEventListener("click", () => { preview = !preview; renderPreview(); if (!preview) body.focus(); });
   $("#rec-save").addEventListener("click", async () => { clearTimeout(saveTimer); await save(); });
@@ -290,6 +299,7 @@
     b.textContent = archivedView ? "戻す" : "アーカイブ";
     b.title = archivedView ? "アーカイブから一覧（現在）に戻します" : "一覧から外してサーバーに保管します（「アーカイブ」で見られ、戻せます）";
     $("#rec-add").hidden = archivedView;
+    $(".rec-sorts").hidden = archivedView; // アーカイブの表示は、アーカイブした新しい順（並び順の切り替えはなし）
     $("#rec-view-now").classList.toggle("on", !archivedView);
     $("#rec-view-arch").classList.toggle("on", archivedView);
   }

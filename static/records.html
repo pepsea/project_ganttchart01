@@ -28,9 +28,15 @@
   <!-- 記録: アイディア・メモの保管庫（左: 登録と一覧、右: 開いた記録の編集） -->
   <main class="rec-layout">
     <section class="rec-card rec-list-card">
-      <div class="rec-views" role="tablist">
-        <button type="button" id="rec-view-now" class="on" role="tab">現在</button>
-        <button type="button" id="rec-view-arch" role="tab" title="アーカイブして保管している記録">アーカイブ</button>
+      <div class="rec-viewbar">
+        <div class="rec-views" role="tablist">
+          <button type="button" id="rec-view-now" class="on" role="tab">現在</button>
+          <button type="button" id="rec-view-arch" role="tab" title="アーカイブして保管している記録">アーカイブ</button>
+        </div>
+        <div class="rec-views rec-sorts" role="group" aria-label="並び順">
+          <button type="button" id="rec-sort-manual" class="on" title="手動の並び（★ → ドラッグで入れ替えた順）">手動</button>
+          <button type="button" id="rec-sort-updated" title="更新日の新しい順（最近を上）">更新日順</button>
+        </div>
       </div>
       <form id="rec-add" class="rec-add">
         <input name="title" placeholder="新しい記録のタイトル" aria-label="新しい記録のタイトル" required>
@@ -40,12 +46,6 @@
         <input id="rec-search" type="search" placeholder="検索（タイトル・本文）">
         <select id="rec-tag-filter" aria-label="タグで絞り込み"><option value="">すべてのタグ</option></select>
       </div>
-      <label class="rec-sort">並び順
-        <select id="rec-sort" aria-label="並び順">
-          <option value="manual">手動（ドラッグで入れ替え）</option>
-          <option value="updated">更新日の新しい順</option>
-        </select>
-      </label>
       <ul id="rec-list" class="rec-list"></ul>
     </section>
 

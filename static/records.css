@@ -95,3 +95,10 @@
 .md h1 { font-size: 23px; } .md h2 { font-size: 20px; } .md h3 { font-size: 17.5px; } .md h4, .md h5, .md h6 { font-size: 16px; }
 .rec-meta { font-size: 13px; }
 .rec-placeholder { font-size: 15px; }
+
+/* 現在｜アーカイブ と、並び順（手動｜更新日順）を同じ行に並べる */
+.rec-viewbar { display: flex; gap: 10px; align-items: center; }
+.rec-viewbar .rec-views { flex: 1 1 0; min-width: 0; }
+.rec-viewbar .rec-sorts { flex: 1 1 0; }
+.rec-viewbar .rec-sorts button.on { background: #2fa36b; border-color: #2fa36b; }
+.rec-viewbar .rec-sorts[hidden] { display: none; }
