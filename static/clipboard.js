@@ -11,14 +11,20 @@ async function copyText(text) {
     }
   } catch (_) { /* 次の方法へ */ }
   try {
+    // 開いているウィンドウ（<dialog>）の中にいるとき、ウィンドウの外の要素にはフォーカスできない（コピーが失敗する）。
+    // そのため、見えない入力欄は開いているウィンドウの中に作る
+    const host = document.querySelector("dialog[open]") || document.body;
+    const prev = document.activeElement;
     const ta = document.createElement("textarea");
     ta.value = text;
     ta.setAttribute("readonly", "");
-    ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;pointer-events:none";
-    document.body.append(ta);
+    ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none";
+    host.append(ta);
+    ta.focus({ preventScroll: true });
     ta.select();
-    const ok = document.execCommand("copy");
-    ta.remove();
+    ta.setSelectionRange(0, text.length); // iOS・Windows の一部のブラウザで select() だけでは選べないことがある
+    let ok = false;
+    try { ok = document.execCommand("copy"); } finally { ta.remove(); if (prev && prev.focus) prev.focus({ preventScroll: true }); }
     if (ok) return true;
   } catch (_) { /* 最後の方法へ */ }
   prompt("自動でコピーできませんでした。この内容をコピーしてください", text);
