@@ -608,6 +608,8 @@ function renderTimeline() {
 // ------------------------------------------------------------ ドロワー（詳細・編集）
 const form = $("#case-form");
 const drawer = $("#drawer");
+// 窓の幅は左端のつまみをドラッグして変えられる（ブラウザに保存）
+enablePanelResize(drawer, $("#drawer-resize"), "cases.drawerWidth");
 
 function renderAreaChecks(selected) {
   const box = $("#area-checks");

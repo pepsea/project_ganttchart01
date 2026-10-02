@@ -260,6 +260,7 @@ dialog.drawer {
   height: 100vh;
   max-height: 100vh;
   width: min(760px, 100vw);
+  max-width: 100vw;
   border-radius: 0;
   padding: 0;
   display: none;

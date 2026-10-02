@@ -6,6 +6,7 @@
   <title>PJ管理</title>
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/cases.css">
+  <link rel="stylesheet" href="/static/inlinepanel.css">
 </head>
 <body>
   <header class="toolbar">
@@ -45,6 +46,7 @@
 
   <!-- 案件詳細（右側ドロワー） -->
   <dialog id="drawer" class="drawer">
+    <div id="drawer-resize" class="gpn-resize" title="ドラッグで幅を変更（ダブルクリックで元の幅）"></div>
     <div class="drawer-head">
       <div>
         <div id="d-no" class="d-no"></div>
@@ -213,6 +215,7 @@
 
   <script src="/static/searchselect.js"></script>
   <script src="/static/clipboard.js"></script>
+  <script src="/static/inlinepanel.js"></script>
   <script src="/static/cases.js"></script>
 </body>
 </html>
