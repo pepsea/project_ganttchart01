@@ -63,3 +63,10 @@
 
 .rec-editor-card .rec-editor { height: 100%; }
 @media (max-width: 900px) { .rec-layout { flex-direction: column; overflow-y: auto; } .rec-list-card { width: 100%; flex: none; max-height: 50vh; } .rec-editor-card { flex: none; } }
+
+.rec-views { display: flex; gap: 0; }
+.rec-views button { flex: 1; border-radius: 0; padding: 4px 10px; font-size: 12.5px; }
+.rec-views button:first-child { border-radius: 6px 0 0 6px; }
+.rec-views button:last-child { border-radius: 0 6px 6px 0; border-left: 0; }
+.rec-views button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+.rec-add[hidden] { display: none; }

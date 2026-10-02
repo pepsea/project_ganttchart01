@@ -46,6 +46,7 @@
   let saveTimer = null;
   let searchTimer = null;
   let preview = false;
+  let archivedView = false; // true = アーカイブした記録を見ている
 
   const list = $("#rec-list");
   const editor = $("#rec-editor");
@@ -81,7 +82,7 @@
     list.innerHTML = "";
     if (!records.length) {
       const filtered = search.value.trim() || tagFilter.value;
-      list.append(h("li", "empty", filtered ? "該当なし" : "記録はまだありません"));
+      list.append(h("li", "empty", filtered ? "該当なし" : archivedView ? "アーカイブした記録はありません" : "記録はまだありません"));
       return;
     }
     for (const r of records) {
@@ -94,7 +95,8 @@
       star.type = "button";
       star.title = r.prioritized ? "優先を外す" : "優先にする（先頭に並びます）";
       star.addEventListener("click", (e) => { e.stopPropagation(); togglePriority(r); });
-      li.append(handle, star, h("span", "rec-title-text", r.title));
+      if (!archivedView) li.append(handle, star); // アーカイブした記録は、並べ替え・優先の操作をしない
+      li.append(h("span", "rec-title-text", r.title));
       if (r.tags.length) {
         const tags = h("span", "rec-chips");
         for (const t of r.tags) tags.append(chip(t));
@@ -102,7 +104,7 @@
       }
       li.querySelector(".rec-title-text").title = r.title;
       const group = r.prioritized ? "rec-p1" : "rec-p0";
-      enableDragSort(li, handle, {
+      if (!archivedView) enableDragSort(li, handle, {
         group, id: r.id,
         ids: () => records.filter((x) => x.prioritized === r.prioritized).map((x) => x.id), // ★ の有無をまたがない
         onDrop: async (ids) => {
@@ -129,7 +131,7 @@
   async function refresh() {
     try {
       await loadTags();
-      const q = new URLSearchParams({ q: search.value.trim(), tag: tagFilter.value });
+      const q = new URLSearchParams({ q: search.value.trim(), tag: tagFilter.value, archived: archivedView });
       records = await call(`${base}?${q}`);
       renderList();
     } catch (err) { say(err.message); }
@@ -260,7 +262,40 @@
     location.href = `/?${q}`;
   });
 
-  // 削除（パスワードで確認）
+  // アーカイブ（一覧から外してサーバーに保管）/ 戻す（アーカイブした記録を一覧に戻す）
+  function syncArchiveButton() {
+    const b = $("#rec-archive");
+    b.textContent = archivedView ? "戻す" : "アーカイブ";
+    b.title = archivedView ? "アーカイブから一覧（現在）に戻します" : "一覧から外してサーバーに保管します（「アーカイブ」で見られ、戻せます）";
+    $("#rec-add").hidden = archivedView;
+    $("#rec-view-now").classList.toggle("on", !archivedView);
+    $("#rec-view-arch").classList.toggle("on", archivedView);
+  }
+  $("#rec-archive").addEventListener("click", async () => {
+    if (selectedId === null) return;
+    await flush();
+    try {
+      await call(`${base}/${selectedId}`, { method: "PUT", body: JSON.stringify({ archived: !archivedView }) });
+      say(archivedView ? `「${titleInput.value}」を一覧に戻しました` : `「${titleInput.value}」をアーカイブしました（サーバーに保管）`, false);
+      selectedId = null;
+      setEditorVisible(false);
+      await refresh();
+    } catch (err) { say(err.message); }
+  });
+  async function switchView(archived) {
+    if (archivedView === archived) return;
+    await flush();
+    archivedView = archived;
+    selectedId = null;
+    setEditorVisible(false);
+    syncArchiveButton();
+    await refresh();
+  }
+  $("#rec-view-now").addEventListener("click", () => switchView(false));
+  $("#rec-view-arch").addEventListener("click", () => switchView(true));
+  syncArchiveButton();
+
+  // 削除（パスワードで確認）。アーカイブと違い、完全に削除する（元に戻せない）
   const dlg = $("#dlg-rec-delete");
   $("#rec-delete").addEventListener("click", () => {
     if (selectedId === null) return;

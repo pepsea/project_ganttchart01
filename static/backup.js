@@ -281,6 +281,13 @@ const DATASETS = [
     summary: (d) => `追加 ${d.added} 件 / 更新 ${d.updated} 件`,
   },
   {
+    name: "記録", desc: "記録（アイディア・メモ）。現在の記録とアーカイブした記録の両方（状態・タイトル・本文・タグ・優先・日時）",
+    exports: [{ label: "CSV エクスポート", url: "/api/records/export.csv" }],
+    importUrl: "/api/records/import",
+    notes: ["必須列: タイトル。タイトルと作成日時が同じ記録は更新、無ければ追加します。「状態」が「アーカイブ」ならアーカイブとして保存します。エクスポートしたファイルを取り込めば、現在・アーカイブとも元に戻せます"],
+    summary: (d) => `追加 ${d.added} 件 / 更新 ${d.updated} 件`,
+  },
+  {
     name: "参考リンク", desc: "リンク（欄・名前・URL・説明・領域・表示順）",
     exports: [{ label: "CSV エクスポート", url: "/api/links/export.csv" }],
     importUrl: "/api/links/import",
