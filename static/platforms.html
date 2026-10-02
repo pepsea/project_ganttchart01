@@ -49,54 +49,12 @@
     </section>
   </div>
 
-  <aside id="goal-panel" class="goal-panel" hidden aria-label="項目の詳細"></aside>
+  <aside id="goal-panel" class="goal-panel" hidden aria-label="項目の詳細">
+    <div id="goal-panel-resize" class="gpn-resize" title="ドラッグで幅を変更（ダブルクリックで元の幅）"></div>
+    <div id="goal-panel-body"></div>
+  </aside>
 
   <div id="toast" class="toast" role="status"></div>
-
-  <!-- 項目の中の実施内容の追加・編集 -->
-  <dialog id="dlg-gtask">
-    <form id="form-gtask" method="dialog" autocomplete="off">
-      <h2 id="gt-title">実施内容の追加</h2>
-      <p id="gt-meta" class="hint"></p>
-      <label><span>実施内容 <span class="req">*</span></span><input name="title" required placeholder="例: 解析パイプラインの検証"></label>
-      <label><span>進捗率 <b id="gt-pc">0%</b></span><input type="range" name="progress" min="0" max="100" step="5" value="0"></label>
-      <div class="goal-form-grid">
-        <label><span>担当者（複数はスペース区切り）</span><input name="owner" placeholder="例: 高橋 鈴木"></label>
-        <label><span>期限</span><input type="date" name="due_date"></label>
-      </div>
-      <label><span>メモ</span><textarea name="note" rows="3"></textarea></label>
-      <p class="error" id="gt-error"></p>
-      <div class="actions goal-actions">
-        <button type="button" id="gt-delete" class="danger-outline">削除…</button>
-        <span class="spacer"></span>
-        <button type="button" data-close>キャンセル</button>
-        <button type="submit" class="primary" id="gt-submit">追加</button>
-      </div>
-    </form>
-  </dialog>
-
-
-  <!-- 目標の追加・編集（目標をクリックで開く） -->
-  <dialog id="dlg-goal">
-    <form id="form-goal" method="dialog">
-      <h2 id="goal-title">項目の編集</h2>
-      <p id="goal-meta" class="hint"></p>
-      <div class="goal-form-grid">
-        <label><span>状態</span><select name="status"></select></label>
-        <label><span>期限</span><input type="date" name="due_date"></label>
-      </div>
-      <label><span>項目 <span class="req">*</span></span><input name="title" required placeholder="例: プロテオーム解析の自動化"></label>
-      <label><span>メモ</span><textarea name="note" rows="4" placeholder="補足、達成条件、関連情報など"></textarea></label>
-      <label><span>リンク</span><input name="url" type="url" placeholder="https://（資料・報告書など）"></label>
-      <p class="error" id="goal-error"></p>
-      <div class="actions goal-actions">
-        <button type="button" id="goal-delete" class="danger-outline">削除…</button>
-        <span class="spacer"></span>
-        <button type="button" data-close>キャンセル</button>
-        <button type="submit" class="primary" id="goal-submit">保存</button>
-      </div>
-    </form>
-  </dialog>
 
   <!-- 目標・月報の削除（パスワードで確認） -->
   <dialog id="dlg-goal-delete">

@@ -64,8 +64,9 @@
 | `platform_links` | id, platform, label, url, sort_order, created_at | 基盤の自由リンク（何個でも。platform = 基盤番号）。`platform_links` を含まない古いバックアップを復元したときは、復元した platforms の旧列から作り直す |
 | | updated_at | 基本情報の更新日時 |
 | | area | （未使用。旧・単一領域。起動時に areas へ引き継ぎ） |
-| `platform_goals` | id, platform, title, due_date, status, note, url, sort_order, created_at, updated_at | 目標（状態: 未着手・取組中・達成・保留。url は目標のリンク。sort_order は項目の並び順 = ドラッグ＆ドロップで入れ替え。0 = 未設定） |
-| `platform_goal_tasks` | id, platform, goal_id, title, progress, owner, due_date, note, created_at, updated_at | 目標達成に必要な項目（`platform_goals`）の中の実施内容（リスト）。goal_id = `platform_goals.id`、progress = 進捗率（％。0〜100）。項目の削除時に一緒に削除 |
+| `platform_goals` | id, platform, title, due_date, status, note, url, sort_order, created_at, updated_at | 目標（状態: 未着手・取組中・達成・保留。note は画面では「内容」と表示（CSV の列名は「メモ」のまま）。url は目標のリンク。sort_order は項目の並び順 = ドラッグ＆ドロップで入れ替え。0 = 未設定） |
+| `platform_goal_tasks` | id, platform, goal_id, title, progress, owner, due_date, note, created_at, updated_at | 目標達成に必要な項目（`platform_goals`）の中の実施内容（リスト）。goal_id = `platform_goals.id`、progress = 進捗率（％。0〜100）。項目の削除時に一緒に削除。画面の「メモ」は「内容」と表示（列名は note のまま） |
+| `platform_goal_notes` | id, platform, goal_id, note_date, body, created_at, updated_at | 目標達成に必要な項目（`platform_goals`）ごとの定期的な議論の記録（画面: 項目の詳細の「議論の記録」）。goal_id = `platform_goals.id`、note_date = 議論の日付（同じ日に複数可）。項目の削除時に一緒に削除 |
 | `platform_topics` | id, platform, meeting_date, title, body, created_at, updated_at | ディスカッション |
 | `platform_monthly` | id, platform, month, body, updated_at | 基盤の月報（基盤×月で一意） |
 

@@ -88,6 +88,18 @@ def init_db() -> None:
                    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
                )"""
         )
+        # 目標達成に必要な項目（platform_goals）ごとの定期的な議論の記録（日付つき。同じ日に複数可）
+        db.execute(
+            """CREATE TABLE IF NOT EXISTS platform_goal_notes (
+                   id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                   platform   TEXT NOT NULL,          -- 基盤番号（platforms.name）
+                   goal_id    INTEGER NOT NULL,       -- 項目（platform_goals.id）
+                   note_date  TEXT NOT NULL,          -- 議論の日付
+                   body       TEXT NOT NULL,          -- 議論の内容・決定事項・宿題
+                   created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                   updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+               )"""
+        )
         db.executescript(
             """
             CREATE TABLE IF NOT EXISTS platform_topics (
@@ -208,6 +220,16 @@ class TopicIn(BaseModel):
     meeting_date: date
     title: str = Field(min_length=1)
     body: str = ""
+
+
+class GoalNoteIn(BaseModel):
+    note_date: date
+    body: str = Field(min_length=1)
+
+    @field_validator("body", mode="before")
+    @classmethod
+    def _strip_body(cls, v):
+        return v.strip() if isinstance(v, str) else v
 
 
 class MonthlyIn(BaseModel):
@@ -779,6 +801,7 @@ async def delete_goal(name: str, goal_id: int, body: ConfirmIn) -> Response:
         if cur.rowcount == 0:
             raise HTTPException(404, "目標が見つかりません")
         db.execute("DELETE FROM platform_goal_tasks WHERE goal_id=? AND platform=?", (goal_id, name))  # 項目の中の実施内容も一緒に削除
+        db.execute("DELETE FROM platform_goal_notes WHERE goal_id=? AND platform=?", (goal_id, name))  # 議論の記録も一緒に削除
     return Response(status_code=204)
 
 
@@ -824,6 +847,47 @@ async def delete_goal_task(name: str, task_id: int, body: ConfirmIn) -> Response
     with get_db() as db:
         if db.execute("DELETE FROM platform_goal_tasks WHERE id=? AND platform=?", (task_id, name)).rowcount == 0:
             raise HTTPException(404, "実施内容が見つかりません")
+    return Response(status_code=204)
+
+
+# ---------------------------------------------------------------- 項目ごとの定期的な議論の記録
+
+@router.get("/{name}/goal-notes")
+def list_goal_notes(name: str) -> list[dict]:
+    """基盤の全項目の議論の記録（新しい日付が上）"""
+    with get_db() as db:
+        fetch_platform(db, name)
+        return [dict(r) for r in db.execute(
+            "SELECT * FROM platform_goal_notes WHERE platform = ? ORDER BY goal_id, note_date DESC, id DESC", (name,))]
+
+
+@router.post("/{name}/goals/{goal_id}/notes", status_code=201)
+def add_goal_note(name: str, goal_id: int, n: GoalNoteIn) -> dict:
+    with get_db() as db:
+        if not db.execute("SELECT 1 FROM platform_goals WHERE id=? AND platform=?", (goal_id, name)).fetchone():
+            raise HTTPException(404, "項目が見つかりません")
+        cur = db.execute("INSERT INTO platform_goal_notes(platform, goal_id, note_date, body) VALUES (?,?,?,?)",
+                         (name, goal_id, n.note_date.isoformat(), n.body))
+        return dict(db.execute("SELECT * FROM platform_goal_notes WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+
+@router.put("/{name}/goal-notes/{note_id}")
+def update_goal_note(name: str, note_id: int, n: GoalNoteIn) -> dict:
+    with get_db() as db:
+        cur = db.execute("UPDATE platform_goal_notes SET note_date=?, body=?, updated_at=datetime('now','localtime')"
+                         " WHERE id=? AND platform=?", (n.note_date.isoformat(), n.body, note_id, name))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "議論の記録が見つかりません")
+        return dict(db.execute("SELECT * FROM platform_goal_notes WHERE id = ?", (note_id,)).fetchone())
+
+
+@router.delete("/{name}/goal-notes/{note_id}", status_code=204)
+async def delete_goal_note(name: str, note_id: int, body: ConfirmIn) -> Response:
+    """議論の記録の削除（パスワード必須）"""
+    await require_password(body)
+    with get_db() as db:
+        if db.execute("DELETE FROM platform_goal_notes WHERE id=? AND platform=?", (note_id, name)).rowcount == 0:
+            raise HTTPException(404, "議論の記録が見つかりません")
     return Response(status_code=204)
 
 

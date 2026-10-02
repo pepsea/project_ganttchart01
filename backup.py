@@ -47,6 +47,7 @@ TABLE_LABELS = {
     "platforms": "基盤（基盤番号・基本情報・全体目標）",
     "platform_goals": "基盤の目標",
     "platform_goal_tasks": "基盤の項目の中の実施内容（進捗率）",
+    "platform_goal_notes": "基盤の項目の議論の記録",
     "platform_topics": "基盤のディスカッション",
     "platform_monthly": "基盤の月報",
     "services": "サービス",

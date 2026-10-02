@@ -19,6 +19,8 @@ const state = {
   current: null, // 選択中の基盤番号
   goals: [],
   goalTasks: [], // 項目の中の実施内容（進捗率つき）
+  goalNotes: [], // 項目ごとの定期的な議論の記録
+  panelEdit: null, // 右の窓の中で編集中のもの { kind: "goal" | "task" | "note", id }（id = null は追加）
   panelGoal: null, // 右の詳細の窓で開いている項目の id
   openTask: null,
   topics: [],
@@ -348,10 +350,12 @@ function showView(detail) {
 
 function backToList(push = true) {
   if (state.editing && state.dirty && !confirm("編集中の変更が保存されていません。破棄して一覧に戻りますか？")) return false;
+  if (!confirmDiscard()) return false;
   state.editing = false;
   state.dirty = false;
   state.current = null;
   state.panelGoal = null;
+  state.panelEdit = null;
   $("#goal-panel").hidden = true;
   if (push) history.pushState(null, "", "/platforms");
   renderList();
@@ -365,15 +369,16 @@ async function select(name) {
     state.editing = false;
   }
   const fromList = state.current !== name;
+  if (fromList && !confirmDiscard()) return;
   state.current = name;
   state.dirty = false;
   const url = `/platforms?id=${enc(name)}${backGroup ? `&from=groups&group=${backGroup.id}&year=${backGroup.year}` : ""}`;
   if (fromList && location.pathname + location.search !== url) history.pushState(null, "", url);
   else history.replaceState(null, "", url);
   const base = `/api/platforms/${enc(name)}`;
-  if (fromList) { state.panelGoal = null; state.openTask = null; }
-  [state.goals, state.goalTasks, state.topics, state.monthly] = await Promise.all(
-    [api(`${base}/goals`), api(`${base}/goal-tasks`), api(`${base}/topics`), api(`${base}/monthly`)]);
+  if (fromList) { state.panelGoal = null; state.openTask = null; state.panelEdit = null; panelDrafts.clear(); }
+  [state.goals, state.goalTasks, state.goalNotes, state.topics, state.monthly] = await Promise.all(
+    [api(`${base}/goals`), api(`${base}/goal-tasks`), api(`${base}/goal-notes`), api(`${base}/topics`), api(`${base}/monthly`)]);
   renderList();
   renderDetail();
   const p = state.platforms.find((x) => x.name === name);
@@ -713,7 +718,8 @@ async function refreshAfterChange(kind) {
   const base = `/api/platforms/${enc(state.current)}`;
   if (kind === "tasks") state.tasks = await api("/api/tasks");
   else if (kind === "goalTasks") state.goalTasks = await api(`${base}/goal-tasks`);
-  else if (kind === "goals") [state.goals, state.goalTasks] = await Promise.all([api(`${base}/goals`), api(`${base}/goal-tasks`)]);
+  else if (kind === "goalNotes") state.goalNotes = await api(`${base}/goal-notes`);
+  else if (kind === "goals") [state.goals, state.goalTasks, state.goalNotes] = await Promise.all([api(`${base}/goals`), api(`${base}/goal-tasks`), api(`${base}/goal-notes`)]);
   else if (kind) state[kind] = await api(`${base}/${kind}`);
   state.platforms = await api("/api/platforms");
   renderList();
@@ -742,7 +748,7 @@ function renderGoals(p) {
   h.append(el("span", "hint", "全体目標を達成するための項目です。クリックすると詳細（実施内容と進捗率）を開きます"));
   const add = el("button", "primary right", "＋ 項目を追加");
   add.type = "button";
-  add.addEventListener("click", () => openGoalDialog(p, null));
+  add.addEventListener("click", () => openGoalPanel("new", { kind: "goal", id: null }));
   h.append(add);
   sec.append(h);
 
@@ -754,7 +760,7 @@ function renderGoals(p) {
   for (const g of state.goals) {
     const li = el("li");
     li.tabIndex = 0;
-    li.title = g.note ? `メモ: ${g.note}\n（クリックで詳細）` : "クリックで詳細";
+    li.title = g.note ? `内容: ${g.note}\n（クリックで詳細）` : "クリックで詳細";
     const due = goalDue(g);
     li.classList.toggle("done", g.status === "達成");
     li.classList.toggle("sel", state.panelGoal === g.id);
@@ -779,7 +785,7 @@ function renderGoals(p) {
       onDrop: (ids) => reorderGoals(p, ids),
     });
     li.append(handle, st, main, sum, d);
-    const open = () => { state.panelGoal = g.id; state.openTask = null; renderDetail(); };
+    const open = () => { if (state.panelGoal !== g.id) openGoalPanel(g.id); };
     li.addEventListener("click", open);
     li.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
     ul.append(li);
@@ -797,56 +803,282 @@ async function reorderGoals(p, ids) {
   await refreshAfterChange("goals");
 }
 
-// 項目の詳細（右の窓）: 項目の内容と、実施内容のリスト（バー = 進捗率。％で色が変わる。クリックで詳細）
+// 項目の詳細（右の窓）: 項目の内容・実施内容（バー = 進捗率。％で色が変わる）・定期的な議論の記録。
+// 編集はポップアップを開かず、窓の中でその場に書く（state.panelEdit = 編集中のもの）
+const panelDrafts = new Map(); // 書きかけの入力（再描画しても消えないように保持）。key → { values, changed }
+const panelDirty = () => [...panelDrafts.values()].some((d) => d.changed);
+// 書きかけを捨ててよいか確認（keys を指定するとその入力だけ）
+function confirmDiscard(keys = null) {
+  const list = keys ? keys.map((k) => panelDrafts.get(k)).filter(Boolean) : [...panelDrafts.values()];
+  if (list.some((d) => d.changed) && !confirm("書きかけの内容が保存されていません。破棄しますか？")) return false;
+  if (keys) keys.forEach((k) => panelDrafts.delete(k)); else panelDrafts.clear();
+  return true;
+}
+const editKey = (e) => (e ? `${e.kind}:${e.id ?? "new"}` : "");
+// 窓の中の編集を切り替える（null = 編集をやめる）
+function setPanelEdit(next) {
+  if (!confirmDiscard(state.panelEdit ? [editKey(state.panelEdit)] : [])) return;
+  state.panelEdit = next;
+  renderDetail();
+}
+// 窓を開く・閉じる・別の項目に切り替える（id = null で閉じる、"new" で項目の追加）
+function openGoalPanel(id, edit = null) {
+  if (state.panelGoal !== id && !confirmDiscard()) return;
+  state.panelGoal = id;
+  state.openTask = null;
+  state.panelEdit = edit;
+  renderDetail();
+}
+
+function panelField(label, input, cls = "") {
+  const l = el("label", `gpn-field ${cls}`.trim());
+  l.append(el("span", "", label), input);
+  return l;
+}
+function panelInput(name, attrs = {}) {
+  const i = el(attrs.tag || "input");
+  i.name = name;
+  for (const [k, v] of Object.entries(attrs)) if (k !== "tag") i[k] = v;
+  return i;
+}
+// 入力欄に値を入れ、書きかけを panelDrafts に残す。Ctrl / ⌘ + Enter で保存、Esc で取消
+function bindPanelForm(form, key, initial, onCancel) {
+  const draft = panelDrafts.get(key) || { values: {}, changed: false };
+  panelDrafts.set(key, draft);
+  for (const [n, v] of Object.entries(initial)) {
+    const i = form.elements.namedItem(n);
+    if (i) i.value = n in draft.values ? draft.values[n] : (v ?? "");
+  }
+  form.addEventListener("input", (e) => {
+    if (!e.target.name) return;
+    draft.values[e.target.name] = e.target.value;
+    draft.changed = true;
+  });
+  form.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); form.requestSubmit(); }
+    else if (e.key === "Escape" && onCancel) { e.preventDefault(); e.stopPropagation(); onCancel(); }
+  });
+}
+function panelActions(form, { submitLabel, onCancel, onDelete }) {
+  const bar = el("div", "gpn-form-actions");
+  if (onDelete) {
+    const del = el("button", "danger-outline", "削除…");
+    del.type = "button";
+    del.addEventListener("click", onDelete);
+    bar.append(del);
+  }
+  bar.append(el("span", "spacer"), el("span", "hint", "Ctrl+Enter で保存"));
+  if (onCancel) {
+    const c = el("button", "", "キャンセル");
+    c.type = "button";
+    c.addEventListener("click", onCancel);
+    bar.append(c);
+  }
+  const s = el("button", "primary", submitLabel);
+  s.type = "submit";
+  bar.append(s);
+  const err = el("p", "error");
+  form.append(err, bar);
+  return err;
+}
+const focusLater = (input) => requestAnimationFrame(() => input.focus());
+
+// 項目（目標）の入力欄。g = null なら追加
+function goalForm(p, g) {
+  const key = editKey({ kind: "goal", id: g?.id });
+  const form = el("form", "gpn-form");
+  form.autocomplete = "off";
+  const status = panelInput("status", { tag: "select" });
+  for (const st of state.statuses) status.append(new Option(st, st));
+  const title = panelInput("title", { required: true, placeholder: "例: プロテオーム解析の自動化" });
+  const grid = el("div", "gpn-grid");
+  grid.append(panelField("状態", status), panelField("期限", panelInput("due_date", { type: "date" })));
+  form.append(grid, panelField("項目 *", title),
+    panelField("内容", panelInput("note", { tag: "textarea", rows: 5, placeholder: "補足、達成条件、関連情報など" })),
+    panelField("リンク", panelInput("url", { type: "url", placeholder: "https://（資料・報告書など）" })));
+  const cancel = () => (g ? setPanelEdit(null) : openGoalPanel(null));
+  const err = panelActions(form, {
+    submitLabel: g ? "保存" : "追加", onCancel: cancel,
+    onDelete: g && (() => confirmPasswordDelete(`/api/platforms/${enc(p.name)}/goals/${g.id}`, "項目", `項目: ${g.title}`, "goals")),
+  });
+  bindPanelForm(form, key, { status: g ? g.status : "未着手", title: g?.title, due_date: g?.due_date, note: g?.note, url: g?.url }, cancel);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = (n) => form.elements.namedItem(n).value;
+    const body = { title: v("title").trim(), status: v("status"), due_date: v("due_date") || null, note: v("note"), url: v("url").trim() };
+    if (!body.title) { err.textContent = "項目を入力してください"; return; }
+    if (body.url && !safeUrl(body.url)) { err.textContent = "リンクは http:// または https:// で始まる URL を入力してください"; return; }
+    const url = `/api/platforms/${enc(p.name)}/goals`;
+    try {
+      const saved = await api(g ? `${url}/${g.id}` : url, { method: g ? "PUT" : "POST", body: JSON.stringify(body) });
+      panelDrafts.delete(key);
+      state.panelGoal = saved.id;
+      state.panelEdit = null;
+      await refreshAfterChange("goals");
+      toast(g ? "保存しました" : "追加しました");
+    } catch (ex) { err.textContent = ex.message; }
+  });
+  focusLater(g ? status : title);
+  return form;
+}
+
+// 実施内容の入力欄。t = null なら追加
+function goalTaskForm(p, g, t) {
+  const key = editKey({ kind: "task", id: t?.id });
+  const form = el("form", "gpn-form");
+  form.autocomplete = "off";
+  const title = panelInput("title", { required: true, placeholder: "例: 解析パイプラインの検証" });
+  const range = panelInput("progress", { type: "range", min: 0, max: 100, step: 5 });
+  const pc = el("b", "", "");
+  const rl = panelField("進捗率 ", range);
+  rl.firstChild.append(pc);
+  range.addEventListener("input", () => { pc.textContent = `${range.value}%`; });
+  const grid = el("div", "gpn-grid");
+  grid.append(panelField("担当者（複数はスペース区切り）", panelInput("owner", { placeholder: "例: 高橋 鈴木" })),
+    panelField("期限", panelInput("due_date", { type: "date" })));
+  form.append(panelField("実施内容 *", title), rl, grid, panelField("内容", panelInput("note", { tag: "textarea", rows: 3 })));
+  const cancel = () => setPanelEdit(null);
+  const err = panelActions(form, {
+    submitLabel: t ? "保存" : "追加", onCancel: cancel,
+    onDelete: t && (() => confirmPasswordDelete(`/api/platforms/${enc(p.name)}/goal-tasks/${t.id}`, "実施内容", `実施内容: ${t.title}`, "goalTasks")),
+  });
+  bindPanelForm(form, key, { title: t?.title, progress: t ? t.progress : 0, owner: t?.owner, due_date: t?.due_date, note: t?.note }, cancel);
+  pc.textContent = `${range.value}%`;
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = (n) => form.elements.namedItem(n).value;
+    const body = { title: v("title").trim(), progress: Number(v("progress")), owner: v("owner").trim(), due_date: v("due_date") || null, note: v("note") };
+    if (!body.title) { err.textContent = "実施内容を入力してください"; return; }
+    try {
+      const saved = await api(t ? `/api/platforms/${enc(p.name)}/goal-tasks/${t.id}` : `/api/platforms/${enc(p.name)}/goals/${g.id}/tasks`,
+        { method: t ? "PUT" : "POST", body: JSON.stringify(body) });
+      panelDrafts.delete(key);
+      state.panelEdit = null;
+      state.openTask = saved.id;
+      await refreshAfterChange("goalTasks");
+      toast(t ? "保存しました" : "追加しました");
+    } catch (ex) { err.textContent = ex.message; }
+  });
+  focusLater(title);
+  return form;
+}
+
+// 議論の記録の入力欄。n = null なら新規（いつも表示しておく）
+function goalNoteForm(p, g, n) {
+  const key = n ? editKey({ kind: "note", id: n.id }) : `newnote:${g.id}`;
+  const form = el("form", "gpn-form gpn-note-form");
+  form.autocomplete = "off";
+  const date = panelInput("note_date", { type: "date", required: true });
+  const body = panelInput("body", { tag: "textarea", rows: n ? 4 : 3, placeholder: "議論の内容・決定事項・宿題（担当者・期限）など" });
+  form.append(panelField("日付", date, "gpn-date"), body);
+  const cancel = n ? () => setPanelEdit(null) : null;
+  const err = panelActions(form, {
+    submitLabel: n ? "保存" : "記録を追加", onCancel: cancel,
+    onDelete: n && (() => confirmPasswordDelete(`/api/platforms/${enc(p.name)}/goal-notes/${n.id}`, "議論の記録", `${slashDate(n.note_date)} の記録`, "goalNotes")),
+  });
+  bindPanelForm(form, key, { note_date: n ? n.note_date : fmtDate(todayMs()), body: n?.body }, cancel);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const data = { note_date: date.value, body: body.value.trim() };
+    if (!data.note_date) { err.textContent = "日付を入力してください"; return; }
+    if (!data.body) { err.textContent = "内容を入力してください"; return; }
+    try {
+      await api(n ? `/api/platforms/${enc(p.name)}/goal-notes/${n.id}` : `/api/platforms/${enc(p.name)}/goals/${g.id}/notes`,
+        { method: n ? "PUT" : "POST", body: JSON.stringify(data) });
+      panelDrafts.delete(key);
+      if (n) state.panelEdit = null;
+      await refreshAfterChange("goalNotes");
+      toast(n ? "記録を保存しました" : "記録を追加しました");
+    } catch (ex) { err.textContent = ex.message; }
+  });
+  if (n) focusLater(body);
+  return form;
+}
+
 function renderGoalPanel() {
   const panel = $("#goal-panel");
+  const box = $("#goal-panel-body");
   const p = state.platforms.find((x) => x.name === state.current);
-  const g = state.panelGoal && state.goals.find((x) => x.id === state.panelGoal);
-  panel.hidden = !g || !p;
-  if (!g || !p) return;
-  panel.innerHTML = "";
+  const isNew = state.panelGoal === "new";
+  const g = !isNew && state.panelGoal && state.goals.find((x) => x.id === state.panelGoal);
+  panel.hidden = !p || (!g && !isNew);
+  if (panel.hidden) { state.panelEdit = null; panelDrafts.clear(); return; }
+  const ed = state.panelEdit;
+  // 編集中のものが消えていたら（削除など）編集をやめる
+  if ((ed?.kind === "task" && ed.id && !state.goalTasks.some((t) => t.id === ed.id)) ||
+      (ed?.kind === "note" && ed.id && !state.goalNotes.some((n) => n.id === ed.id))) {
+    panelDrafts.delete(editKey(ed));
+    state.panelEdit = null;
+  }
+  const editing = (kind, id) => state.panelEdit?.kind === kind && (state.panelEdit.id ?? null) === (id ?? null);
+  const scroll = box.scrollTop;
+  box.innerHTML = "";
+
   const head = el("div", "gpn-head");
-  const st = el("span", "status-badge", g.status);
-  st.dataset.v = g.status;
+  if (g) {
+    const st = el("span", "status-badge", g.status);
+    st.dataset.v = g.status;
+    head.append(st);
+  } else head.append(el("b", "", "項目の追加"));
   const close = el("button", "gpn-close", "✕");
   close.type = "button";
   close.title = "閉じる";
-  close.addEventListener("click", () => { state.panelGoal = null; renderDetail(); });
-  head.append(st, el("span", "spacer"), close);
-  const due = goalDue(g);
-  const facts = el("dl", "gpn-facts");
-  const fact = (k, v, cls = "") => { if (v) facts.append(el("dt", "", k), el("dd", cls, v)); };
-  fact("期限", g.due_date ? `${slashDate(g.due_date)}${due === "overdue" ? `（${-daysLeft(g.due_date)} 日超過）` : g.status !== "達成" ? `（あと ${daysLeft(g.due_date)} 日）` : ""}` : "", due);
-  fact("メモ", g.note, "pre");
-  panel.append(head, el("h3", "gpn-title", g.title), facts);
-  if (safeUrl(g.url)) {
-    const a = el("a", "g-link", "リンク ↗");
-    a.href = g.url; a.target = "_blank"; a.rel = "noopener noreferrer";
-    panel.append(a, " ");
-  }
-  const edit = el("button", "gpn-edit", "✎ 項目を編集");
-  edit.type = "button";
-  edit.addEventListener("click", () => openGoalDialog(p, g));
-  panel.append(edit);
+  close.addEventListener("click", () => openGoalPanel(null));
+  head.append(el("span", "spacer"), close);
+  box.append(head);
 
+  if (!g) {
+    box.append(el("p", "hint", `${p.name} ${p.title || ""}`), goalForm(p, null));
+    box.scrollTop = 0;
+    return;
+  }
+
+  if (editing("goal", g.id)) {
+    box.append(el("p", "hint", `最終更新 ${g.updated_at.slice(0, 16)}`), goalForm(p, g));
+  } else {
+    const due = goalDue(g);
+    const facts = el("dl", "gpn-facts");
+    const fact = (k, v, cls = "") => { if (v) facts.append(el("dt", "", k), el("dd", cls, v)); };
+    fact("期限", g.due_date ? `${slashDate(g.due_date)}${due === "overdue" ? `（${-daysLeft(g.due_date)} 日超過）` : g.status !== "達成" ? `（あと ${daysLeft(g.due_date)} 日）` : ""}` : "", due);
+    fact("内容", g.note, "pre");
+    box.append(el("h3", "gpn-title", g.title), facts);
+    if (safeUrl(g.url)) {
+      const a = el("a", "g-link", "リンク ↗");
+      a.href = g.url; a.target = "_blank"; a.rel = "noopener noreferrer";
+      box.append(a, " ");
+    }
+    const edit = el("button", "gpn-edit", "✎ 項目を編集");
+    edit.type = "button";
+    edit.addEventListener("click", () => setPanelEdit({ kind: "goal", id: g.id }));
+    box.append(edit);
+  }
+
+  // 実施内容
   const tasks = goalTasksOf(g.id);
   const ah = el("div", "gpn-ah");
   ah.append(el("b", "", "実施内容"), el("span", "count-badge", `${tasks.length} 件${tasks.length ? `・進捗率 ${avgProgress(tasks)}%` : ""}`), el("span", "spacer"));
   const add = el("button", "primary", "＋ 実施内容を追加");
   add.type = "button";
-  add.addEventListener("click", () => openGoalTaskDialog(p, g, null));
+  add.disabled = editing("task", null);
+  add.addEventListener("click", () => setPanelEdit({ kind: "task", id: null }));
   ah.append(add);
-  panel.append(ah);
+  box.append(ah);
+  if (editing("task", null)) box.append(goalTaskForm(p, g, null));
   if (tasks.length) {
-    panel.append(progBar(avgProgress(tasks)));
+    box.append(progBar(avgProgress(tasks)));
     const legend = el("div", "gpn-legend");
     legend.innerHTML = '<span class="p0"><i></i>〜29%</span><span class="p1"><i></i>30〜69%</span><span class="p2"><i></i>70〜99%</span><span class="p3"><i></i>100%</span>';
-    panel.append(legend);
-  } else {
-    panel.append(el("p", "hint", "まだ実施内容がありません。「＋ 実施内容を追加」から登録してください。"));
+    box.append(legend);
+  } else if (!editing("task", null)) {
+    box.append(el("p", "hint", "まだ実施内容がありません。「＋ 実施内容を追加」から登録してください。"));
   }
   for (const t of tasks) {
     const item = el("div", "gpn-ach");
+    if (editing("task", t.id)) {
+      item.append(goalTaskForm(p, g, t));
+      box.append(item);
+      continue;
+    }
     const row = el("button", `gpn-bar ${progClass(t.progress)}`);
     row.type = "button";
     row.title = "クリックで詳細";
@@ -862,107 +1094,69 @@ function renderGoalPanel() {
       f2("進捗率", `${t.progress}%`);
       f2("担当者", t.owner ? t.owner.split(" ").join("・") : "");
       f2("期限", t.due_date ? slashDate(t.due_date) : "");
-      f2("メモ", t.note, "pre");
+      f2("内容", t.note, "pre");
       d.append(dl);
       const eb = el("button", "", "✎ 編集");
       eb.type = "button";
-      eb.addEventListener("click", () => openGoalTaskDialog(p, g, t));
+      eb.addEventListener("click", () => setPanelEdit({ kind: "task", id: t.id }));
       d.append(eb);
       item.append(d);
     }
-    panel.append(item);
+    box.append(item);
   }
+
+  // 定期的な議論の記録（新しい日付が上）
+  const notes = state.goalNotes.filter((n) => n.goal_id === g.id);
+  const nh = el("div", "gpn-ah");
+  nh.append(el("b", "", "議論の記録"), el("span", "count-badge", `${notes.length} 件`), el("span", "spacer"),
+    el("span", "hint", "定期的な議論の内容・決定事項・宿題"));
+  box.append(nh, goalNoteForm(p, g, null));
+  const ol = el("ol", "log-list gpn-notes");
+  for (const n of notes) {
+    const li = el("li");
+    if (editing("note", n.id)) {
+      li.append(goalNoteForm(p, g, n));
+    } else {
+      const lh = el("div", "lh");
+      lh.append(el("b", "", slashDate(n.note_date)), el("span", "upd", `更新 ${n.updated_at.slice(0, 16)}`));
+      const eb = el("button", "", "編集");
+      eb.type = "button";
+      eb.addEventListener("click", () => setPanelEdit({ kind: "note", id: n.id }));
+      lh.append(eb);
+      li.append(lh, el("div", "lb", n.body));
+    }
+    ol.append(li);
+  }
+  if (notes.length) box.append(ol);
+  box.scrollTop = scroll;
 }
 
-// 実施内容の追加・編集（項目の中）
-let gtEditing = null; // { platform, goal, task }
-function openGoalTaskDialog(p, g, t) {
-  gtEditing = { platform: p.name, goal: g, task: t };
-  const f = $("#form-gtask");
-  f.reset();
-  f.title.value = t?.title || "";
-  f.progress.value = t ? t.progress : 0;
-  $("#gt-pc").textContent = `${f.progress.value}%`;
-  f.owner.value = t?.owner || "";
-  f.due_date.value = t?.due_date || "";
-  f.note.value = t?.note || "";
-  $("#gt-title").textContent = t ? "実施内容の編集" : "実施内容の追加";
-  $("#gt-meta").textContent = `${p.name} ${p.title}　／　項目: ${g.title}`;
-  $("#gt-submit").textContent = t ? "保存" : "追加";
-  $("#gt-delete").hidden = !t;
-  $("#gt-error").textContent = "";
-  $("#dlg-gtask").showModal();
-  f.title.focus();
-}
-$("#form-gtask").progress.addEventListener("input", (e) => { $("#gt-pc").textContent = `${e.target.value}%`; });
-$("#dlg-gtask [data-close]").addEventListener("click", () => $("#dlg-gtask").close());
-$("#form-gtask").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const f = e.target;
-  const { platform, goal, task } = gtEditing;
-  const body = { title: f.title.value.trim(), progress: Number(f.progress.value), owner: f.owner.value.trim(), due_date: f.due_date.value || null, note: f.note.value };
-  if (!body.title) { $("#gt-error").textContent = "実施内容を入力してください"; return; }
-  try {
-    await api(task ? `/api/platforms/${enc(platform)}/goal-tasks/${task.id}` : `/api/platforms/${enc(platform)}/goals/${goal.id}/tasks`,
-      { method: task ? "PUT" : "POST", body: JSON.stringify(body) });
-    $("#dlg-gtask").close();
-    await refreshAfterChange("goalTasks");
-    toast(task ? "保存しました" : "追加しました", false);
-  } catch (err) {
-    $("#gt-error").textContent = err.message;
-  }
-});
-$("#gt-delete").addEventListener("click", () => {
-  const { platform, task } = gtEditing;
-  $("#dlg-gtask").close();
-  confirmPasswordDelete(`/api/platforms/${enc(platform)}/goal-tasks/${task.id}`, "実施内容", `実施内容: ${task.title}`, "goalTasks");
-});
+// 窓の幅: 左端をドラッグして変えられる（幅はブラウザに保存）
+(() => {
+  const panel = $("#goal-panel");
+  const handle = $("#goal-panel-resize");
+  const clamp = (w) => Math.max(320, Math.min(w, window.innerWidth - 40));
+  const apply = (w) => { panel.style.width = `${clamp(w)}px`; };
+  const saved = Number(store.get("platforms.panelWidth"));
+  if (saved) apply(saved);
+  handle.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    document.body.classList.add("gpn-resizing");
+    const move = (ev) => apply(window.innerWidth - ev.clientX);
+    const up = () => {
+      handle.removeEventListener("pointermove", move);
+      document.body.classList.remove("gpn-resizing");
+      store.set("platforms.panelWidth", String(parseInt(panel.style.width, 10)));
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up, { once: true });
+    handle.addEventListener("pointercancel", up, { once: true });
+  });
+  handle.addEventListener("dblclick", () => { panel.style.width = ""; store.set("platforms.panelWidth", ""); });
+  window.addEventListener("resize", () => { if (panel.style.width) apply(parseInt(panel.style.width, 10)); });
+})();
 
-// 目標の追加・編集ダイアログ
-let goalEditing = null; // { platform, goal }
-function openGoalDialog(p, g) {
-  goalEditing = { platform: p.name, goal: g };
-  const f = $("#form-goal");
-  f.reset();
-  f.status.innerHTML = "";
-  for (const st of state.statuses) f.status.append(new Option(st, st));
-  f.status.value = g ? g.status : "未着手";
-  f.title.value = g ? g.title : "";
-  f.due_date.value = g?.due_date || "";
-  f.note.value = g?.note || "";
-  f.url.value = g?.url || "";
-  $("#goal-title").textContent = g ? "項目の編集" : "項目の追加";
-  $("#goal-meta").textContent = g ? `${p.name} ${p.title}　／　最終更新 ${g.updated_at.slice(0, 16)}` : `${p.name} ${p.title}`;
-  $("#goal-submit").textContent = g ? "保存" : "追加";
-  $("#goal-delete").hidden = !g;
-  $("#goal-error").textContent = "";
-  $("#dlg-goal").showModal();
-  (g ? f.status : f.title).focus();
-}
-$("#dlg-goal [data-close]").addEventListener("click", () => $("#dlg-goal").close());
-$("#form-goal").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const f = e.target;
-  const { platform, goal } = goalEditing;
-  const body = { title: f.title.value.trim(), status: f.status.value, due_date: f.due_date.value || null, note: f.note.value, url: f.url.value.trim() };
-  if (body.url && !safeUrl(body.url)) { $("#goal-error").textContent = "リンクは http:// または https:// で始まる URL を入力してください"; return; }
-  if (!body.title) { $("#goal-error").textContent = "項目を入力してください"; return; }
-  const url = `/api/platforms/${enc(platform)}/goals`;
-  try {
-    await api(goal ? `${url}/${goal.id}` : url, { method: goal ? "PUT" : "POST", body: JSON.stringify(body) });
-    $("#dlg-goal").close();
-    await refreshAfterChange("goals");
-    toast(goal ? "保存しました" : "追加しました");
-  } catch (err) {
-    $("#goal-error").textContent = err.message;
-  }
-});
-$("#goal-delete").addEventListener("click", () => {
-  const { platform, goal } = goalEditing;
-  if (!goal) return;
-  $("#dlg-goal").close();
-  confirmPasswordDelete(`/api/platforms/${enc(platform)}/goals/${goal.id}`, "項目", `項目: ${goal.title}`, "goals");
-});
 
 // 目標・月報の削除: パスワードを入力して確認（サーバー側でも検証）
 let pwDelete = null; // { url, label, kind }
@@ -1296,7 +1490,7 @@ $("#f-area").addEventListener("change", (e) => {
 });
 
 window.addEventListener("beforeunload", (e) => {
-  if (state.dirty) { e.preventDefault(); e.returnValue = ""; }
+  if (state.dirty || panelDirty()) { e.preventDefault(); e.returnValue = ""; }
 });
 
 (async () => {
