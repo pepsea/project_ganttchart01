@@ -110,3 +110,9 @@
 .rec-viewbar .rec-views button { flex: 1 1 0; min-width: fit-content; white-space: nowrap; padding-left: 8px; padding-right: 8px; }
 .rec-viewbar #rec-view-now { flex-grow: 4; }
 .rec-viewbar .rec-views button:not(#rec-view-now) { font-size: 12.5px; padding-left: 6px; padding-right: 6px; }
+
+/* Markdown のチェックボックス（- [ ] / - [x]） */
+.md li.md-task { list-style: none; margin-left: -1.3em; }
+.md .md-check { margin: 0 4px 0 0; vertical-align: -1px; width: 15px; height: 15px; accent-color: var(--accent); }
+.md .md-check:not(:disabled) { cursor: pointer; }
+.md .md-done { color: var(--muted); text-decoration: line-through; }

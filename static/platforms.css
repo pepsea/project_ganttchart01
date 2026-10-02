@@ -700,3 +700,9 @@ a.back-group:hover { filter: brightness(1.1); color: #fff; }
 .md hr { border: 0; border-top: 1px solid var(--line-strong); margin: 12px 0; }
 .md a { color: var(--accent); }
 
+
+/* Markdown のチェックボックス（- [ ] / - [x]） */
+.md li.md-task { list-style: none; margin-left: -1.3em; }
+.md .md-check { margin: 0 4px 0 0; vertical-align: -1px; width: 15px; height: 15px; accent-color: var(--accent); }
+.md .md-check:not(:disabled) { cursor: pointer; }
+.md .md-done { color: var(--muted); text-decoration: line-through; }

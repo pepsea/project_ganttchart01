@@ -21,7 +21,9 @@
 
   const cells = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
 
-  window.mdToHtml = function (src) {
+  // opts.interactive = true のとき、チェックボックスを押せる（data-line = 元の文章の行番号。押したときの書き換えは呼び出し側で行う）
+  // それ以外は表示だけ（押せない）
+  window.mdToHtml = function (src, opts = {}, nested = false) {
     const lines = String(src || "").replace(/\r\n?/g, "\n").split("\n");
     const out = [];
     let i = 0;
@@ -46,7 +48,7 @@
       if (/^\s*>/.test(line)) {
         const buf = [];
         while (i < lines.length && /^\s*>/.test(lines[i])) buf.push(lines[i++].replace(/^\s*>\s?/, ""));
-        out.push(`<blockquote>${window.mdToHtml(buf.join("\n"))}</blockquote>`);
+        out.push(`<blockquote>${window.mdToHtml(buf.join("\n"), opts, true)}</blockquote>`);
         continue;
       }
       // 表
@@ -68,9 +70,16 @@
           const indent = mm[1].replace(/\t/g, "    ").length;
           const tag = /\d/.test(mm[2]) ? "ol" : "ul";
           while (stack.length && indent < stack[stack.length - 1].indent) { html += `</li></${stack.pop().tag}>`; }
-          if (!stack.length || indent > stack[stack.length - 1].indent) { stack.push({ indent, tag }); html += `<${tag}><li>`; }
-          else html += "</li><li>";
-          html += inline(mm[3]);
+          // チェックボックス: - [ ] 未完了 / - [x] 完了
+          const task = /^\[([ xX])\]\s+(.*)$/.exec(mm[3]);
+          const li = task ? '<li class="md-task">' : "<li>";
+          if (!stack.length || indent > stack[stack.length - 1].indent) { stack.push({ indent, tag }); html += `<${tag}>${li}`; }
+          else html += `</li>${li}`;
+          if (task) {
+            const checked = task[1] !== " ";
+            const can = opts.interactive && !nested; // 引用の中は行番号がずれるので、押せない
+            html += `<input type="checkbox" class="md-check"${checked ? " checked" : ""}${can ? ` data-line="${i}"` : " disabled"}> <span class="${checked ? "md-done" : ""}">${inline(task[2])}</span>`;
+          } else html += inline(mm[3]);
           i++;
         }
         while (stack.length) html += `</li></${stack.pop().tag}>`;

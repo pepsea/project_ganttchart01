@@ -175,7 +175,7 @@
   }
 
   function renderPreview() {
-    rendered.innerHTML = window.mdToHtml(body.value);
+    rendered.innerHTML = window.mdToHtml(body.value, { interactive: true });
     rendered.hidden = !preview;
     body.hidden = preview;
     $("#rec-preview").textContent = preview ? "編集" : "表示";
@@ -252,6 +252,19 @@
   }
   syncSortButtons();
   search.addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(refresh, SEARCH_MS); });
+  // 表示の中のチェックボックスを押すと、本文の「[ ]」「[x]」を書き換えて保存する
+  rendered.addEventListener("change", (e) => {
+    const box = e.target.closest("input.md-check[data-line]");
+    if (!box) return;
+    const lines = body.value.split("\n");
+    const n = Number(box.dataset.line);
+    const re = /^(\s*(?:[-*+]|\d+[.)])\s+)\[([ xX])\]/;
+    if (!re.test(lines[n] || "")) return;
+    lines[n] = lines[n].replace(re, (_, pre) => `${pre}[${box.checked ? "x" : " "}]`);
+    body.value = lines.join("\n");
+    renderPreview();
+    scheduleSave();
+  });
   $("#rec-preview").addEventListener("click", () => { preview = !preview; renderPreview(); if (!preview) body.focus(); });
   $("#rec-save").addEventListener("click", async () => { clearTimeout(saveTimer); await save(); });
   tagInput.addEventListener("keydown", (e) => {

@@ -313,3 +313,9 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 /* 項目に結びついていない達成したいこと: その場で編集するカードは横いっぱいに */
 .ach-cards li.editing { grid-column: 1 / -1; cursor: default; padding: 0; border: 0; background: none; box-shadow: none; }
 .ach-cards li.editing .gpn-form { margin: 0; }
+
+/* Markdown のチェックボックス（- [ ] / - [x]） */
+.md li.md-task { list-style: none; margin-left: -1.3em; }
+.md .md-check { margin: 0 4px 0 0; vertical-align: -1px; width: 15px; height: 15px; accent-color: var(--accent); }
+.md .md-check:not(:disabled) { cursor: pointer; }
+.md .md-done { color: var(--muted); text-decoration: line-through; }
