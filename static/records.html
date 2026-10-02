@@ -40,6 +40,12 @@
         <input id="rec-search" type="search" placeholder="検索（タイトル・本文）">
         <select id="rec-tag-filter" aria-label="タグで絞り込み"><option value="">すべてのタグ</option></select>
       </div>
+      <label class="rec-sort">並び順
+        <select id="rec-sort" aria-label="並び順">
+          <option value="manual">手動（ドラッグで入れ替え）</option>
+          <option value="updated">更新日の新しい順</option>
+        </select>
+      </label>
       <ul id="rec-list" class="rec-list"></ul>
     </section>
 

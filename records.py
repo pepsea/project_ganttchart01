@@ -83,10 +83,13 @@ def _fetch(db, rid: int) -> dict:
 
 
 @router.get("")
-def list_records(q: str = "", tag: str = "", archived: bool = False) -> list[dict]:
-    """archived=false: 現在の記録 / archived=true: アーカイブした記録（アーカイブした新しい順）"""
+def list_records(q: str = "", tag: str = "", archived: bool = False, sort: str = "manual") -> list[dict]:
+    """archived=false: 現在の記録 / archived=true: アーカイブした記録（アーカイブした新しい順）
+    sort=manual: ★ 優先 → 手で入れ替えた順 / sort=updated: ★ 優先 → 更新日の新しい順"""
     with get_db() as db:
-        order = ORDER if not archived else "ORDER BY archived_at DESC, id DESC"
+        order = ORDER if sort != "updated" else "ORDER BY prioritized DESC, updated_at DESC, id DESC"
+        if archived:
+            order = "ORDER BY archived_at DESC, id DESC"
         rows = [_to_record(r) for r in db.execute(f"SELECT * FROM records WHERE archived = ? {order}", (int(archived),))]
     q = q.strip().lower()
     return [r for r in rows
@@ -217,7 +220,9 @@ def update_record(rid: int, r: RecordUpdate) -> dict:
             sets.append("archived = ?"); vals.append(int(r.archived))
             sets.append("archived_at = ?"); vals.append(datetime_now() if r.archived else "")
         if sets:
-            db.execute(f"UPDATE records SET {', '.join(sets)}, updated_at = datetime('now','localtime') WHERE id = ?", (*vals, rid))
+            # 更新日は、内容（タイトル・本文・タグ）を変えたときだけ更新する（★ やアーカイブの切り替えでは変えない）
+            touch = ", updated_at = datetime('now','localtime')" if (r.title is not None or r.body is not None or r.tags is not None) else ""
+            db.execute(f"UPDATE records SET {', '.join(sets)}{touch} WHERE id = ?", (*vals, rid))
         return _fetch(db, rid)
 
 

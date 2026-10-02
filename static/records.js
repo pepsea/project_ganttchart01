@@ -33,6 +33,12 @@
     say._t = setTimeout(() => t.classList.remove("show"), isErr ? 4000 : 2200);
   }
   const stamp = (s) => (s ? s.slice(0, 16).replaceAll("-", "/") : "");
+  // 一覧に出す更新日（今年なら 月/日、ほかの年は 年/月/日）
+  const shortDate = (s) => {
+    if (!s) return "";
+    const [y, m, d] = s.slice(0, 10).split("-");
+    return Number(y) === new Date().getFullYear() ? `${Number(m)}/${Number(d)}` : `${y}/${Number(m)}/${Number(d)}`;
+  };
   // タグの色（名前から決める）
   const tagColor = (name) => {
     let n = 0;
@@ -47,6 +53,8 @@
   let searchTimer = null;
   let preview = false;
   let archivedView = false; // true = アーカイブした記録を見ている
+  let sortMode = "manual"; // manual = 手動の並び / updated = 更新日の新しい順
+  try { sortMode = localStorage.getItem("records.sort") === "updated" ? "updated" : "manual"; } catch (_) { /* 記憶できなくても使える */ }
 
   const list = $("#rec-list");
   const editor = $("#rec-editor");
@@ -95,8 +103,15 @@
       star.type = "button";
       star.title = r.prioritized ? "優先を外す" : "優先にする（先頭に並びます）";
       star.addEventListener("click", (e) => { e.stopPropagation(); togglePriority(r); });
+      const canDrag = !archivedView && sortMode === "manual"; // 更新日順のときは、手動の並べ替えはしない
+      handle.classList.toggle("off", !canDrag);
+      if (!canDrag) handle.title = "「並び順」を「手動」にすると、ドラッグで入れ替えられます";
       if (!archivedView) li.append(handle, star); // アーカイブした記録は、並べ替え・優先の操作をしない
       li.append(h("span", "rec-title-text", r.title));
+      // 更新日（アーカイブの表示では、アーカイブした日）
+      const when = h("span", "rec-date", shortDate(archivedView ? r.archived_at || r.updated_at : r.updated_at));
+      when.title = archivedView ? `アーカイブ ${stamp(r.archived_at)}（更新 ${stamp(r.updated_at)}）` : `更新 ${stamp(r.updated_at)}（作成 ${stamp(r.created_at)}）`;
+      li.append(when);
       if (r.tags.length) {
         const tags = h("span", "rec-chips");
         for (const t of r.tags) tags.append(chip(t));
@@ -104,7 +119,7 @@
       }
       li.querySelector(".rec-title-text").title = r.title;
       const group = r.prioritized ? "rec-p1" : "rec-p0";
-      if (!archivedView) enableDragSort(li, handle, {
+      if (canDrag) enableDragSort(li, handle, {
         group, id: r.id,
         ids: () => records.filter((x) => x.prioritized === r.prioritized).map((x) => x.id), // ★ の有無をまたがない
         onDrop: async (ids) => {
@@ -131,7 +146,7 @@
   async function refresh() {
     try {
       await loadTags();
-      const q = new URLSearchParams({ q: search.value.trim(), tag: tagFilter.value, archived: archivedView });
+      const q = new URLSearchParams({ q: search.value.trim(), tag: tagFilter.value, archived: archivedView, sort: sortMode });
       records = await call(`${base}?${q}`);
       renderList();
     } catch (err) { say(err.message); }
@@ -221,6 +236,12 @@
   $("#rec-close").addEventListener("click", close);
   editor.addEventListener("keydown", (e) => { if (e.key === "Escape" && !e.isComposing) close(); });
   tagFilter.addEventListener("change", refresh);
+  $("#rec-sort").value = sortMode;
+  $("#rec-sort").addEventListener("change", (e) => {
+    sortMode = e.target.value;
+    try { localStorage.setItem("records.sort", sortMode); } catch (_) { /* 記憶できなくても並びは変わる */ }
+    refresh();
+  });
   search.addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(refresh, SEARCH_MS); });
   $("#rec-preview").addEventListener("click", () => { preview = !preview; renderPreview(); if (!preview) body.focus(); });
   $("#rec-save").addEventListener("click", async () => { clearTimeout(saveTimer); await save(); });
