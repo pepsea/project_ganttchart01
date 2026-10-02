@@ -9,7 +9,7 @@
 
   function inline(text) {
     const codes = [];
-    let s = esc(text).replace(/`([^`]+)`/g, (_, c) => { codes.push(c); return `\u0000${codes.length - 1}\u0000`; });
+    let s = esc(text).replace(/``([^`](?:[\s\S]*?[^`])?)``(?!`)|`([^`]+)`/g, (_, c2, c1) => { codes.push((c2 ?? c1).trim()); return `\u0000${codes.length - 1}\u0000`; });
     s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, t, u) => `<a href="${safeHref(u.replace(/&amp;/g, "&"))}" target="_blank" rel="noopener noreferrer">${t}</a>`);
     s = s.replace(/(^|[\s(（])(https?:\/\/[^\s<)）]+)/g, (m, pre, u) => `${pre}<a href="${u.replace(/&amp;/g, "&")}" target="_blank" rel="noopener noreferrer">${u}</a>`);
     s = s.replace(/\*\*([^*]+)\*\*|__([^_]+)__/g, (_, a, b) => `<strong>${a || b}</strong>`)

@@ -24,19 +24,41 @@ function enableMarkdownEditing(ta) {
   const lineStart = (pos) => ta.value.lastIndexOf("\n", pos - 1) + 1;
   const lineEnd = (pos) => { const i = ta.value.indexOf("\n", pos); return i < 0 ? ta.value.length : i; };
 
+  // 番号付きの行の番号を、その段（インデント）の前の項目に続く番号にする。前の項目が無ければ 1 から
+  //（Tab で入れ子にしたら 1 から再開、Shift+Tab で戻したら元の段の続きの番号になる）
+  function numberFor(lines, i) {
+    const indent = (lines[i].match(/^\s*/)[0] || "").replace(/\t/g, "    ").length;
+    for (let j = i - 1; j >= 0; j--) {
+      const l = lines[j];
+      if (l.trim() === "") continue; // 空行は飛ばす
+      const m = /^(\s*)(\d+)[.)]\s/.exec(l);
+      const li = (l.match(/^\s*/)[0] || "").replace(/\t/g, "    ").length;
+      if (li < indent) return 1; // 親の項目まで戻った: この段の最初
+      if (li > indent) continue; // 子の項目は飛ばす
+      return m ? Number(m[2]) + 1 : 1; // 同じ段の番号付き → 続きの番号 / 別の種類の箇条書き → 1 から
+    }
+    return 1;
+  }
+  const ORDERED = /^(\s*)(\d+)([.)])(\s)/;
+
   // 選択している行をまとめて下げる / 戻す
   function shiftLines(back) {
     const { selectionStart: s, selectionEnd: e, value } = ta;
     const from = lineStart(s);
     const to = lineEnd(e > s && value[e - 1] === "\n" ? e - 1 : e);
+    const all = value.split("\n");
+    const firstIdx = value.slice(0, from).split("\n").length - 1;
     const lines = value.slice(from, to).split("\n");
     let firstDelta = 0, total = 0;
     const out = lines.map((l, i) => {
-      let nl = l, d = 0;
-      if (!back) { nl = INDENT + l; d = INDENT.length; }
-      else if (l.startsWith(INDENT)) { nl = l.slice(INDENT.length); d = -INDENT.length; }
-      else if (l.startsWith("\t")) { nl = l.slice(1); d = -1; }
-      else if (l.startsWith(" ")) { nl = l.slice(1); d = -1; }
+      let nl = l;
+      if (!back) nl = INDENT + l;
+      else if (l.startsWith(INDENT)) nl = l.slice(INDENT.length);
+      else if (l.startsWith("\t") || l.startsWith(" ")) nl = l.slice(1);
+      all[firstIdx + i] = nl;
+      if (ORDERED.test(nl)) all[firstIdx + i] = nl.replace(ORDERED, (_, sp, _n, dl, ws) => `${sp}${numberFor(all, firstIdx + i)}${dl}${ws}`);
+      nl = all[firstIdx + i];
+      const d = nl.length - l.length;
       if (i === 0) firstDelta = d;
       total += d;
       return nl;
@@ -84,8 +106,16 @@ function enableMarkdownEditing(ta) {
           // 何も書いていない箇条書きの行: 入れ子なら 1 段戻し、そうでなければ印を消して終える
           e.preventDefault();
           ta.setSelectionRange(ls, lineEnd(s));
-          if (m[1].length >= INDENT.length) insert(m[1].slice(INDENT.length) + m[2] + m[3] + (m[4] || ""));
-          else insert("");
+          if (m[1].length >= INDENT.length) {
+            let marker = m[2];
+            if (/^\d+[.)]$/.test(marker)) {
+              const all = value.split("\n");
+              const idx = value.slice(0, ls).split("\n").length - 1;
+              all[idx] = m[1].slice(INDENT.length) + m[2] + m[3];
+              marker = `${numberFor(all, idx)}${m[2].slice(-1)}`;
+            }
+            insert(m[1].slice(INDENT.length) + marker + m[3] + (m[4] || ""));
+          } else insert("");
           return;
         }
         e.preventDefault();
