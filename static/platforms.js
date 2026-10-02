@@ -537,6 +537,7 @@ function renderDetail() {
   if (state.editing) {
     const vision = el("textarea", "vision");
     vision.name = "vision";
+    enableMarkdownEditing(vision); // 箇条書きの Enter・Tab などの入力補助
     vision.value = p.vision;
     vision.placeholder = "例: 受託解析の共通パイプラインを整備し、納期を 30% 短縮する（Markdown で書けます。例: **強調**、- 箇条書き、# 見出し）";
     visionSec.append(vision);

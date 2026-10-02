@@ -765,6 +765,7 @@ function openGroupDialog(g = null) {
 }
 $("#btn-group-add").addEventListener("click", () => openGroupDialog());
 $("#dlg-group [data-close]").addEventListener("click", () => $("#dlg-group").close());
+enableMarkdownEditing($("#form-group").vision); // 大目標: 箇条書きの Enter・Tab などの入力補助
 $("#form-group").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;

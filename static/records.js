@@ -217,6 +217,7 @@
 
   titleInput.addEventListener("input", scheduleSave);
   body.addEventListener("input", scheduleSave);
+  enableMarkdownEditing(body); // 箇条書きの Enter・Tab などの入力補助
   $("#rec-close").addEventListener("click", close);
   editor.addEventListener("keydown", (e) => { if (e.key === "Escape" && !e.isComposing) close(); });
   tagFilter.addEventListener("change", refresh);
