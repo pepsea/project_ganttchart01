@@ -75,3 +75,23 @@
 .rec-sort { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .rec-sort select { flex: 1; min-width: 0; }
 .rec-list .drag-handle.off { cursor: default; opacity: .3; }
+
+/* 文字サイズを大きめに（メモ・議論の画面） */
+.rec-layout { font-size: 15px; }
+.rec-list li { padding: 8px 10px; }
+.rec-title-text { font-size: 15px; }
+.rec-list .drag-handle, .rec-star { font-size: 17px; }
+.rec-chip { font-size: 12.5px; line-height: 20px; }
+.rec-chip-x { font-size: 13px; }
+.rec-date { font-size: 13px; }
+.rec-add input, .rec-filters input, .rec-filters select, .rec-sort select, .rec-tags input { font-size: 14.5px; }
+.rec-add button { font-size: 14.5px; }
+.rec-views button { font-size: 14px; }
+.rec-sort { font-size: 13.5px; }
+.rec-editor-head input { font-size: 18px; }
+.rec-actions button { font-size: 14px; padding: 4px 12px; }
+.rec-body { font-size: 16px; }
+.rec-rendered { font-size: 16px; }
+.md h1 { font-size: 23px; } .md h2 { font-size: 20px; } .md h3 { font-size: 17.5px; } .md h4, .md h5, .md h6 { font-size: 16px; }
+.rec-meta { font-size: 13px; }
+.rec-placeholder { font-size: 15px; }
