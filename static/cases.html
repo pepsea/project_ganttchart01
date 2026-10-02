@@ -183,7 +183,8 @@
     <form id="form-finish" method="dialog">
       <h2>案件の終了</h2>
       <p>案件 <strong id="finish-target"></strong> を終了し、アーカイブ（カンバンの一番右）へ移します。<br>
-        戻すときは、案件を開いて「状況」を選び直して保存してください。</p>
+        戻すときは、案件を開いて「状況」を選び直して保存してください。<br>
+        終了した案件は、写しを案件履歴に永続保管します（あとで削除しても残ります）。</p>
       <label><span>確認のため、案件番号 <strong id="finish-no"></strong> を入力してください</span>
         <input name="confirm" autocomplete="off">
       </label>
@@ -197,7 +198,8 @@
   <dialog id="dlg-delete">
     <form id="form-delete" method="dialog">
       <h2 class="danger">案件の削除</h2>
-      <p>案件と、その進捗メモ・月報をすべて削除します。<strong>この操作は元に戻せません。</strong></p>
+      <p>案件と、その進捗メモ・月報をすべて削除します。<strong>この操作は元に戻せません。</strong><br>
+        （削除した案件も、写しが案件履歴に残ります。バックアップ画面の「案件履歴」CSV で確認できます）</p>
       <label><span>確認のため、案件番号 <strong id="delete-no"></strong> を入力してください</span>
         <input name="confirm" autocomplete="off">
       </label>

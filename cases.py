@@ -112,8 +112,23 @@ def init_db() -> None:
                       )""")
         if not has_links:
             db.execute(LEGACY_LINKS_COPY)
+        # 案件の履歴: 終了（アーカイブ）・削除した案件の写しを単独で永続保管する（元の案件を削除しても残る）
+        db.execute("""CREATE TABLE IF NOT EXISTS case_history (
+                          id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                          case_id    INTEGER NOT NULL UNIQUE,     -- 元の案件（cases.id）。削除後も残す
+                          case_no    TEXT NOT NULL DEFAULT '',
+                          trial      TEXT NOT NULL DEFAULT '',
+                          name       TEXT NOT NULL DEFAULT '',
+                          status     TEXT NOT NULL DEFAULT '',
+                          created_at  TEXT NOT NULL DEFAULT '',   -- 案件の登録日時
+                          finished_at TEXT NOT NULL DEFAULT '',   -- 終了日時
+                          deleted_at  TEXT NOT NULL DEFAULT '',   -- 削除日時（空 = 削除していない）
+                          data       TEXT NOT NULL DEFAULT '{}',  -- 写し（案件の全項目・自由リンク・進捗メモ・月報。JSON）
+                          saved_at   TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+                      )""")
         if sample_data_enabled() and db.execute("SELECT COUNT(*) FROM cases").fetchone()[0] == 0:
             seed_sample_cases(db)
+        keep_all_history(db)  # 終了済みの案件を履歴に（まだ無いもの・変わったものだけ。起動時・復元後に毎回）
         # 既存の案件から顧客・案件番号のマスタを補完
         db.execute("INSERT OR IGNORE INTO customers(name) SELECT DISTINCT customer FROM cases WHERE customer <> ''")
         db.execute("INSERT OR IGNORE INTO case_nos(name) SELECT case_no FROM cases ORDER BY case_no")
@@ -376,11 +391,48 @@ def migrate_old_statuses() -> None:
             db.execute("UPDATE cases SET status = ? WHERE status = ?", (new, old))
 
 
+HISTORY_SKIP = ("last_note", "last_month", "task_count")  # 一覧表示用の集計（写しには入れない）
+
+
+def keep_history(db: sqlite3.Connection, case_id: int, deleted: bool = False) -> None:
+    """終了（アーカイブ）した案件・削除する案件の写しを case_history に保存（内容が変わったときだけ更新）。
+    一度終了した案件は、状況を戻しても履歴は残す（次に終了・削除したときに更新）。"""
+    row = db.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone()
+    if row is None or (not deleted and row["status"] != "アーカイブ"):
+        return
+    c = attach_links(db, [to_case(row)])[0]
+    c = {k: v for k, v in c.items() if k not in HISTORY_SKIP}
+    c["progress"] = [dict(r) for r in db.execute(
+        "SELECT note_date, body, created_at, updated_at FROM case_progress WHERE case_id = ? ORDER BY note_date, id", (case_id,))]
+    c["monthly"] = [dict(r) for r in db.execute(
+        "SELECT month, body, updated_at FROM case_monthly WHERE case_id = ? ORDER BY month", (case_id,))]
+    data = json.dumps(c, ensure_ascii=False, sort_keys=True)
+    old = db.execute("SELECT data, deleted_at FROM case_history WHERE case_id = ?", (case_id,)).fetchone()
+    if old and old["data"] == data and not deleted:
+        return
+    db.execute("""INSERT INTO case_history(case_id, case_no, trial, name, status, created_at, finished_at, deleted_at, data)
+                  VALUES (?,?,?,?,?,?,?,?,?)
+                  ON CONFLICT(case_id) DO UPDATE SET case_no = excluded.case_no, trial = excluded.trial,
+                    name = excluded.name, status = excluded.status, created_at = excluded.created_at,
+                    finished_at = excluded.finished_at, deleted_at = excluded.deleted_at, data = excluded.data,
+                    saved_at = datetime('now', 'localtime')""",
+               (case_id, c["case_no"], c["trial"], c["name"], c["status"], c["created_at"] or "", c["finished_at"] or "",
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S") if deleted else "", data))
+
+
+def keep_all_history(db: sqlite3.Connection) -> None:
+    """終了済みの全案件の写しを履歴にそろえる（CSV の取り込み後・起動時）"""
+    for r in db.execute("SELECT id FROM cases WHERE status = 'アーカイブ'").fetchall():
+        keep_history(db, r["id"])
+
+
 def sync_finished(db: sqlite3.Connection, case_id: int) -> None:
-    """終了日時を自動で記録: アーカイブにしたらその日時（既にあればそのまま）、アーカイブ以外に戻したら空欄"""
+    """終了日時を自動で記録: アーカイブにしたらその日時（既にあればそのまま）、アーカイブ以外に戻したら空欄。
+    終了した案件は履歴（case_history）にも写しを保存する"""
     db.execute("""UPDATE cases SET finished_at = CASE WHEN status = 'アーカイブ'
                     THEN COALESCE(NULLIF(finished_at, ''), datetime('now', 'localtime')) ELSE '' END
                   WHERE id = ?""", (case_id,))
+    keep_history(db, case_id)
 
 
 def parse_datetime(value: str, line: int, col: str) -> str:
@@ -520,6 +572,40 @@ def export_list_csv() -> Response:
     return csv_response([heads, *(_case_row(c, nl) for c in cases)], "cases_list")
 
 
+def _log_text(items: list[dict], key: str) -> str:
+    """進捗メモ・月報を 1 セルに（日付順。「2026-09-01: 内容」を空行でつなぐ）"""
+    return NOTE_SEP.join(f"{x[key]}: {x['body']}" for x in items)
+
+
+@router.get("/export-history.csv")
+def export_history_csv() -> Response:
+    """案件履歴: これまでに登録した案件（終了・削除したものを含む）と進行中の案件をすべて 1 案件 1 行で出力（登録日の順）。
+    進行中・終了の案件は今の内容、削除した案件は履歴（case_history）の写しを使う"""
+    live = list_cases()
+    with get_db() as db:
+        progress: dict[int, list[dict]] = {}
+        for r in db.execute("SELECT case_id, note_date, body FROM case_progress ORDER BY note_date, id"):
+            progress.setdefault(r["case_id"], []).append(dict(r))
+        monthly: dict[int, list[dict]] = {}
+        for r in db.execute("SELECT case_id, month, body FROM case_monthly ORDER BY month"):
+            monthly.setdefault(r["case_id"], []).append(dict(r))
+        live_ids = {c["id"] for c in live}
+        gone = [{**json.loads(r["data"]), "deleted_at": r["deleted_at"]}
+                for r in db.execute("SELECT case_id, data, deleted_at FROM case_history ORDER BY id") if r["case_id"] not in live_ids]
+    items = [(c, progress.get(c["id"], []), monthly.get(c["id"], [])) for c in live]
+    items += [({**c, "areas": c.get("areas") or [], "links": c.get("links") or []}, c.get("progress", []), c.get("monthly", []))
+              for c in gone]
+    items.sort(key=lambda x: (x[0].get("created_at") or "", x[0]["id"]))
+    heads, nl = _headers([c for c, _, _ in items])
+    rows = [["区分", *heads, "削除日", "進捗メモ（すべて）", "月報（すべて）"]]
+    for c, notes, reports in items:
+        kind = ("削除済み" if c.get("deleted_at") else "終了" if c["status"] == "アーカイブ"
+                else "キャンセル" if c["status"] == "キャンセル" else "進行中")
+        rows.append([kind, *_case_row(c, nl), (c.get("deleted_at") or "")[:16],
+                     _log_text(notes, "note_date"), _log_text(reports, "month")])
+    return csv_response(rows, "cases_history")
+
+
 LOG_HEADERS_MONTHLY = ["案件番号", "試験名", "企業名", "案件名", "月", "月報"]
 LOG_HEADERS_NOTES = ["案件番号", "試験名", "企業名", "案件名", "日付", "進捗メモ"]
 
@@ -614,6 +700,7 @@ def _import_log_list(raw: bytes, kind: str) -> dict:
             else:
                 _import_note(db, row["id"], parse_date(r[key], line, "日付").isoformat(), body)
                 notes += 1
+        keep_all_history(db)
     return {"added": 0, "updated": 0, "monthly": monthly, "notes": notes}
 
 
@@ -749,6 +836,7 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                 else:
                     _import_note(db, case_id, key, body)
                     notes += 1
+        keep_all_history(db)
     return {"added": added, "updated": updated, "notes": notes, "monthly": reports}
 
 
@@ -805,6 +893,7 @@ def delete_case(case_id: int, confirm: str = "") -> Response:
         c = fetch_case(db, case_id)
         if confirm != c["case_no"]:
             raise HTTPException(400, "確認用の案件番号が一致しないため削除できません")
+        keep_history(db, case_id, deleted=True)  # 削除しても履歴（写し）は残す
         db.execute("DELETE FROM cases WHERE id = ?", (case_id,))
     return Response(status_code=204)
 
@@ -825,6 +914,7 @@ def add_note(case_id: int, n: NoteIn) -> dict:
         fetch_case(db, case_id)
         cur = db.execute("INSERT INTO case_progress(case_id, note_date, body) VALUES (?,?,?)",
                          (case_id, n.note_date.isoformat(), n.body))
+        keep_history(db, case_id)
         return dict(db.execute("SELECT * FROM case_progress WHERE id = ?", (cur.lastrowid,)).fetchone())
 
 
@@ -835,6 +925,7 @@ def update_note(case_id: int, note_id: int, n: NoteIn) -> dict:
                          " WHERE id = ? AND case_id = ?", (n.note_date.isoformat(), n.body, note_id, case_id))
         if cur.rowcount == 0:
             raise HTTPException(404, "進捗メモが見つかりません")
+        keep_history(db, case_id)
         return dict(db.execute("SELECT * FROM case_progress WHERE id = ?", (note_id,)).fetchone())
 
 
@@ -844,6 +935,7 @@ def delete_note(case_id: int, note_id: int) -> Response:
         cur = db.execute("DELETE FROM case_progress WHERE id = ? AND case_id = ?", (note_id, case_id))
         if cur.rowcount == 0:
             raise HTTPException(404, "進捗メモが見つかりません")
+        keep_history(db, case_id)
     return Response(status_code=204)
 
 
@@ -868,6 +960,7 @@ def upsert_monthly(case_id: int, m: MonthlyIn) -> dict:
                SET body = excluded.body, updated_at = datetime('now', 'localtime')""",
             (case_id, m.month, m.body.strip()),
         )
+        keep_history(db, case_id)
         return dict(db.execute("SELECT * FROM case_monthly WHERE case_id = ? AND month = ?",
                                (case_id, m.month)).fetchone())
 
@@ -878,4 +971,5 @@ def delete_monthly(case_id: int, report_id: int) -> Response:
         cur = db.execute("DELETE FROM case_monthly WHERE id = ? AND case_id = ?", (report_id, case_id))
         if cur.rowcount == 0:
             raise HTTPException(404, "月報が見つかりません")
+        keep_history(db, case_id)
     return Response(status_code=204)

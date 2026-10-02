@@ -204,7 +204,10 @@ const NOTE_ALL = "空欄のセルは今の値のまま変わりません。削�
 const DATASETS = [
   {
     name: "ガントチャート（タスク）", desc: "タスク（領域・PJ名・タスク・担当者・優先度・開始日・終了日・詳細）",
-    exports: [{ label: "CSV エクスポート", url: "/api/export.csv" }],
+    exports: [
+      { title: "ガントチャート（今のタスク）", url: "/api/export.csv", desc: "いまガントチャートにあるタスク。インポートすると元に戻せます" },
+      { title: "ガントチャート履歴", url: "/api/export-history.csv", desc: "完了したタスク・削除したタスク（完了から 1 週間の自動削除を含む）も含めて、これまでのタスクをすべて出力（区分: 未完了・完了・削除済み）" },
+    ],
     importUrl: "/api/import", mode: true,
     notes: ["列: id, 領域, PJ名, タスク, 担当者（複数はスペース区切り）, 優先度, 開始日, 終了日, 詳細",
       "「追加・更新」では id が一致するタスクは上書き、それ以外は追加します。「置き換え」は既存のタスクをすべて削除してから取り込みます"],
@@ -215,6 +218,7 @@ const DATASETS = [
     exports: [
       { title: "全データ（案件一覧＋月報・進捗メモ）", url: "/api/cases/export.csv", desc: "1 案件 1 行。月報・進捗メモをすべて日付ごとの列に展開。インポートすると元に戻せます" },
       { title: "案件一覧のみ", url: "/api/cases/export-list.csv", desc: "案件の情報だけ（月報・進捗メモは含めない）" },
+      { title: "案件履歴", url: "/api/cases/export-history.csv", desc: "これまでに登録した案件（終了・削除したものを含む）と進行中の案件をすべて 1 案件 1 行で出力（区分: 進行中・終了・キャンセル・削除済み。進捗メモ・月報も含む）" },
       { title: "月報一覧", url: "/api/cases/export-monthly.csv", period: "月報", desc: "案件 × 月で 1 行。月を指定するとその月の全案件の月報のみ" },
       { title: "進捗メモ一覧", url: "/api/cases/export-notes.csv", period: "進捗メモ", desc: "案件 × 日付で 1 行。月を指定するとその月の進捗メモのみ" },
     ],

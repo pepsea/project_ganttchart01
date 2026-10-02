@@ -40,6 +40,8 @@ LEGACY_UPGRADES: dict[str, tuple[str, str]] = {}
 # テーブルの説明（管理画面の表示用）
 TABLE_LABELS = {
     "tasks": "ガントチャートのタスク",
+    "task_history": "ガントチャートの履歴（完了・削除したタスクの写し）",
+    "case_history": "案件の履歴（終了・削除した案件の写し）",
     "cases": "案件",
     "case_notes": "案件の週次進捗メモ（旧形式・未使用）",
     "case_progress": "案件の進捗メモ",

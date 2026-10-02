@@ -25,7 +25,7 @@ import links
 import people
 import platforms
 import services
-from csvutil import decode_csv, parse_date
+from csvutil import csv_response, decode_csv, parse_date
 import db as dbmod
 from db import BASE_DIR, ensure_master, get_db
 
@@ -90,10 +90,26 @@ TASK_COLS = ("area", "project", "task", "assignee", "priority", "start_date", "e
 DONE_KEEP_DAYS = 7  # 完了にしたタスクは、この日数がたつと自動で削除する
 
 
+def keep_task_history(db: sqlite3.Connection, where: str, params: tuple = (), deleted: bool = False) -> None:
+    """完了したタスク・削除するタスクの写しを task_history に保存（ガントチャートから消えても残る）。
+    where はタスクを選ぶ条件（例: "id = ?"）。deleted=False のときは完了したタスクだけ"""
+    cond = where if deleted else f"({where}) AND completed_at <> ''"
+    cols = ", ".join(TASK_COLS)
+    db.execute(f"""INSERT INTO task_history(task_id, {cols}, completed_at, deleted_at)
+                   SELECT id, {cols}, completed_at, ? FROM tasks WHERE {cond}
+                   ON CONFLICT(task_id) DO UPDATE SET {", ".join(f"{c} = excluded.{c}" for c in TASK_COLS)},
+                     completed_at = excluded.completed_at, deleted_at = excluded.deleted_at,
+                     saved_at = datetime('now', 'localtime')
+                   WHERE ({" OR ".join(f"{c} IS NOT excluded.{c}" for c in (*TASK_COLS, "completed_at", "deleted_at"))})""",
+               (datetime.now().strftime("%Y-%m-%d %H:%M:%S") if deleted else "", *params))
+
+
 def purge_done_tasks(db: sqlite3.Connection) -> int:
-    """完了から DONE_KEEP_DAYS 日たったタスクを削除（起動時・一覧の取得時）"""
-    return db.execute("DELETE FROM tasks WHERE completed_at <> ''"
-                      " AND completed_at <= datetime('now', 'localtime', ?)", (f"-{DONE_KEEP_DAYS} days",)).rowcount
+    """完了から DONE_KEEP_DAYS 日たったタスクを削除（起動時・一覧の取得時）。削除しても履歴（task_history）には残る"""
+    cond = "completed_at <> '' AND completed_at <= datetime('now', 'localtime', ?)"
+    params = (f"-{DONE_KEEP_DAYS} days",)
+    keep_task_history(db, cond, params, deleted=True)
+    return db.execute(f"DELETE FROM tasks WHERE {cond}", params).rowcount
 
 
 def init_db() -> None:
@@ -128,6 +144,23 @@ def init_db() -> None:
                 db.execute(f"ALTER TABLE tasks ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
         if "completed_at" not in cols:  # 完了にした日時（空 = 未完了）。完了から 1 週間たつと自動で削除する
             db.execute("ALTER TABLE tasks ADD COLUMN completed_at TEXT NOT NULL DEFAULT ''")
+        # タスクの履歴: 完了・削除したタスクの写しを永続保管する（完了から 1 週間の自動削除のあとも残る）
+        db.execute("""CREATE TABLE IF NOT EXISTS task_history (
+                          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                          task_id      INTEGER NOT NULL UNIQUE,   -- 元のタスク（tasks.id）。削除後も残す
+                          area         TEXT NOT NULL DEFAULT '',
+                          project      TEXT NOT NULL DEFAULT '',
+                          task         TEXT NOT NULL DEFAULT '',
+                          assignee     TEXT NOT NULL DEFAULT '',
+                          priority     TEXT NOT NULL DEFAULT '',
+                          start_date   TEXT NOT NULL DEFAULT '',
+                          end_date     TEXT NOT NULL DEFAULT '',
+                          detail       TEXT NOT NULL DEFAULT '',
+                          completed_at TEXT NOT NULL DEFAULT '',  -- 完了日時
+                          deleted_at   TEXT NOT NULL DEFAULT '',  -- 削除日時（空 = まだガントチャートにある）
+                          saved_at     TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+                      )""")
+        keep_task_history(db, "1")  # 完了済みのタスクを履歴に（起動時・復元後に毎回。変わったものだけ）
         purge_done_tasks(db)
 
         if dbmod.is_fresh_install() and db.execute("SELECT COUNT(*) FROM areas").fetchone()[0] == 0:
@@ -446,6 +479,7 @@ def update_task(task_id: int, task: TaskIn) -> dict:
         cur = db.execute(UPDATE_SQL, (*task.values(), task_id))
         if cur.rowcount == 0:
             raise HTTPException(404, "タスクが見つかりません")
+        keep_task_history(db, "id = ?", (task_id,))
         return get_task(db, task_id)
 
 
@@ -461,6 +495,7 @@ def set_task_done(task_id: int, body: DoneIn) -> dict:
                          ("" if not body.done else datetime.now().strftime("%Y-%m-%d %H:%M:%S"), task_id))
         if cur.rowcount == 0:
             raise HTTPException(404, "タスクが見つかりません")
+        keep_task_history(db, "id = ?", (task_id,))  # 完了したタスクは履歴に写しを残す
         return get_task(db, task_id)
 
 
@@ -479,6 +514,7 @@ def delete_task(task_id: int, confirm: str = "") -> Response:
             raise HTTPException(404, "タスクが見つかりません")
         if digits not in accepted:
             raise HTTPException(400, "確認用の日付が本日と一致しないため削除できません（例: 20260927）")
+        keep_task_history(db, "id = ?", (task_id,), deleted=True)  # 削除しても履歴（写し）は残す
         db.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
     return Response(status_code=204)
 
@@ -500,6 +536,21 @@ def export_csv() -> Response:
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.get("/api/export-history.csv")
+def export_history_csv() -> Response:
+    """ガントチャート履歴: 今あるタスク（未完了・完了）と、削除したタスク（完了から 1 週間の自動削除を含む）をすべて出力（id 順）"""
+    live = list_tasks()
+    live_ids = {t["id"] for t in live}
+    with get_db() as db:
+        gone = [{**dict(r), "id": r["task_id"]} for r in db.execute("SELECT * FROM task_history ORDER BY task_id")
+                if r["task_id"] not in live_ids]
+    rows = [["区分", *CSV_HEADERS, "削除日時"]]
+    for t in sorted([*live, *gone], key=lambda t: t["id"]):
+        kind = "削除済み" if t.get("deleted_at") else "完了" if t["completed_at"] else "未完了"
+        rows.append([kind, t["id"], *(t[c] for c in TASK_COLS), (t["completed_at"] or "")[:16], (t.get("deleted_at") or "")[:16]])
+    return csv_response(rows, "tasks_history")
 
 
 @app.post("/api/import")
@@ -560,6 +611,7 @@ async def import_csv(
     added = updated = 0
     with get_db() as db:
         if mode == "replace":
+            keep_task_history(db, "1", deleted=True)  # 置き換えで消えるタスクも履歴に残す
             db.execute("DELETE FROM tasks")
         for task_id, t, done in rows:
             save_masters(db, t)
@@ -573,6 +625,7 @@ async def import_csv(
             if has_done and done:
                 db.execute("UPDATE tasks SET completed_at = ? WHERE id = ?", (done, new_id))
             added += 1
+        keep_task_history(db, "1")
     return {"added": added, "updated": updated, "mode": mode}
 
 

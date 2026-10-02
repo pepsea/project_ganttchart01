@@ -24,7 +24,12 @@
 | | task / assignee / priority | タスク名 / 担当者（複数は半角スペース区切り。1 人ならこれまで通り名前だけ） / 優先度（高・中・低） |
 | | start_date / end_date | 開始日 / 終了日 |
 | | detail | 詳細 |
-| | completed_at | 完了にした日時（空 = 未完了）。完了したタスクはグレーアウトして一番下に表示し、完了から 1 週間（7 日）たつと自動で削除する（起動時・一覧の取得時） |
+| | completed_at | 完了にした日時（空 = 未完了）。完了したタスクはグレーアウトして一番下に表示し、完了から 1 週間（7 日）たつと自動で削除する（起動時・一覧の取得時）。削除しても `task_history` に写しが残る |
+| `task_history` | id, task_id (一意) | ガントチャートの履歴。完了したタスク・削除したタスク（完了から 1 週間の自動削除、CSV の「置き換え」を含む）の写しを永続保管する。task_id = 元の `tasks.id`（削除後も残す） |
+| | area / project / task / assignee / priority / start_date / end_date / detail | 写した時点のタスクの内容（`tasks` と同じ意味） |
+| | completed_at / deleted_at / saved_at | 完了日時 / 削除日時（空 = まだガントチャートにある）/ 写しを保存・更新した日時。完了したタスクを編集すると写しも更新。起動時・復元後に、完了済みのタスクを毎回写す |
+
+「ガントチャート履歴」CSV（`/api/export-history.csv`）は、今のタスク（未完了・完了）と `task_history` の削除済みタスクをすべて出力する。
 
 ## 案件管理
 
@@ -47,8 +52,15 @@
 | `case_notes` | id, case_id, week, body, updated_at | （未使用）旧・週次進捗メモ（week = その週の月曜日。案件×週で一意）。`case_progress` 作成時に 1 回だけ引き継ぎ済み |
 | `case_progress` | id, case_id, note_date, body, created_at, updated_at | 進捗メモ（note_date = 日付。同じ日に複数可）。`case_progress` を含まない古いバックアップを復元したときは、復元した `case_notes` から作り直す |
 | `case_monthly` | id, case_id, month, body, updated_at | 案件の月報（案件×月で一意） |
+| `case_history` | id, case_id (一意) | 案件の履歴。終了（アーカイブ）した案件・削除した案件の写しを単独で永続保管する（`cases` を参照しない。案件を削除しても残る）。case_id = 元の `cases.id` |
+| | case_no / trial / name / status | 写した時点の案件番号 / 試験名 / 案件名 / 状況 |
+| | created_at / finished_at / deleted_at | 案件の登録日時 / 終了日時 / 削除日時（空 = 削除していない） |
+| | data | 写し（JSON。案件の全項目・自由リンク links・進捗メモ progress・月報 monthly） |
+| | saved_at | 写しを保存・更新した日時。終了した案件の内容・進捗メモ・月報を変えると写しも更新。状況を戻しても履歴は残る。起動時・復元後に、終了済みの案件を毎回写す |
 
-`case_links` / `case_notes` / `case_progress` / `case_monthly` は `cases.id` を参照し、案件の削除時に一緒に削除されます。
+`case_links` / `case_notes` / `case_progress` / `case_monthly` は `cases.id` を参照し、案件の削除時に一緒に削除されます。`case_history` は削除されません。
+
+「案件履歴」CSV（`/api/cases/export-history.csv`）は、今ある案件（進行中・終了・キャンセル）と `case_history` の削除済み案件をすべて、登録日の順に出力する（進捗メモ・月報も 1 セルずつ含む）。
 
 ## 基盤技術
 

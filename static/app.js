@@ -447,7 +447,7 @@ async function toggleDone(task) {
   try {
     const saved = await api(`/api/tasks/${task.id}/done`, { method: "POST", body: JSON.stringify({ done }) });
     task.completed_at = saved.completed_at;
-    toast(done ? "完了にしました（一番下に移ります。1 週間後に自動で削除されます）" : "完了を取り消しました");
+    toast(done ? "完了にしました（一番下に移ります。1 週間後に自動で削除されます。ガントチャート履歴には残ります）" : "完了を取り消しました");
     rerenderKeepScroll();
   } catch (err) {
     toast(err.message, true);
