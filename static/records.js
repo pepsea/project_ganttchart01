@@ -103,14 +103,14 @@
       star.type = "button";
       star.title = r.prioritized ? "優先を外す" : "優先にする（先頭に並びます）";
       star.addEventListener("click", (e) => { e.stopPropagation(); togglePriority(r); });
-      const canDrag = !archivedView && sortMode === "manual"; // 更新日順のときは、手動の並べ替えはしない
+      const canDrag = sortMode === "manual"; // 更新日順のときは、手動の並べ替えはしない（現在・アーカイブとも同じ）
       handle.classList.toggle("off", !canDrag);
       if (!canDrag) handle.title = "「並び順」を「手動」にすると、ドラッグで入れ替えられます";
-      if (!archivedView) li.append(handle, star); // アーカイブした記録は、並べ替え・優先の操作をしない
+      li.append(handle, star);
       li.append(h("span", "rec-title-text", r.title));
-      // 更新日（アーカイブの表示では、アーカイブした日）
-      const when = h("span", "rec-date", shortDate(archivedView ? r.archived_at || r.updated_at : r.updated_at));
-      when.title = archivedView ? `アーカイブ ${stamp(r.archived_at)}（更新 ${stamp(r.updated_at)}）` : `更新 ${stamp(r.updated_at)}（作成 ${stamp(r.created_at)}）`;
+      // 更新日（現在・アーカイブとも同じ表記。マウスを重ねると日時。アーカイブした記録はアーカイブした日時も）
+      const when = h("span", "rec-date", shortDate(r.updated_at));
+      when.title = `更新 ${stamp(r.updated_at)}（作成 ${stamp(r.created_at)}）${archivedView && r.archived_at ? `・アーカイブ ${stamp(r.archived_at)}` : ""}`;
       li.append(when);
       if (r.tags.length) {
         const tags = h("span", "rec-chips");
@@ -299,7 +299,6 @@
     b.textContent = archivedView ? "戻す" : "アーカイブ";
     b.title = archivedView ? "アーカイブから一覧（現在）に戻します" : "一覧から外してサーバーに保管します（「アーカイブ」で見られ、戻せます）";
     $("#rec-add").hidden = archivedView;
-    $(".rec-sorts").hidden = archivedView; // アーカイブの表示は、アーカイブした新しい順（並び順の切り替えはなし）
     $("#rec-view-now").classList.toggle("on", !archivedView);
     $("#rec-view-arch").classList.toggle("on", archivedView);
   }

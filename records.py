@@ -84,12 +84,10 @@ def _fetch(db, rid: int) -> dict:
 
 @router.get("")
 def list_records(q: str = "", tag: str = "", archived: bool = False, sort: str = "manual") -> list[dict]:
-    """archived=false: 現在の記録 / archived=true: アーカイブした記録（アーカイブした新しい順）
+    """archived=false: 現在の記録 / archived=true: アーカイブした記録（どちらも同じ並び方）
     sort=manual: ★ 優先 → 手で入れ替えた順 / sort=updated: ★ 優先 → 更新日の新しい順"""
     with get_db() as db:
         order = ORDER if sort != "updated" else "ORDER BY prioritized DESC, updated_at DESC, id DESC"
-        if archived:
-            order = "ORDER BY archived_at DESC, id DESC"
         rows = [_to_record(r) for r in db.execute(f"SELECT * FROM records WHERE archived = ? {order}", (int(archived),))]
     q = q.strip().lower()
     return [r for r in rows
