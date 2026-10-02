@@ -862,7 +862,7 @@ $("#btn-copy-link").addEventListener("click", async () => {
   const url = caseUrl(c);
   if (await copyText(url)) toast(`リンクをコピーしました: ${url}`);
 });
-drawer.addEventListener("click", (e) => { if (e.target === drawer) drawer.close(); }); // 背景クリックで閉じる
+// 開いた案件のウィンドウは、外（背景）をクリックしても閉じない。閉じるのは「✕」ボタンか Esc キー（入力中の内容を誤って失わないため）
 
 // ---- 進捗メモ（日付ごと。同じ日に複数可。日付は今日が初期値）
 const noteForm = $("#note-form");
