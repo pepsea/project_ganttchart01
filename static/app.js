@@ -1284,8 +1284,15 @@ $("#btn-cal").addEventListener("click", () => setCalendar(!cal.on));
     scrollToDate(todayMs());
     // 「記録」から「タスク化」したとき: タスク名を入れた「タスク追加」を開く
     if (params.get("newtask")) {
+      let handoff = {};
+      try {
+        handoff = JSON.parse(sessionStorage.getItem("gantt.newtask") || "{}");
+        sessionStorage.removeItem("gantt.newtask"); // 1 回だけ使う
+      } catch (_) { handoff = {}; }
       openTaskDialog();
-      $("#form-task").task.value = params.get("newtask");
+      const f = $("#form-task");
+      f.task.value = handoff.title || params.get("newtask");
+      if (handoff.detail) f.detail.value = handoff.detail; // タスクの詳細に、記録の本文を入れる
     }
     const shared = openTaskId && state.tasks.find((t) => String(t.id) === openTaskId);
     if (shared) {

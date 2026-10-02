@@ -305,12 +305,15 @@
     if (await copyText(text)) say("メモ全体を Markdown のままコピーしました", false);
   });
 
-  // タスク化: ガントチャートでタスクの追加画面を開く（タスク名 = 記録のタイトル）
+  // タスク化: ガントチャートでタスクの追加画面を開く（タスク名 = 記録のタイトル、詳細 = 記録の本文）。
+  // 本文は長いことがあるので、アドレスには入れず、ブラウザの一時保存（sessionStorage）で渡す
   $("#rec-to-task").addEventListener("click", async () => {
     if (selectedId === null) return;
     await flush();
-    const q = new URLSearchParams({ newtask: titleInput.value.trim() });
-    location.href = `/?${q}`;
+    try {
+      sessionStorage.setItem("gantt.newtask", JSON.stringify({ title: titleInput.value.trim(), detail: body.value.replace(/\s+$/, "") }));
+    } catch (_) { /* 渡せなくてもタスク名だけは入る */ }
+    location.href = `/?newtask=${enc(titleInput.value.trim())}`;
   });
 
   // アーカイブ（一覧から外してサーバーに保管）/ 戻す（アーカイブした記録を一覧に戻す）
