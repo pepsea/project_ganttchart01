@@ -241,6 +241,8 @@
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       clearTimeout(saveTimer);
+      preview = true; // 保存と同時に、Markdown を変換した表示にする（「編集」で書く状態に戻る）
+      renderPreview();
       save().then(() => say("保存しました", false));
     }
   });
