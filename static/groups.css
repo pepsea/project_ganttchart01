@@ -293,7 +293,7 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .md p { margin: 6px 0; }
 .md ul, .md ol { margin: 6px 0; padding-left: 1.6em; }
 .md blockquote { margin: 8px 0; padding: 2px 12px; border-left: 4px solid var(--line-strong); color: var(--muted); }
-.md code { background: #9c2b3a; color: #fff; border-radius: 4px; padding: 1px 6px; font-size: .92em; } /* `xxx` は臙脂（えんじ）色の背景 */
+.md code { background: #efd0d5; color: #8b1e2d; border-radius: 4px; padding: 1px 6px; font-size: .92em; } /* `xxx` は薄い臙脂（えんじ）色の背景に、濃い臙脂色の文字 */
 .md pre { background: #e3e7ee; border-radius: 6px; padding: 8px 10px; overflow: auto; }
 .md pre code { background: none; color: inherit; padding: 0; } /* コードブロックの中は、これまでどおり */
 .md table { border-collapse: collapse; margin: 8px 0; }

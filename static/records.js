@@ -329,7 +329,7 @@
     const html = window.mdToHtml(text)
       .replace(/<input type="checkbox" class="md-check" checked[^>]*>/g, "☑")
       .replace(/<input type="checkbox" class="md-check"[^>]*>/g, "☐")
-      .replace(/<code>/g, '<code style="background:#9c2b3a;color:#fff;padding:1px 5px;border-radius:3px;font-family:Consolas,monospace">')
+      .replace(/<code>/g, '<code style="background:#efd0d5;color:#8b1e2d;padding:1px 5px;border-radius:3px;font-family:Consolas,monospace">')
       .replace(/<pre><code style="[^"]*">/g, '<pre style="background:#e3e7ee;padding:6px 8px"><code style="font-family:Consolas,monospace">');
     if (await copyRich(text, `<meta charset="utf-8">${html}`)) say("メモ全体をコピーしました（Teams などには書式つきで、メモ帳などには Markdown の文字で貼れます）", false);
   });
