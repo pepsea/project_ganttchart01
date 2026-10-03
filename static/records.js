@@ -71,6 +71,7 @@
   function setEditorVisible(v) {
     editor.hidden = !v;
     placeholder.hidden = v;
+    if (!v) history.replaceState(null, "", "/records"); // 閉じたら、アドレスから記録の指定を外す
   }
 
   function chip(name, onRemove) {
@@ -220,6 +221,7 @@
       preview = !!r.body; // 本文があるときは、まず表示（Markdown 変換後）で開く
       renderPreview();
       setEditorVisible(true);
+      history.replaceState(null, "", `/records?id=${r.id}`); // 開いている記録のアドレス（「リンク」でコピーできる）
       renderList();
     } catch (err) { say(err.message); }
   }
@@ -322,7 +324,21 @@
   $("#rec-copy").addEventListener("click", async () => {
     if (selectedId === null) return;
     const text = `# ${titleInput.value.trim()}\n\n${body.value.replace(/\s+$/, "")}\n`;
-    if (await copyText(text)) say("メモ全体を Markdown のままコピーしました", false);
+    // 書式つき（HTML）も一緒にコピーする。Teams・Outlook・Word に貼ると見出し・太字・箇条書きなどが反映され、
+    // メモ帳などの文字だけの欄に貼ると Markdown の文字のままになる
+    const html = window.mdToHtml(text)
+      .replace(/<input type="checkbox" class="md-check" checked[^>]*>/g, "☑")
+      .replace(/<input type="checkbox" class="md-check"[^>]*>/g, "☐")
+      .replace(/<code>/g, '<code style="background:#9c2b3a;color:#fff;padding:1px 5px;border-radius:3px;font-family:Consolas,monospace">')
+      .replace(/<pre><code style="[^"]*">/g, '<pre style="background:#e3e7ee;padding:6px 8px"><code style="font-family:Consolas,monospace">');
+    if (await copyRich(text, `<meta charset="utf-8">${html}`)) say("メモ全体をコピーしました（Teams などには書式つきで、メモ帳などには Markdown の文字で貼れます）", false);
+  });
+
+  // リンク: このメモを直接開くアドレスをコピー（開くと、その記録が開く。アーカイブした記録は「アーカイブ」の表示で開く）
+  $("#rec-link").addEventListener("click", async () => {
+    if (selectedId === null) return;
+    const url = `${location.origin}/records?id=${selectedId}`;
+    if (await copyText(url)) say(`このメモへのリンクをコピーしました: ${url}`, false);
   });
 
   // タスク化: ガントチャートでタスクの追加画面を開く（タスク名 = 記録のタイトル、詳細 = 記録の本文）。
@@ -399,5 +415,18 @@
   });
 
   window.addEventListener("beforeunload", () => { if (saveTimer !== null) save(); });
-  refresh();
+  // リンク（/records?id=番号）で開いたとき: その記録を開く（アーカイブした記録なら、アーカイブの表示で）
+  (async () => {
+    const want = Number(new URLSearchParams(location.search).get("id"));
+    if (!want) { await refresh(); return; }
+    try {
+      const r = await call(`${base}/${want}`);
+      if (r.archived) await switchView(true); else await refresh();
+      await select(want);
+    } catch (err) {
+      say("このリンクのメモは見つかりません（削除された可能性があります）");
+      history.replaceState(null, "", "/records");
+      await refresh();
+    }
+  })();
 })();

@@ -128,3 +128,6 @@
 .rec-editor-head .rec-actions { gap: 5px; }
 .rec-editor-head .rec-actions button { font-size: 13.5px; padding: 4px 8px; white-space: nowrap; }
 .rec-editor-head #rec-close { padding: 2px 8px; }
+.rec-editor-head .rec-actions button { font-size: 13px; padding: 4px 7px; }
+.rec-editor-head .rec-actions { gap: 4px; }
+.rec-editor-head .rec-actions button { font-size: 12.5px; padding: 4px 6px; }
