@@ -2,11 +2,11 @@
 
 - バックアップは JSON（全テーブルの全行）。テーブル・列はデータベースから自動で読み取るので、今後項目が増えても対象になる
 - 復元は全データの置き換え。パスワードが必要で、直前の状態を自動でサーバーに保存してから実行する
-- サーバーには毎週日曜日に自動でバックアップを保存する（日曜に止まっていたときは、次に動いたときに保存）
+- サーバーには毎日 1 回、夜 12 時（0 時台）に自動でバックアップを保存する（その時間にアプリが止まっていた日は保存しない）
 - サーバー上のバックアップは、作成から KEEP_DAYS 日（約 1 か月）を過ぎたら自動で削除する（最新の 1 つは残す）
 - バックアップは管理サイトからいつでも作れる（「今すぐバックアップを作る」）。一覧の「復元」でいつでも戻せる
 - バックアップファイルはダウンロードでき、手元のファイルをサーバーにアップロード（保存のみ。復元は別操作）もできる
-- アプリの起動のたび（アップデートでテーブルを更新する前）にもバックアップを保存し、直近 STARTUP_KEEP 回分を残す
+- アプリの起動時には自動バックアップを行わない（アップデートの前は update.sh が手動のバックアップを取る。直接 docker compose up するときは先に手動で作る）
 - 復元のあとには MIGRATIONS（テーブルの作成・列の追加）を実行し、古い形式のバックアップも新しいアプリで使えるようにする
 """
 
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/api/admin", tags=["バックアップ"])
 BACKUP_DIR = DATA_DIR / "backups"
 FORMAT = "gantt-pm-backup"
 VERSION = 1
-AUTO_KEEP = 14  # 自動バックアップ（毎週日曜日）を残す数の上限 = 14 週分
+AUTO_KEEP = 40  # 自動バックアップ（毎日 0 時）を残す数の上限（KEEP_DAYS を過ぎたものは別に自動削除）
 KEEP_DAYS = 31  # サーバー上のバックアップを残す日数（約 1 か月）。これより古いものは自動で削除
 STARTUP_KEEP = 10
 NAME_RE = re.compile(r"^(auto|manual|pre-restore|startup|upload)-\d{8}-\d{6}\.json$")
@@ -181,32 +181,17 @@ def _prune(prefix: str, keep: int) -> None:
         old.unlink(missing_ok=True)
 
 
-def save_startup_backup() -> str | None:
-    """起動時（テーブル更新の前）のバックアップ。失敗しても起動は続ける"""
-    try:
-        name = save_to_server("startup")
-        _prune("startup", STARTUP_KEEP)
-        return name
-    except Exception as e:  # noqa: BLE001
-        print(f"[backup] 起動時のバックアップに失敗しました: {e}")
-        return None
+# ---------------------------------------------------------------- 自動バックアップ（毎日 夜 12 時）
 
-
-# ---------------------------------------------------------------- 自動バックアップ（毎週日曜日）
-
-def last_sunday(now: datetime | None = None) -> datetime:
-    """直近の日曜日の 0 時（今日が日曜なら今日）"""
+def ensure_daily_backup(now: datetime | None = None) -> str | None:
+    """夜 12 時（0 時台）に、今日の自動バックアップがまだなければ保存する（1 分ごとに確認）。
+    アプリが止まっていて 0 時台に動いていなかった日は保存しない（起動時にバックアップを取らない方針）"""
     now = now or datetime.now()
-    d = now - timedelta(days=(now.weekday() + 1) % 7)
-    return d.replace(hour=0, minute=0, second=0, microsecond=0)
-
-
-def ensure_weekly_backup(now: datetime | None = None) -> str | None:
-    """直近の日曜日以降の自動バックアップがまだなければ保存する（1 時間ごとに確認）。
-    日曜日にアプリが止まっていた場合も、次に動いたときに保存する"""
+    if now.hour != 0:
+        return None
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    since = f"auto-{last_sunday(now):%Y%m%d}"
-    if any(f.name[:len(since)] >= since for f in BACKUP_DIR.glob("auto-*.json") if NAME_RE.match(f.name)):
+    today = f"auto-{now:%Y%m%d}"
+    if any(f.name.startswith(today) for f in BACKUP_DIR.glob("auto-*.json")):
         return None
     name = save_to_server("auto")
     _prune("auto", AUTO_KEEP)
@@ -239,11 +224,11 @@ def prune_old_backups(now: datetime | None = None) -> list[str]:
 async def auto_backup_loop() -> None:
     while True:
         try:
-            ensure_weekly_backup()
+            ensure_daily_backup()
             prune_old_backups()
         except Exception as e:  # noqa: BLE001  バックアップの失敗でアプリを止めない
             print(f"[backup] 自動バックアップに失敗しました: {e}")
-        await asyncio.sleep(3600)
+        await asyncio.sleep(60)
 
 
 # ---------------------------------------------------------------- API

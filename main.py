@@ -246,9 +246,7 @@ def save_masters(db: sqlite3.Connection, t: TaskIn) -> None:
 
 # ---------------------------------------------------------------- App
 
-# アップデート前の状態を残す: 既存データがあれば、起動のたび（テーブル更新の前）にバックアップを保存
-if not dbmod.FRESH_DB:
-    backup.save_startup_backup()
+# （起動時の自動バックアップはしない。バックアップは毎日夜 12 時。アップデートの前は update.sh が手動のバックアップを取る）
 
 # テーブルの作成・更新（列の追加など。既存データは消さない）
 MIGRATIONS = [init_db, cases.init_db, platforms.init_db, services.init_db, documents.init_db, links.init_db,
@@ -266,7 +264,7 @@ backup.LEGACY_UPGRADES["platform_links"] = ("platforms", platforms.LEGACY_LINKS_
 
 @asynccontextmanager
 async def lifespan(_app):
-    # 1 日 1 回、全データのバックアップをサーバーに自動保存
+    # 毎日 夜 12 時（0 時台）に、全データのバックアップをサーバーに自動保存
     task = asyncio.create_task(backup.auto_backup_loop())
     yield
     task.cancel()

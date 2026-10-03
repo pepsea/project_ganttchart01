@@ -45,6 +45,6 @@ if [ "$STASHED" = 1 ]; then
   echo "注意: サーバー側で書き換えたプログラムの変更を stash に退避しました。必要なら  git stash list / git stash pop  で戻せます。" >&2
 fi
 
-# 3) 作り直して起動（起動時にもバックアップ startup-*.json が保存される）
+# 3) 作り直して起動（起動時の自動バックアップはしない。更新前のバックアップは 1) の手動バックアップ）
 docker compose up -d --build
 docker compose ps

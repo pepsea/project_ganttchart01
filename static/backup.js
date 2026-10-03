@@ -40,7 +40,7 @@ async function api(path, options = {}) {
 // ガントチャートと同じ領域の色
 
 // ------------------------------------------------------------ バックアップ・復元
-const KIND_LABEL = { auto: "自動（毎週日曜）", manual: "手動", "pre-restore": "復元前", startup: "起動時", upload: "アップロード" };
+const KIND_LABEL = { auto: "自動（毎日 0 時）", manual: "手動", "pre-restore": "復元前", startup: "起動時", upload: "アップロード" };
 const fmtSize = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
 const fmtTime = (s) => s.replace("T", " ").slice(0, 16);
 let restoreTarget = null; // { file } または { name }
@@ -54,7 +54,7 @@ async function loadBackups() {
     s.append(`${t.label} `, el("b", "", String(t.rows)));
     sum.append(s);
   }
-  $("#auto-keep").textContent = `（毎週日曜日と起動時に自動保存。作成から約 1 か月（${d.keep_days} 日）で自動削除。最新の 1 つは残す）`;
+  $("#auto-keep").textContent = `（毎日 夜 12 時に自動保存。作成から約 1 か月（${d.keep_days} 日）で自動削除。最新の 1 つは残す）`;
   const ul = $("#server-backups");
   ul.innerHTML = "";
   if (!d.server_backups.length) ul.append(el("li", "empty", "まだありません"));
