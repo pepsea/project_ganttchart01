@@ -1255,6 +1255,24 @@ function setCalendar(on) {
 }
 $("#btn-cal").addEventListener("click", () => setCalendar(!cal.on));
 
+// 「🔗 リンク」: いま表示している条件（領域・PJ名・担当者・検索・折り畳み・表示の幅・カレンダー）で開くリンクをコピー
+function viewUrl() {
+  const p = new URLSearchParams();
+  if (state.filter.projects) p.set("pj", state.filter.projects);
+  if (state.filter.areas) p.set("farea", state.filter.areas);
+  if (state.filter.assignees) p.set("who", state.filter.assignees === NO_ASSIGNEE ? "none" : state.filter.assignees);
+  if (state.q) p.set("q", state.q);
+  if (state.compact) p.set("compact", "1");
+  if (state.dayW !== 26) p.set("zoom", String(state.dayW));
+  if (cal.on) { p.set("view", "cal"); p.set("cal", `${cal.y}-${String(cal.m + 1).padStart(2, "0")}`); }
+  const qs = p.toString();
+  return `${location.origin}/${qs ? `?${qs}` : ""}`;
+}
+$("#btn-link").addEventListener("click", async () => {
+  const url = viewUrl();
+  if (await copyText(url)) toast("いまの表示条件のリンクをコピーしました");
+});
+
 // ------------------------------------------------------------ 起動
 (async () => {
   try {
@@ -1264,6 +1282,9 @@ $("#btn-cal").addEventListener("click", () => setCalendar(!cal.on));
     state.filter.projects = params.get("pj") || "";
     if (params.get("back") && params.get("pj")) backCase = { pj: params.get("pj"), id: params.get("back") };
     state.q = params.get("q") || "";
+    // 条件つきリンク（「🔗 リンク」でコピー）: 領域・担当者の絞り込みも復元する
+    state.filter.areas = params.get("farea") || "";
+    state.filter.assignees = params.get("who") === "none" ? NO_ASSIGNEE : params.get("who") || "";
     state.defaultArea = params.get("area") || ""; // 案件管理から来たとき: 「タスク追加」の領域の初期値
     if (params.get("from") === "people" && params.get("person")) {
       // 個人の画面から来たとき: 同じ画面のまま個人に戻れる
@@ -1280,8 +1301,24 @@ $("#btn-cal").addEventListener("click", () => setCalendar(!cal.on));
       $("#q").value = state.q;
     }
     syncPjActions();
+    // 表示の形（折り畳み・日/週/月の幅・カレンダー）も、リンクどおりにする
+    if (params.get("compact") === "1") {
+      state.compact = true;
+      $("#btn-compact").textContent = "展開";
+      $("#btn-compact").title = "折りたたんだ列を元に戻す";
+    }
+    if (["36", "26", "14", "6"].includes(params.get("zoom") || "")) {
+      state.dayW = Number(params.get("zoom"));
+      $("#zoom").value = params.get("zoom");
+    }
     render();
     scrollToDate(todayMs());
+    if (params.get("compact") === "1") scroller.scrollLeft = Math.max(0, ((todayMs() - 5 * DAY_MS - state.rangeStart) / DAY_MS) * state.dayW);
+    if (params.get("view") === "cal") {
+      const m = /^(\d{4})-(\d{2})$/.exec(params.get("cal") || "");
+      if (m) { cal.y = Number(m[1]); cal.m = Number(m[2]) - 1; }
+      setCalendar(true);
+    }
     // 「記録」から「タスク化」したとき: タスク名を入れた「タスク追加」を開く
     if (params.get("newtask")) {
       let handoff = {};
