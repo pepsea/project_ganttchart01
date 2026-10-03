@@ -19,6 +19,7 @@ from db import get_db
 
 router = APIRouter(prefix="/api/records", tags=["記録"])
 
+LIST_COLS = "id, title, tags, prioritized, position, archived, archived_at, created_at, updated_at"  # 一覧用（本文は含めない）
 ORDER = "ORDER BY prioritized DESC, position, id DESC"  # 優先（★）が先頭 → 手で入れ替えた順 → 新しい順
 
 
@@ -85,13 +86,19 @@ def _fetch(db, rid: int) -> dict:
 @router.get("")
 def list_records(q: str = "", tag: str = "", archived: bool = False, sort: str = "manual") -> list[dict]:
     """archived=false: 現在の記録 / archived=true: アーカイブした記録（どちらも同じ並び方）
-    sort=manual: ★ 優先 → 手で入れ替えた順 / sort=updated: ★ 優先 → 更新日の新しい順"""
+    sort=manual: ★ 優先 → 手で入れ替えた順 / sort=updated: ★ 優先 → 更新日の新しい順
+    一覧には本文を含めない（本文は開いたときに 1 件ずつ取得する）。検索（タイトル・本文）はここで行う"""
     with get_db() as db:
         order = ORDER if sort != "updated" else "ORDER BY prioritized DESC, updated_at DESC, id DESC"
-        rows = [_to_record(r) for r in db.execute(f"SELECT * FROM records WHERE archived = ? {order}", (int(archived),))]
-    q = q.strip().lower()
-    return [r for r in rows
-            if (not q or q in r["title"].lower() or q in r["body"].lower()) and (not tag or tag in r["tags"])]
+        where, params = ["archived = ?"], [int(archived)]
+        q = q.strip()
+        if q:
+            like = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+            where.append("(title LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\')")
+            params += [like, like]
+        rows = [_to_record(r) for r in db.execute(
+            f"SELECT {LIST_COLS} FROM records WHERE {' AND '.join(where)} {order}", params)]
+    return [r for r in rows if not tag or tag in r["tags"]]
 
 
 @router.get("/tags")

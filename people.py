@@ -98,20 +98,39 @@ def task_state(start: str, end: str, today: date | None = None, completed: str =
 
 @router.get("")
 def list_people() -> list[dict]:
-    """登録されている人の一覧（名前順）と、担当の件数・タスクの状態ごとの件数"""
-    names: set[str] = set()
+    """登録されている人の一覧（名前順）と、担当の件数・タスクの状態ごとの件数。
+    各テーブルを 1 回ずつ読んで人ごとに数える（人数 × データ量にならないようにする）"""
+    stats: dict[str, dict] = {}
+
+    def of(name: str) -> dict:
+        return stats.setdefault(name, {"name": name, "task_counts": {}, "tasks": 0, "cases": 0, "platforms": 0,
+                                       "services": 0, "groups": 0})
+
+    def count(key: str, *texts: str) -> None:
+        for n in {n for t in texts for n in _names(t)}:  # 同じ人が PL とメンバーの両方でも 1 件
+            of(n)[key] += 1
+
+    today = date.today()
     with get_db() as db:
-        for sql in ("SELECT assignee FROM tasks", "SELECT pl || ' ' || assignees FROM cases",
-                    "SELECT owner || ' ' || members FROM platforms", "SELECT pl || ' ' || members FROM services",
-                    "SELECT pl || ' ' || members FROM team_groups"):
-            for r in db.execute(sql):
-                names.update(_names(r[0]))
-    out = []
-    for n in sorted(names):
-        d = person(n)
-        out.append({"name": n, "task_counts": d["task_counts"], "tasks": len(d["tasks"]), "cases": len(d["cases"]),
-                    "platforms": len(d["platforms"]), "services": len(d["services"]), "groups": len(d["groups"])})
-    return out
+        for r in db.execute("SELECT assignee, start_date, end_date, completed_at FROM tasks"):
+            state = task_state(r["start_date"], r["end_date"], today, completed=r["completed_at"])
+            for n in dict.fromkeys(_names(r["assignee"])):
+                p = of(n)
+                p["tasks"] += 1
+                p["task_counts"][state] = p["task_counts"].get(state, 0) + 1
+        for r in db.execute("SELECT pl, assignees FROM cases WHERE status NOT IN ('キャンセル', 'アーカイブ')"):
+            count("cases", r["pl"], r["assignees"])
+        # 状態が対象外の案件に関わる人も、一覧には出す（担当の件数は 0）
+        for r in db.execute("SELECT pl, assignees FROM cases WHERE status IN ('キャンセル', 'アーカイブ')"):
+            for n in {n for t in (r["pl"], r["assignees"]) for n in _names(t)}:
+                of(n)
+        for r in db.execute("SELECT owner, members FROM platforms"):
+            count("platforms", r["owner"], r["members"])
+        for r in db.execute("SELECT pl, members FROM services"):
+            count("services", r["pl"], r["members"])
+        for r in db.execute("SELECT pl, members FROM team_groups"):
+            count("groups", r["pl"], r["members"])
+    return [stats[n] for n in sorted(stats)]
 
 
 @router.get("/{name}")
