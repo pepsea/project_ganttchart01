@@ -276,6 +276,15 @@
     renderPreview();
     scheduleSave();
   });
+  // 表示（Markdown 変換後）をダブルクリックすると、編集に切り替える（チェックボックス・リンクの上は除く）
+  rendered.addEventListener("dblclick", (e) => {
+    if (e.target.closest("input, a")) return;
+    preview = false;
+    renderPreview();
+    body.focus();
+    body.setSelectionRange(body.value.length, body.value.length);
+    getSelection()?.removeAllRanges(); // ダブルクリックで選ばれた単語の選択を消す
+  });
   $("#rec-preview").addEventListener("click", () => { preview = !preview; renderPreview(); if (!preview) body.focus(); });
   $("#rec-save").addEventListener("click", async () => { clearTimeout(saveTimer); await save(); });
   tagInput.addEventListener("keydown", (e) => {
