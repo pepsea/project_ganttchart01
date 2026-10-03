@@ -34,7 +34,7 @@ async function api(path, options = {}) {
     } catch (_) { /* ignore */ }
     throw new Error(msg);
   }
-  return res.json();
+  return res.status === 204 ? null : res.json(); // 削除などの「中身なし」の応答（204）は JSON として読まない
 }
 
 // ガントチャートと同じ領域の色

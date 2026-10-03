@@ -35,7 +35,7 @@ async function api(path, options = {}) {
     throw new Error("ログインが必要です");
   }
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  return res.json();
+  return res.status === 204 ? null : res.json(); // 削除などの「中身なし」の応答（204）は JSON として読まない
 }
 
 function toast(msg, isErr = true) {
