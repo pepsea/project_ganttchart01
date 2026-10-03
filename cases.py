@@ -97,7 +97,8 @@ def init_db() -> None:
             db.execute(LEGACY_NOTES_COPY)
         cols = {r["name"] for r in db.execute("PRAGMA table_info(cases)")}
         # trial = 試験名 / contact = 顧客名（個人名）/ finished_at = 終了日時（アーカイブにした日時。自動）
-        for col in ("project", "detail", *FREE_LINK_COLS, "trial", "contact", "finished_at"):
+        # status_changed_at = 状況を変えた日時（自動。変えるたびに上書き。空 = 登録してから変えていない）
+        for col in ("project", "detail", *FREE_LINK_COLS, "trial", "contact", "finished_at", "status_changed_at"):
             if col not in cols:
                 db.execute(f"ALTER TABLE cases ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
         # 自由リンク（何個でも）。旧・自由リンク 2 つ（cases.link1_* / link2_*）は初回だけ引き継ぐ
@@ -426,6 +427,12 @@ def keep_all_history(db: sqlite3.Connection) -> None:
         keep_history(db, r["id"])
 
 
+def mark_status_change(db: sqlite3.Connection, case_id: int, status: str) -> None:
+    """状況が変わるときだけ、状況を変えた日時（status_changed_at）を今の日時で上書きする（状況を書き換える前に呼ぶ）"""
+    db.execute("""UPDATE cases SET status_changed_at = datetime('now', 'localtime')
+                  WHERE id = ? AND status <> ?""", (case_id, status))
+
+
 def sync_finished(db: sqlite3.Connection, case_id: int) -> None:
     """終了日時を自動で記録: アーカイブにしたらその日時（既にあればそのまま）、アーカイブ以外に戻したら空欄。
     終了した案件は履歴（case_history）にも写しを保存する"""
@@ -489,7 +496,8 @@ def write_case(db: sqlite3.Connection, sql: str, params: tuple, case_no: str):
 @router.get("")
 def list_cases() -> list[dict]:
     with get_db() as db:
-        rows = db.execute(f"{CASE_SELECT} ORDER BY COALESCE(c.end_date, '9999-12-31'), c.case_no")
+        rows = db.execute(f"{CASE_SELECT} ORDER BY c.status_changed_at DESC, c.created_at DESC, c.id DESC")
+        # 並び: 状況を変えた日時の新しい順 → （変えていない案件は）登録の新しい順
         return attach_links(db, [to_case(r) for r in rows])
 
 
@@ -501,7 +509,8 @@ def list_statuses() -> list[str]:
 # エクスポートの基本列（月報・進捗メモの列はこの後ろに日付ごとに並ぶ）
 EXPORT_HEADERS = ["案件番号", "試験名", "状況", "企業名", "顧客名（個人名）", "案件名", "PL", "担当者", "領域", "開始日", "終了予定日",
                   "BOXリンク", "Teamsリンク", "案件概要書リンク", "試験計画書リンク", "案件詳細",
-                  "登録日", "終了日"]  # 登録日 = 案件を登録した日時、終了日 = アーカイブにした日時（どちらも自動で記録）
+                  "登録日", "終了日", "状況変更日"]
+# 登録日 = 案件を登録した日時、終了日 = アーカイブにした日時、状況変更日 = 状況を最後に変えた日時（どれも自動で記録）
 # 日付パターンの列名: 月報_YYYY-MM / 進捗_YYYY-MM-DD（旧形式の 週次_YYYY-MM-DD も読み込める）
 MONTH_COL = re.compile(r"^月報_(\d{4})[-/](\d{1,2})$")
 NOTE_COL = re.compile(r"^(?:進捗|週次)_(\d{4}[-/]\d{1,2}[-/]\d{1,2})$")
@@ -533,7 +542,7 @@ def _link_heads(n: int) -> list[str]:
 
 def _headers(cases: list[dict]) -> tuple[list[str], int]:
     n = max((len(c["links"]) for c in cases), default=0)
-    return [*EXPORT_HEADERS[:-2], *_link_heads(max(n, 2)), *EXPORT_HEADERS[-2:]], max(n, 2)
+    return [*EXPORT_HEADERS[:-3], *_link_heads(max(n, 2)), *EXPORT_HEADERS[-3:]], max(n, 2)
 
 
 def _case_row(c: dict, n: int = 2) -> list:
@@ -542,7 +551,7 @@ def _case_row(c: dict, n: int = 2) -> list:
             " ".join(c["areas"]), c["start_date"] or "", c["end_date"] or "",
             c["box_url"], c["teams_url"], c["overview_url"], c["plan_url"], c["detail"],
             *links,
-            (c["created_at"] or "")[:16], (c["finished_at"] or "")[:16]]
+            (c["created_at"] or "")[:16], (c["finished_at"] or "")[:16], (c.get("status_changed_at") or "")[:16]]
 
 
 @router.get("/export.csv")
@@ -667,7 +676,7 @@ IMPORT_ALIASES = {
     "案件概要書リンク": "overview_url", "案件概要書": "overview_url", "overview_url": "overview_url",
     "試験計画書リンク": "plan_url", "試験計画書": "plan_url", "plan_url": "plan_url",
     "案件詳細": "detail", "detail": "detail",
-    "登録日": "created_at", "終了日": "finished_at",
+    "登録日": "created_at", "終了日": "finished_at", "状況変更日": "status_changed_at",
     "最新進捗週": "note_week", "最新進捗メモ": "note_body",  # 旧形式
 }
 
@@ -793,7 +802,9 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
                     msg = "; ".join(err["msg"].replace("Value error, ", "") for err in e.errors())
                     raise HTTPException(422, f"{line} 行目（{no}）: {msg}")
             save_case_masters(db, c)
+            status_changed = bool(row) and row["status"] != c.status  # この取り込みで状況が変わった
             if row:
+                mark_status_change(db, row["id"], c.status)
                 db.execute(f"UPDATE cases SET {', '.join(k + '=?' for k in CASE_COLS)},"
                            " updated_at = datetime('now', 'localtime') WHERE id = ?", (*c.values(), row["id"]))
                 case_id = row["id"]
@@ -806,9 +817,12 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
             if links_in is not None:  # CSV に自由リンクがあれば置き換え（全部空欄なら今のまま）
                 save_links(db, case_id, links_in)
 
-            # 登録日・終了日（CSV に書いてあれば、その日時で記録。無ければ自動）
+            # 登録日・終了日・状況変更日（CSV に書いてあれば、その日時で記録。無ければ自動）
             # （CSV は分までなので、今の値と分まで同じなら秒を含む元の値のままにする）
-            for col, field, label in (("created_at", "created_at", "登録日"), ("finished_at", "finished_at", "終了日")):
+            for col, field, label in (("created_at", "created_at", "登録日"), ("finished_at", "finished_at", "終了日"),
+                                      ("status_changed_at", "status_changed_at", "状況変更日")):
+                if col == "status_changed_at" and status_changed:
+                    continue  # 取り込みで状況を変えたときは、今の日時のまま
                 if rec.get(col):
                     new = parse_datetime(rec[col], line, label)
                     cur = db.execute(f"SELECT {field} FROM cases WHERE id = ?", (case_id,)).fetchone()[0] or ""
@@ -864,6 +878,7 @@ def update_case(case_id: int, c: CaseIn) -> dict:
         auto_trial(db, c, case_id)
         check_duplicate(db, c, case_id)
         save_case_masters(db, c)
+        mark_status_change(db, case_id, c.status)
         write_case(
             db,
             f"UPDATE cases SET {', '.join(k + '=?' for k in CASE_COLS)},"
@@ -880,6 +895,7 @@ def update_case(case_id: int, c: CaseIn) -> dict:
 def update_status(case_id: int, s: StatusIn) -> dict:
     with get_db() as db:
         fetch_case(db, case_id)
+        mark_status_change(db, case_id, s.status)
         db.execute("UPDATE cases SET status = ?, updated_at = datetime('now', 'localtime') WHERE id = ?",
                    (s.status, case_id))
         sync_finished(db, case_id)

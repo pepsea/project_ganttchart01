@@ -168,16 +168,9 @@ function filtered({ ignoreStatus = false } = {}) {
 const byEnd = (a, b) =>
   (a.end_date || "9999").localeCompare(b.end_date || "9999") || a.case_no.localeCompare(b.case_no) || (a.trial || "").localeCompare(b.trial || "");
 
-// カンバンの列内の並び:
-//  ・打診 … 登録の新しい順（最新が上）
-//  ・ほかの列 … 終了予定日のある案件を早い順（一番早いものが一番上）、その下に終了予定日のない案件を登録の新しい順
+// カンバンの列内の並び: 状況を変えた日時の新しい順（最新が上）。状況を変えていない案件はその下に登録の新しい順
 const newerFirst = (a, b) => (b.created_at || "").localeCompare(a.created_at || "") || b.id - a.id;
-const byBoard = (status) => (a, b) => {
-  if (status === "打診") return newerFirst(a, b);
-  if (!a.end_date !== !b.end_date) return a.end_date ? -1 : 1; // 終了予定日のある案件が先
-  if (a.end_date && a.end_date !== b.end_date) return a.end_date.localeCompare(b.end_date);
-  return newerFirst(a, b); // 終了予定日が同じ・どちらも無いときは登録の新しい順
-};
+const byBoard = (a, b) => (b.status_changed_at || "").localeCompare(a.status_changed_at || "") || newerFirst(a, b);
 
 // ------------------------------------------------------------ 描画
 function render() {
@@ -244,7 +237,7 @@ function renderBoard() {
     if (s === "キャンセル") col.classList.add("cancel");
     if (s === ARCHIVE) col.classList.add("archive");
     col.style.setProperty("--c", STATUS_COLOR[s]);
-    const items = list.filter((c) => c.status === s).sort(byBoard(s));
+    const items = list.filter((c) => c.status === s).sort(byBoard);
     const head = el("div", "col-head");
     head.append(el("span", "", s), el("span", "count", `${items.length} 件`));
     const body = el("div", "col-body");
