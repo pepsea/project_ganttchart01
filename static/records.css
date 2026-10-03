@@ -117,3 +117,14 @@
 .md .md-check:not(:disabled) { cursor: pointer; }
 .md .md-done { color: var(--muted); text-decoration: line-through; }
 .md img { max-width: 100%; height: auto; border-radius: 4px; vertical-align: middle; }
+
+/* タイトル欄を半分の幅にして、その右にボタンを並べる */
+.rec-editor-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rec-editor-head > input { flex: 0 0 50%; max-width: 50%; min-width: 0; }
+.rec-editor-head .rec-actions { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rec-editor-head .rec-actions .spacer { flex: 1; }
+@media (max-width: 900px) { .rec-editor-head > input { flex: 1 1 100%; max-width: none; } }
+/* ボタンがタイトルの右 1 行に収まるように、少しコンパクトに */
+.rec-editor-head .rec-actions { gap: 5px; }
+.rec-editor-head .rec-actions button { font-size: 13.5px; padding: 4px 8px; white-space: nowrap; }
+.rec-editor-head #rec-close { padding: 2px 8px; }

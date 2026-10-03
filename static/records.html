@@ -54,16 +54,16 @@
       <div id="rec-editor" class="rec-editor" hidden>
         <div class="rec-editor-head">
           <input id="rec-title" aria-label="タイトル">
+          <div class="rec-actions">
+            <button id="rec-save" type="button" title="今すぐ保存（Ctrl+Enter。入力は自動でも保存されます）">保存</button>
+            <button id="rec-preview" type="button" title="Markdown の表示と編集を切り替え">編集</button>
+            <button id="rec-to-task" type="button" class="primary" title="ガントチャートでタスクの追加画面を開く">タスク化</button>
+            <button id="rec-copy" type="button" title="メモ全体（タイトルと本文）を Markdown のままコピー">コピー</button>
+            <span class="spacer"></span>
+            <button id="rec-archive" type="button" title="一覧から外してサーバーに保管します（「アーカイブ」で見られ、戻せます）">アーカイブ</button>
+            <button id="rec-delete" type="button" class="danger-outline" title="完全に削除します（元に戻せません）">削除…</button>
+          </div>
           <button id="rec-close" type="button" title="閉じる（Esc）" aria-label="閉じる">×</button>
-        </div>
-        <div class="rec-actions">
-          <button id="rec-save" type="button" title="今すぐ保存（入力は自動でも保存されます）">保存</button>
-          <button id="rec-preview" type="button" title="Markdown の表示と編集を切り替え">編集</button>
-          <button id="rec-to-task" type="button" class="primary" title="ガントチャートでタスクの追加画面を開く">タスク化</button>
-          <button id="rec-copy" type="button" title="メモ全体（タイトルと本文）を Markdown のままコピー">コピー</button>
-          <span class="spacer"></span>
-          <button id="rec-archive" type="button" title="一覧から外してサーバーに保管します（「アーカイブ」で見られ、戻せます）">アーカイブ</button>
-          <button id="rec-delete" type="button" class="danger-outline" title="完全に削除します（元に戻せません）">削除…</button>
         </div>
         <div class="rec-tags">
           <span id="rec-tag-chips" class="rec-chips"></span>

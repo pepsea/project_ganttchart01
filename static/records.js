@@ -234,7 +234,16 @@
   body.addEventListener("input", scheduleSave);
   enableMarkdownEditing(body); // 箇条書きの Enter・Tab などの入力補助
   $("#rec-close").addEventListener("click", close);
-  editor.addEventListener("keydown", (e) => { if (e.key === "Escape" && !e.isComposing) close(); });
+  editor.addEventListener("keydown", (e) => {
+    if (e.isComposing || e.keyCode === 229) return; // 日本語入力の変換中は何もしない
+    if (e.key === "Escape") close();
+    // Ctrl+Enter（Mac は ⌘+Enter）で、今すぐ保存
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      clearTimeout(saveTimer);
+      save().then(() => say("保存しました", false));
+    }
+  });
   tagFilter.addEventListener("change", refresh);
   // 並び順: クリックで切り替え（手動 / 日付）。「現在」「アーカイブ」の隣
   function syncSortButtons() {
