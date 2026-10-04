@@ -236,9 +236,9 @@ const DATASETS = [
     exports: [
       { title: "全データ（バックアップ用）", url: "/api/platforms/export-backup.csv", desc: "基盤・目標・ディスカッション・月報をすべて 1 ファイルに。インポートすると、データが空の状態からでも元に戻せます" },
       { title: "基盤一覧＋月報", url: "/api/platforms/export.csv", desc: "1 基盤 1 行。全体目標・目標の達成状況に加え、月報をすべて月ごとの列に展開" },
-      { title: "月報一覧", url: "/api/platforms/export-monthly.csv", period: "月報", desc: "基盤 × 月で 1 行。月を指定するとその月の全基盤の月報のみ" },
-      { title: "目標一覧", url: "/api/platforms/export-goals.csv", desc: "基盤ごとの目標（状態・期限・メモ）" },
-      { title: "ディスカッション一覧", url: "/api/platforms/export-topics.csv", desc: "日付・トピック・内容（決定事項・宿題）" },
+      { title: "月報一覧", url: "/api/platforms/export-monthly.csv", period: "月報", desc: "基盤 × 月で 1 行。月を指定するとその月の全基盤の月報のみ。月報が空の基盤も、空の行で出力" },
+      { title: "目標一覧", url: "/api/platforms/export-goals.csv", desc: "基盤ごとの目標（状態・期限・メモ）。目標が空の基盤も、空の行で出力" },
+      { title: "ディスカッション一覧", url: "/api/platforms/export-topics.csv", desc: "日付・トピック・内容（決定事項・宿題）。ディスカッションが空の基盤も、空の行で出力" },
     ],
     importUrl: "/api/platforms/import",
     notes: ["エクスポートした 5 種類の CSV を取り込めます（種類は列名から自動で判別します）",

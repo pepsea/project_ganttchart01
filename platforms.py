@@ -431,7 +431,8 @@ def export_backup(area: str = "", person: str = "") -> Response:
 
 @router.get("/export-monthly.csv")
 def export_monthly(area: str = "", person: str = "", month: str = "") -> Response:
-    """月報一覧: 基盤 × 月 で 1 行。month=YYYY-MM を指定するとその月だけ。"""
+    """月報一覧: 基盤 × 月 で 1 行。month=YYYY-MM を指定するとその月だけ。
+    月報が空の基盤も出力する（月を指定したときはその月の月報が無い基盤を、全期間のときは月報が 1 件も無い基盤を、月報 = 空の行で）"""
     info = {p["name"]: p for p in platforms_for_export(area, person)}
     sql = "SELECT platform, month, body, updated_at FROM platform_monthly"
     params: list = []
@@ -443,12 +444,17 @@ def export_monthly(area: str = "", person: str = "", month: str = "") -> Respons
     rows = [["月", "基盤番号", "基盤名", "領域", "PL", "メンバー", "月報", "更新日時"]]
     with get_db() as db:
         records = db.execute(sql + " ORDER BY month DESC", params).fetchall()
+        has_any = {r[0] for r in db.execute("SELECT DISTINCT platform FROM platform_monthly")}
     order = list(info)
     for r in sorted((r for r in records if r["platform"] in info),
                     key=lambda r: (-int(r["month"].replace("-", "")), order.index(r["platform"]))):
         p = info[r["platform"]]
         rows.append([r["month"], p["name"], p["title"], "、".join(p["areas"]), p["owner"], p["members"],
                      r["body"], r["updated_at"]])
+    have = {r["platform"] for r in records}
+    for name, p in info.items():  # 月報が空の基盤
+        if name not in have and (month or name not in has_any):
+            rows.append([month, p["name"], p["title"], "、".join(p["areas"]), p["owner"], p["members"], "", ""])
     return csv_response(rows, f"platform_monthly_{month}" if month else "platform_monthly")
 
 
@@ -458,9 +464,13 @@ def export_goals(area: str = "", person: str = "") -> Response:
     rows = [["基盤番号", "基盤名", "領域", "PL", "メンバー", "状態", "目標", "期限", "メモ", "リンク", "更新日時"]]
     with get_db() as db:
         for name, p in info.items():
+            found = False
             for g in db.execute(f"SELECT * FROM platform_goals WHERE platform = ? {GOAL_ORDER}", (name,)):
+                found = True
                 rows.append([name, p["title"], "、".join(p["areas"]), p["owner"], p["members"], g["status"], g["title"],
                              g["due_date"] or "", g["note"], g["url"], g["updated_at"]])
+            if not found:  # 目標が空の基盤も、空の行で出力する
+                rows.append([name, p["title"], "、".join(p["areas"]), p["owner"], p["members"], "", "", "", "", "", ""])
     return csv_response(rows, "platform_goals")
 
 
@@ -470,12 +480,17 @@ def export_topics(area: str = "", person: str = "") -> Response:
     rows = [["日付", "基盤番号", "基盤名", "領域", "PL", "メンバー", "トピック", "内容・決定事項", "更新日時"]]
     with get_db() as db:
         records = db.execute("SELECT * FROM platform_topics ORDER BY meeting_date DESC, id DESC").fetchall()
+    have: set[str] = set()
     for t in records:
         if t["platform"] in info:
             p = info[t["platform"]]
+            have.add(t["platform"])
             rows.append([t["meeting_date"], p["name"], p["title"], "、".join(p["areas"]), p["owner"], p["members"],
                          t["title"], t["body"],
                          t["updated_at"]])
+    for name, p in info.items():  # ディスカッションが空の基盤も、空の行で出力する
+        if name not in have:
+            rows.append(["", p["name"], p["title"], "、".join(p["areas"]), p["owner"], p["members"], "", "", ""])
     return csv_response(rows, "platform_topics")
 
 
@@ -563,6 +578,8 @@ def _import_monthly(db: sqlite3.Connection, name: str, r: dict, line: int, resul
 
 
 def _import_goal(db: sqlite3.Connection, name: str, r: dict, line: int, result: dict) -> None:
+    if not any(r.get(k) for k in ("目標", "状態", "期限", "メモ", "リンク")):
+        return  # 目標が空の基盤の行（エクスポートで出力される）は、何もしない
     title = r.get("目標", "")
     if not title:
         raise HTTPException(422, f"{line} 行目: 目標は必須です")
@@ -589,6 +606,8 @@ def _import_goal(db: sqlite3.Connection, name: str, r: dict, line: int, result: 
 
 
 def _import_topic(db: sqlite3.Connection, name: str, r: dict, line: int, result: dict) -> None:
+    if not any(r.get(k) for k in ("日付", "トピック", "内容・決定事項", "内容")):
+        return  # ディスカッションが空の基盤の行（エクスポートで出力される）は、何もしない
     title = r.get("トピック", "")
     if not title:
         raise HTTPException(422, f"{line} 行目: トピックは必須です")
