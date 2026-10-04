@@ -621,33 +621,48 @@ LOG_HEADERS_NOTES = ["案件番号", "試験名", "企業名", "案件名", "日
 
 @router.get("/export-monthly.csv")
 def export_monthly_csv(month: str = "") -> Response:
-    """月報一覧: 案件 × 月で 1 行。month=YYYY-MM を指定するとその月だけ"""
+    """月報一覧: 案件 × 月で 1 行。month=YYYY-MM を指定するとその月だけ。
+    月報が空の案件も出力する（月を指定したときは、その月の月報が無い案件を「月」= その月・月報 = 空の行で。全期間のときは、月報が 1 件も無い案件を空の行で）"""
     if month and not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
         raise HTTPException(422, "月は YYYY-MM の形式で指定してください")
-    cases = {c["id"]: c for c in list_cases()}
+    all_cases = list_cases()
+    cases = {c["id"]: c for c in all_cases}
     with get_db() as db:
         rows = [r for r in db.execute("SELECT case_id, month, body FROM case_monthly ORDER BY month DESC, case_id")
                 if r["case_id"] in cases and (not month or r["month"] == month)]
+        has_any = {r[0] for r in db.execute("SELECT DISTINCT case_id FROM case_monthly")}
     out = [LOG_HEADERS_MONTHLY]
     for r in sorted(rows, key=lambda r: (r["month"], ), reverse=True):
         c = cases[r["case_id"]]
         out.append([c["case_no"], c["trial"], c["customer"], c["name"], r["month"], r["body"]])
+    have = {r["case_id"] for r in rows}
+    for c in all_cases:  # 月報が空の案件（月を指定したときはその月に、全期間のときは 1 件も無い案件）
+        if c["id"] not in have and (month or c["id"] not in has_any):
+            out.append([c["case_no"], c["trial"], c["customer"], c["name"], month, ""])
     return csv_response(out, f"cases_monthly{'_' + month if month else ''}")
 
 
 @router.get("/export-notes.csv")
 def export_notes_csv(month: str = "") -> Response:
-    """進捗メモ一覧: 案件 × 日付で 1 行（同じ日に複数あるときは空行でつなぐ）。month=YYYY-MM でその月だけ"""
+    """進捗メモ一覧: 案件 × 日付で 1 行（同じ日に複数あるときは空行でつなぐ）。month=YYYY-MM でその月だけ。
+    進捗メモが空の案件も出力する（月を指定したときはその月に進捗メモが無い案件を、全期間のときは 1 件も無い案件を、日付・進捗メモ = 空の行で）"""
     if month and not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
         raise HTTPException(422, "月は YYYY-MM の形式で指定してください")
-    cases = {c["id"]: c for c in list_cases()}
+    all_cases = list_cases()
+    cases = {c["id"]: c for c in all_cases}
     with get_db() as db:
         notes = _notes_by_day(db)
     out = [LOG_HEADERS_NOTES]
+    have: set[int] = set()
     for (cid, day), body in sorted(notes.items(), key=lambda kv: (kv[0][1], kv[0][0]), reverse=True):
         if cid in cases and (not month or day.startswith(month)):
             c = cases[cid]
             out.append([c["case_no"], c["trial"], c["customer"], c["name"], day, body])
+            have.add(cid)
+    has_any = {cid for cid, _ in notes}
+    for c in all_cases:  # 進捗メモが空の案件
+        if c["id"] not in have and (month or c["id"] not in has_any):
+            out.append([c["case_no"], c["trial"], c["customer"], c["name"], "", ""])
     return csv_response(out, f"cases_notes{'_' + month if month else ''}")
 
 
