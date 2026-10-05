@@ -46,5 +46,8 @@ if [ "$STASHED" = 1 ]; then
 fi
 
 # 3) 作り直して起動（起動時の自動バックアップはしない。更新前のバックアップは 1) の手動バックアップ）
+# 画面のバージョン表示に、どのコミットを・いつ作ったかも出す
+export GIT_COMMIT="$(git rev-parse --short HEAD)"
+export BUILD_DATE="$(date '+%Y-%m-%d %H:%M')"
 docker compose up -d --build
 docker compose ps

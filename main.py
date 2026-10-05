@@ -30,6 +30,7 @@ import people
 import platforms
 import records
 import services
+import version
 from csvutil import csv_response, decode_csv, parse_date
 import db as dbmod
 from db import BASE_DIR, ensure_master, get_db
@@ -288,6 +289,7 @@ app.include_router(records.router)
 app.include_router(auth.router)
 app.include_router(backup.router)
 app.include_router(applog.router)
+app.include_router(version.router)
 # ログイン必須（/login と /static 以外。API は 401、画面はログイン画面へ転送）
 app.middleware("http")(auth.require_login)
 

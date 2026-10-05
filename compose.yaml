@@ -2,7 +2,11 @@
 # 設定値は .env で変更する（.env.example を参照）。未設定のときは括弧内の既定値。
 services:
   gantt:
-    build: .
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-}      # update.sh が渡す（画面のバージョン表示用）
+        BUILD_DATE: ${BUILD_DATE:-}
     image: gantt-pm
     ports:
       - "${PORT:-5005}:5005"
