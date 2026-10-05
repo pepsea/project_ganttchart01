@@ -8,6 +8,9 @@ import sqlite3
 from datetime import date, datetime, timedelta
 from typing import Literal
 
+from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -16,6 +19,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 import asyncio
 from contextlib import asynccontextmanager
 
+import applog
 import auth
 import backup
 import cases
@@ -266,8 +270,10 @@ backup.LEGACY_UPGRADES["platform_links"] = ("platforms", platforms.LEGACY_LINKS_
 async def lifespan(_app):
     # 毎日 夜 12 時（0 時台）に、全データのバックアップをサーバーに自動保存
     task = asyncio.create_task(backup.auto_backup_loop())
+    log_task = asyncio.create_task(applog.prune_loop())  # 操作・エラーのログは約 1 か月（31 日）で自動削除
     yield
     task.cancel()
+    log_task.cancel()
 
 
 app = FastAPI(title="ガントチャート プロジェクト管理", lifespan=lifespan)
@@ -281,8 +287,22 @@ app.include_router(people.router)
 app.include_router(records.router)
 app.include_router(auth.router)
 app.include_router(backup.router)
+app.include_router(applog.router)
 # ログイン必須（/login と /static 以外。API は 401、画面はログイン画面へ転送）
 app.middleware("http")(auth.require_login)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _http_error(request, exc):
+    request.state.err_detail = str(exc.detail)  # ログに残す（エラーの内容）
+    return await http_exception_handler(request, exc)
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error(request, exc):
+    request.state.err_detail = "入力が正しくありません: " + "; ".join(
+        f"{'.'.join(str(x) for x in e.get('loc', []) if x != 'body')}: {e.get('msg', '')}" for e in exc.errors())
+    return await request_validation_exception_handler(request, exc)
 
 
 @app.middleware("http")
@@ -292,6 +312,10 @@ async def no_stale_cache(request, call_next):
     if not request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-cache"
     return response
+
+
+# すべての操作とエラーを記録する（いちばん外側のミドルウェア。ログイン前の 401 なども見える）
+app.middleware("http")(applog.log_requests)
 
 
 @app.get("/", include_in_schema=False)

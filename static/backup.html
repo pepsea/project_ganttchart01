@@ -49,6 +49,20 @@
       </div>
     </section>
 
+    <!-- 操作・エラーのログ -->
+    <section class="admin-card log-card">
+      <header>
+        <h2>操作・エラーのログ <span class="count" id="log-summary"></span></h2>
+        <p class="desc">すべての操作（登録・更新・削除・インポート・エクスポート・ログイン・ログアウト）と、すべてのエラー（サーバーのエラー・入力のエラー・画面のエラー）を記録しています。入力した内容（本文・パスワードなど）は記録しません。約 1 か月（<span id="log-keep">31</span> 日）で自動的に削除されます。</p>
+      </header>
+      <div class="backup-body">
+        <div class="backup-actions">
+          <a class="button primary-link" href="/api/admin/logs/download" id="btn-log-all" title="日時・種別・操作・パス・状態・内容を CSV で（新しいものが上）">⬇ ログをダウンロード（CSV）</a>
+          <a class="button" href="/api/admin/logs/download?kind=error" id="btn-log-error" title="エラーだけを CSV で">⬇ エラーだけダウンロード</a>
+        </div>
+      </div>
+    </section>
+
     <!-- データごとの CSV エクスポート・インポート -->
     <section class="admin-card csv-card">
       <header>
@@ -120,5 +134,6 @@
   <div id="toast" class="toast" role="status"></div>
   <script src="/static/backup.js"></script>
   <script src="/static/ctrlenter.js"></script>
+  <script src="/static/errlog.js"></script>
 </body>
 </html>

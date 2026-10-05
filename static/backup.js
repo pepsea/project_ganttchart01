@@ -426,3 +426,12 @@ $("#form-import").addEventListener("submit", async (e) => {
 
 renderCsvList();
 loadBackups().catch((e) => toast(`バックアップ情報の読み込みに失敗しました: ${e.message}`, true));
+
+// 操作・エラーのログ: 件数と期間を表示（ダウンロードはリンク）
+api("/api/admin/logs/summary").then((d) => {
+  const fmt = (s) => (s ? `${s.slice(0, 4)}/${s.slice(4, 6)}/${s.slice(6, 8)}` : "");
+  $("#log-summary").textContent = d.entries
+    ? `${d.entries} 件（エラー ${d.errors} 件）・${fmt(d.oldest)} 〜 ${fmt(d.newest)}`
+    : "まだ記録がありません";
+  $("#log-keep").textContent = String(d.keep_days);
+}).catch(() => { $("#log-summary").textContent = "（読み込めませんでした）"; });
