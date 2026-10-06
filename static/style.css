@@ -8,7 +8,7 @@
   --accent: #2f6fed;
   --weekend: #f1f3f6;
   --today: #e5484d;
-  --row-h: 36px;
+  --row-h: 30px;
   --head-h: 52px;
   --left-w: 856px;
   --prio-high: #e5484d;
@@ -212,13 +212,13 @@ button.primary:hover { filter: brightness(1.08); }
 /* バー */
 .bar {
   position: absolute;
-  top: 7px;
-  height: calc(var(--row-h) - 15px);
+  top: 4px;
+  height: calc(var(--row-h) - 8px);
   border-radius: 5px;
   background: var(--area-color, var(--accent));
   color: #fff;
   font-size: 11px;
-  line-height: calc(var(--row-h) - 15px);
+  line-height: calc(var(--row-h) - 8px);
   padding: 0 8px;
   white-space: nowrap;
   overflow: visible;
