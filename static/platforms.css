@@ -13,12 +13,12 @@
 .pf-list-head a { font-size: 11.5px; text-decoration: none; }
 .pf-list ul { list-style: none; margin: 0; padding: 0 8px 12px; overflow-y: auto; }
 .pf-item {
-  padding: 10px 10px;
+  padding: 5px 10px;
   border-radius: 8px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 2px;
   border: 1px solid transparent;
 }
 .pf-item:hover { background: var(--bg); }
@@ -167,7 +167,7 @@ table.tasks .soon { color: #b56d00; font-weight: 700; }
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 8px 4px;
+  padding: 6px 8px 2px;
   font-size: 12px;
   font-weight: 700;
   color: var(--muted);
