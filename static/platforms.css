@@ -492,8 +492,8 @@ table.tasks td { border-bottom-color: var(--line); }
 .pf-table-wrap { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 10px; overflow: auto; }
 table.pf-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.pf-table th { position: sticky; top: 0; background: #f7f8fa; text-align: left; font-size: 12px; color: var(--muted); font-weight: 700;
-  padding: 8px 10px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
-table.pf-table td { padding: 9px 10px; border-bottom: 1px solid #d3d8e0; vertical-align: middle; }
+  padding: 5px 10px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+table.pf-table td { padding: 3px 10px; border-bottom: 1px solid #d3d8e0; vertical-align: middle; }
 table.pf-table tbody tr { cursor: pointer; }
 table.pf-table tbody tr:nth-child(even) { background: #fafbfd; }
 table.pf-table tbody tr:hover, table.pf-table tbody tr:focus { background: #eef3ff; outline: none; }
