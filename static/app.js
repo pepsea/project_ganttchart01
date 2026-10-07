@@ -23,8 +23,8 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const scroller = $("#scroller");
 const gantt = $("#gantt");
 // 左側の列幅。領域・PJ名・タスク・担当者・終了日は見出しの右端をドラッグして変更でき、ブラウザに記憶する
-const COL_W_DEFAULT = { area: 6, pj: 240, task: 200, assignee: 80, end: 96 };
-const COL_W_MIN_OF = { area: 60, pj: 80, task: 80, assignee: 44, end: 56 };
+const COL_W_DEFAULT = { area: 6, pj: 170, task: 150, assignee: 64, end: 84 };
+const COL_W_MIN_OF = { area: 60, pj: 60, task: 60, assignee: 44, end: 56 };
 const COL_W_MAX = 640;
 const colW = (() => {
   try {
