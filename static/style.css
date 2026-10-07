@@ -8,7 +8,7 @@
   --accent: #2f6fed;
   --weekend: #f1f3f6;
   --today: #e5484d;
-  --row-h: 30px;
+  --row-h: 24px;
   --head-h: 52px;
   --left-w: 856px;
   --prio-high: #e5484d;
@@ -103,6 +103,7 @@ button.primary:hover { filter: brightness(1.08); }
   background: var(--panel);
   border-right: 1px solid var(--line-strong);
 }
+.g-left { font-size: 12.5px; }
 .g-left > * { min-width: 0; }
 .g-left input, .g-left select {
   width: 100%;
@@ -212,13 +213,13 @@ button.primary:hover { filter: brightness(1.08); }
 /* バー */
 .bar {
   position: absolute;
-  top: 4px;
-  height: calc(var(--row-h) - 8px);
+  top: 3px;
+  height: calc(var(--row-h) - 6px);
   border-radius: 5px;
   background: var(--area-color, var(--accent));
   color: #fff;
   font-size: 11px;
-  line-height: calc(var(--row-h) - 8px);
+  line-height: calc(var(--row-h) - 6px);
   padding: 0 8px;
   white-space: nowrap;
   overflow: visible;
