@@ -128,10 +128,15 @@ function fillPjOptions(sel, value, emptyLabel) {
     if (!list.length) continue;
     const g = document.createElement("optgroup");
     g.label = label;
-    for (const v of list) g.append(new Option(pjText(v), v, false, v === value));
+    for (const v of list) {
+      const o = new Option(pjText(v), v, false, v === value);
+      o.dataset.search = `${label} ${v}`; // 検索は PJ名（番号）・案件/基盤の区別でも当たる
+      g.append(o);
+    }
     sel.append(g);
   }
   sel.value = value || "";
+  sel._ss?.refresh(); // 検索できるプルダウンの表示を更新
 }
 
 function toast(msg, isErr = false) {
@@ -819,6 +824,9 @@ async function loadMasters() {
 
   if (!state.masters.projects.includes(state.filter.projects)) state.filter.projects = "";
   fillPjOptions($("#filter-projects"), state.filter.projects, "すべて");
+  const fp = $("#filter-projects");
+  if (!fp._ss) searchSelect(fp, { placeholder: "PJ名・案件番号で検索", allowEmpty: true });
+  fp._ss.refresh();
 }
 
 async function loadTasks() {
@@ -850,6 +858,8 @@ function openTaskDialog(task = null) {
   const withCurrent = (list, v) => (v && !list.includes(v) ? [...list, v] : list);
   fillSelect(form.area, withCurrent(state.masters.areas, task?.area), false);
   fillPjOptions(form.project, task?.project || "", "（なし）");
+  if (!form.project._ss) searchSelect(form.project, { placeholder: "PJ名・案件番号で検索", allowEmpty: true });
+  form.project._ss.refresh();
   const meta = $("#task-meta");
   if (task) {
     $("#task-copy").hidden = false;
@@ -876,7 +886,7 @@ function openTaskDialog(task = null) {
     // 領域: 絞り込み中ならその領域、案件管理から来たときはその案件の領域
     if (state.filter.areas) form.area.value = state.filter.areas;
     else if (state.defaultArea && state.masters.areas.includes(state.defaultArea)) form.area.value = state.defaultArea;
-    if (state.filter.projects) form.project.value = state.filter.projects;
+    if (state.filter.projects) { form.project.value = state.filter.projects; form.project._ss.refresh(); }
     if (state.filter.assignees && state.filter.assignees !== NO_ASSIGNEE) form.assignee.value = state.filter.assignees;
     const t = todayMs();
     form.start_date.value = fmtDate(t);
