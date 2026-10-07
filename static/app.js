@@ -853,6 +853,7 @@ function openTaskDialog(task = null) {
   const meta = $("#task-meta");
   if (task) {
     $("#task-copy").hidden = false;
+    $("#task-link").hidden = false;
     $("#task-title").textContent = "タスク詳細";
     $("#task-submit").textContent = "保存";
     for (const k of ["area", "project", "task", "assignee", "priority", "start_date", "end_date", "detail"]) {
@@ -868,6 +869,7 @@ function openTaskDialog(task = null) {
     meta.hidden = false;
   } else {
     $("#task-copy").hidden = true;
+    $("#task-link").hidden = true;
     $("#task-title").textContent = "タスク追加";
     $("#task-submit").textContent = "追加";
     meta.hidden = true;
@@ -957,13 +959,22 @@ $("#q").addEventListener("input", (e) => {
 
 let backCase = null; // 案件管理から来たときの戻り先 { pj, id }
 
+function taskUrl(t) {
+  return `${location.origin}/?${new URLSearchParams({ ...(t.project ? { pj: t.project } : {}), task: t.id })}`;
+}
+
+// タスク詳細: リンクだけをコピー
+$("#task-link").addEventListener("click", async () => {
+  if (editing && (await copyText(taskUrl(editing)))) toast("タスクへのリンクをコピーしました");
+});
+
 // タスク詳細: 内容とリンクをコピー（保存済みの内容。リンクはこのタスクを開くガントチャート /?task=番号）
 $("#task-copy").addEventListener("click", async () => {
   const t = editing;
   if (!t) return;
   const left = Math.round((parseDate(t.end_date) - todayMs()) / DAY_MS);
   const rest = left < 0 ? `${-left} 日超過` : left === 0 ? "今日まで" : `あと ${left} 日`;
-  const url = `${location.origin}/?${new URLSearchParams({ ...(t.project ? { pj: t.project } : {}), task: t.id })}`;
+  const url = taskUrl(t);
   const text = [
     `【タスク】${t.task}`,
     t.project ? `PJ名：${pjText(t.project)}` : "",
