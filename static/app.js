@@ -1328,7 +1328,7 @@ $("#btn-link").addEventListener("click", async () => {
       $("#btn-compact").textContent = "展開";
       $("#btn-compact").title = "折りたたんだ列を元に戻す";
     }
-    if (["36", "26", "14", "6"].includes(params.get("zoom") || "")) {
+    if (["26", "14", "6"].includes(params.get("zoom") || "")) {
       state.dayW = Number(params.get("zoom"));
       $("#zoom").value = params.get("zoom");
     }

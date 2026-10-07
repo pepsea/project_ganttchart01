@@ -631,3 +631,11 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 .filter .ss { flex: none; width: 190px; }
 .filter .ss-btn { height: 28px; font-size: 13px; }
 .filter .ss-panel { min-width: 260px; }
+
+/* ガントチャートのツールバー: ボタン・入力を小さく */
+.page-gantt .tools { gap: 6px; }
+.page-gantt .tools button, .page-gantt .tools .button { padding: 2px 8px; font-size: 12px; }
+.page-gantt .tools .filter { font-size: 12px; }
+.page-gantt .tools .filter select { padding: 2px 4px; font-size: 12px; }
+.page-gantt .tools .search { padding: 3px 8px; font-size: 12px; width: 190px; }
+.page-gantt .filter .ss-btn { height: 24px; font-size: 12px; }
