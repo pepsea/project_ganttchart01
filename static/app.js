@@ -582,6 +582,9 @@ function syncReadonlyCells(row, task, areaCell, projCell, assigneeCell) {
   areaCell.parentElement.title = `領域: ${task.area}`;
   projCell.textContent = pjText(task.project) || "—";
   projCell.classList.toggle("empty", !task.project);
+  // 種類（案件 / 基盤 / その他）: 頭に印（案・基）と、ごく薄い背景
+  const kind = !task.project ? "" : state.pj.cases.includes(task.project) ? "case" : state.pj.platforms.includes(task.project) ? "platform" : "other";
+  if (kind) projCell.dataset.kind = kind; else delete projCell.dataset.kind;
   projCell.title = `PJ名: ${pjText(task.project) || "なし"}（修正はクリックしてタスク詳細で）`;
 }
 
