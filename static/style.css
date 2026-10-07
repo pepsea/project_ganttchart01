@@ -641,15 +641,14 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 .page-gantt .tools .search { padding: 3px 8px; font-size: 12px; width: 190px; }
 .page-gantt .filter .ss-btn { height: 24px; font-size: 12px; }
 
-/* PJ名の種類: 案件 = 「案」・薄いグレー / 基盤 = 「基」・薄い緑 / その他 = 印なし・薄いベージュ */
+/* PJ名の種類: 案件 = 「案」・薄いグレー / 基盤 = 「基」・薄いベージュ / その他 = 印なし・白 */
 .g-left .ro-cell[data-kind="case"] { background: #e4e6ea; }
-.g-left .ro-cell[data-kind="platform"] { background: #d0efd9; }
-.g-left .ro-cell[data-kind="other"] { background: #ece9e0; }
+.g-left .ro-cell[data-kind="platform"] { background: #ece9e0; }
 .g-left .ro-cell[data-kind="case"]::before,
 .g-left .ro-cell[data-kind="platform"]::before {
   display: inline-block; width: 14px; margin-right: 4px; text-align: center; vertical-align: 1px;
   font-size: 10px; line-height: 13px; font-weight: 700; border: 1px solid currentColor; border-radius: 3px; color: var(--muted);
 }
 .g-left .ro-cell[data-kind="case"]::before { content: "案"; color: #5f6672; }
-.g-left .ro-cell[data-kind="platform"]::before { content: "基"; color: #4d8a63; }
+.g-left .ro-cell[data-kind="platform"]::before { content: "基"; color: #7a6f55; }
 .g-left .ro-cell[data-kind]:hover { filter: brightness(.96); }
