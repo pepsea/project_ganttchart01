@@ -23,12 +23,12 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const scroller = $("#scroller");
 const gantt = $("#gantt");
 // 左側の列幅。領域・PJ名・タスク・担当者・終了日は見出しの右端をドラッグして変更でき、ブラウザに記憶する
-const COL_W_DEFAULT = { area: 6, pj: 170, task: 150, assignee: 64, end: 84 };
-const COL_W_MIN_OF = { area: 60, pj: 60, task: 60, assignee: 44, end: 56 };
+const COL_W_DEFAULT = { area: 6, pj: 130, task: 120, assignee: 56, end: 76 };
+const COL_W_MIN_OF = { area: 60, pj: 50, task: 50, assignee: 40, end: 50 };
 const COL_W_MAX = 640;
 const colW = (() => {
   try {
-    const saved = JSON.parse(localStorage.getItem("gantt.colW") || "{}");
+    const saved = JSON.parse(localStorage.getItem("gantt.colW2") || "{}");
     return { ...COL_W_DEFAULT, ...saved, area: COL_W_DEFAULT.area }; // 領域は色の帯だけ（幅は固定）
   } catch (_) {
     return { ...COL_W_DEFAULT };
@@ -37,7 +37,7 @@ const colW = (() => {
 // 列: 領域 + PJ名 + タスク + (担当者 + 優先度 56 + 開始 40 + 終了日) + 削除 34
 const leftW = () => colW.area + colW.pj + colW.task + 64 + (state.compact ? 0 : colW.assignee + 56 + 40 + colW.end);
 const saveColW = () => {
-  try { localStorage.setItem("gantt.colW", JSON.stringify(colW)); } catch (_) { /* 記憶できなくても幅は変わる */ }
+  try { localStorage.setItem("gantt.colW2", JSON.stringify(colW)); } catch (_) { /* 記憶できなくても幅は変わる */ }
 };
 
 function applyColWidths() {
