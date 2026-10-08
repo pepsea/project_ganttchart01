@@ -57,7 +57,7 @@ TABLE_LABELS = {
     "service_links": "サービス・パッケージの追加リンク",
     "app_settings": "画面の設定（親リンクなど）",
     "documents": "共有資料",
-    "ref_links": "参考リンク",
+    "ref_links": "自社リンク・ナレッジのリンク",
     "team_groups": "グループ",
     "team_goals": "グループの目標",
     "team_goal_notes": "グループの項目の議論の記録",

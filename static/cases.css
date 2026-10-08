@@ -306,6 +306,23 @@ dialog.drawer[open] { display: flex; animation: slide-in .18s ease-out; }
   color: color-mix(in srgb, var(--c) 75%, black);
   font-weight: 600;
 }
+/* 基本情報〜案件詳細: 表示のみのときは入力欄の枠を消して、文字として読めるようにする */
+.case-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
+.case-fields:disabled :is(input, select, textarea, .ss-btn) {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+  opacity: 1;
+  cursor: default;
+  appearance: none;
+  resize: none;
+}
+.case-fields:disabled .ss-btn::after { display: none; }
+.case-fields:disabled ::placeholder { color: transparent; -webkit-text-fill-color: transparent; }
+.case-fields:disabled .chips-select label { cursor: default; }
+.case-fields:disabled .chips-select label:not(.on) { display: none; }
+.case-fields:disabled .req { display: none; }
 .form-actions { display: flex; gap: 8px; align-items: center; padding-top: 12px; }
 .form-actions .spacer { flex: 1; }
 button.danger-outline { color: var(--today); border-color: #f2b8b9; }

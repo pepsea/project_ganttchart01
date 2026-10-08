@@ -288,10 +288,10 @@ const DATASETS = [
     summary: (d) => `追加 ${d.added} 件 / 更新 ${d.updated} 件`,
   },
   {
-    name: "参考リンク", desc: "リンク（欄・名前・URL・説明・領域・表示順）",
+    name: "自社リンク・ナレッジ", desc: "リンク（欄・名前・URL・説明・領域・表示順）",
     exports: [{ label: "CSV エクスポート", url: "/api/links/export.csv" }],
     importUrl: "/api/links/import",
-    notes: ["必須列: 名前・URL。欄（自社技術リンク / 自社サービス / その他参考）と URL が同じリンクは更新、無ければ欄の最後に追加します"],
+    notes: ["必須列: 名前・URL。欄（自社サイト / グループサイト / その他参考 / ナレッジ。旧名の 自社技術リンク / 自社サービス も可）と URL が同じリンクは更新、無ければ欄の最後に追加します"],
     summary: (d) => `追加 ${d.added} 件 / 更新 ${d.updated} 件`,
   },
 ];

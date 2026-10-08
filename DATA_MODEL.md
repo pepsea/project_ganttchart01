@@ -154,12 +154,12 @@
 | | areas | 領域（JSON 配列） |
 | | created_at / updated_at | 登録・更新日時 |
 
-## 参考リンク
+## 自社リンク・ナレッジ
 
 | テーブル | 列 | 内容 |
 |---|---|---|
 | `ref_links` | id | |
-| | category | 欄: `tech` = 自社技術リンク / `own` = WEB リンク（自社サービス） / `other` = WEB リンク（その他参考） |
+| | category | 欄: `tech` = 自社サイト（旧: 自社技術リンク） / `own` = グループサイト（旧: WEB リンク（自社サービス））（以上 自社リンク画面） / `knowledge` = ナレッジ / `other` = 参考リンク（もとの WEB リンク（その他参考））（以上 ナレッジ画面） |
 | | title / url / note | 名前 / URL / 説明 |
 | | areas | 領域（JSON 配列） |
 | | sort_order | 欄の中での表示順 |

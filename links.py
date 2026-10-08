@@ -1,6 +1,7 @@
-"""参考リンク API
+"""自社リンク・ナレッジ API
 
-「自社技術リンク（tech）」「自社サービスの WEB リンク（own）」「その他の参考リンク（other）」を管理する。
+自社リンク画面の「自社サイト（tech。もとの自社技術リンク）」「グループサイト（own。もとの WEB リンク（自社サービス））」と、
+ナレッジ画面の「ナレッジ（knowledge）」「参考リンク（other。もとの WEB リンク（その他参考））」を管理する。
 """
 
 import asyncio
@@ -16,9 +17,9 @@ import auth
 from csvutil import csv_response, read_csv, split_list
 from db import ensure_master, get_db
 
-router = APIRouter(prefix="/api/links", tags=["参考リンク"])
+router = APIRouter(prefix="/api/links", tags=["自社リンク・ナレッジ"])
 
-Category = Literal["tech", "own", "other"]
+Category = Literal["tech", "own", "other", "knowledge"]
 
 
 def init_db() -> None:
@@ -26,7 +27,7 @@ def init_db() -> None:
         db.execute(
             """CREATE TABLE IF NOT EXISTS ref_links (
                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                   category   TEXT NOT NULL DEFAULT 'other',  -- tech = 自社技術リンク / own = 自社サービスの WEB リンク / other = その他の参考リンク
+                   category   TEXT NOT NULL DEFAULT 'other',  -- tech = 自社サイト（もと自社技術リンク） / own = グループサイト（もと自社サービスの WEB リンク） / other = 参考リンク / knowledge = ナレッジ
                    title      TEXT NOT NULL,                   -- 名前
                    url        TEXT NOT NULL,
                    note       TEXT NOT NULL DEFAULT '',        -- 説明
@@ -95,7 +96,7 @@ def list_links() -> list[dict]:
 
 # ---------------------------------------------------------------- CSV（エクスポート・インポート）
 
-CATEGORY_LABELS = {"tech": "自社技術リンク", "own": "自社サービス", "other": "その他参考"}
+CATEGORY_LABELS = {"tech": "自社サイト", "own": "グループサイト", "other": "その他参考", "knowledge": "ナレッジ"}
 EXPORT_HEADERS = ["欄", "名前", "URL", "説明", "領域", "表示順"]
 
 
@@ -114,13 +115,13 @@ async def import_csv(file: UploadFile = File(...)) -> dict:
     1 行でもエラーがあれば何も取り込まない。"""
     rows = read_csv(await file.read(), ["名前", "URL"])
     cat_by_label = {v: k for k, v in CATEGORY_LABELS.items()} | {k: k for k in CATEGORY_LABELS} | {
-        "WEB リンク（自社サービス）": "own", "WEB リンク（その他参考）": "other"}
+        "WEB リンク（自社サービス）": "own", "自社技術リンク": "tech", "自社サービス": "own", "WEB リンク（その他参考）": "other", "参考リンク": "other"}
     added = updated = 0
     with get_db() as db:
         for line, r in rows:
             cat = cat_by_label.get(r.get("欄") or "その他参考")
             if not cat:
-                raise HTTPException(422, f"{line} 行目: 欄は「自社技術リンク」「自社サービス」「その他参考」のいずれかにしてください")
+                raise HTTPException(422, f"{line} 行目: 欄は「自社サイト」「グループサイト」「その他参考」「ナレッジ」のいずれかにしてください")
             row = db.execute("SELECT * FROM ref_links WHERE category = ? AND url = ? ORDER BY id LIMIT 1",
                              (cat, r.get("URL", ""))).fetchone()
             cur = _to_link(row) if row else {}

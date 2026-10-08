@@ -1,4 +1,4 @@
-/* 参考リンク */
+/* 自社リンク・ナレッジ */
 body { overflow: auto; }
 .links-main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 14px 18px 40px; align-items: start; }
 .link-section { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 10px; overflow: hidden; }
@@ -6,6 +6,7 @@ body { overflow: auto; }
 .link-section.other { border-top: 3px solid #8a90a3; }
 .sec-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line-strong); }
 .sec-head h2 { margin: 0; font-size: 15px; }
+.sec-head .sec-desc { font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 6px; }
 .sec-head button { padding: 3px 10px; font-size: 12px; }
 .link-list { list-style: none; margin: 0; padding: 0; }
 .link-list li { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
@@ -68,6 +69,7 @@ button.danger-outline { color: var(--today); border-color: #f2b8b9; }
 .links-main { grid-template-columns: 1fr 1fr; }
 .web-links { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .link-section.tech { border-top: 3px solid #2fa36b; }
+.link-section.knowledge { border-top: 3px solid #b08a3e; }
 
 /* 左右の上端をそろえ、長い URL などで列が広がらないようにする */
 .links-main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }

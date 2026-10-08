@@ -16,12 +16,13 @@
       <a href="/platforms">基盤技術</a>
       <a href="/groups">グループ</a>
       <a href="/people">個人</a>
-      <a href="/records">メモ・議論</a>
+      <a href="/records" title="メモ・議論">メモ</a>
       <a href="/services">サービス</a>
-      <a href="/documents">共有資料</a>
-      <a href="/links">参考リンク</a>
+      <a href="/documents" title="共有資料">資料</a>
+      <a href="/links">自社リンク</a>
+      <a href="/knowledge">ナレッジ</a>
       <a href="/admin">管理</a>
-      <a href="/backup">バックアップ</a>
+      <a href="/backup" title="バックアップ">BU</a>
     </nav>
     <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
     <div class="tools">
@@ -59,13 +60,17 @@
     <div class="drawer-body">
       <!-- 案件の終了・削除（一番上） -->
       <div class="case-top-actions" id="case-top-actions">
+        <button type="button" id="btn-edit" class="primary" title="案件番号〜案件詳細を編集する">✎ 編集</button>
+        <button type="submit" form="case-form" class="primary" id="btn-save">保存</button>
+        <span class="spacer"></span>
         <button type="button" id="btn-finish" class="finish-btn" title="案件を終了してアーカイブ（カンバンの一番右）へ移す">✓ 案件を終了</button>
         <button type="button" id="btn-delete" class="danger-outline">案件を削除</button>
-        <span class="spacer"></span>
         <button type="button" id="btn-copy-link" title="この案件を直接開くリンクをコピー（Teams・メールなどに貼れる）">🔗 リンクをコピー</button>
-        <p class="hint archive-note" id="archive-note" hidden>この案件は終了（アーカイブ）しています。戻すときは「状況」を選び直して「保存」してください。</p>
+        <p class="hint archive-note" id="archive-note" hidden>この案件は終了（アーカイブ）しています。戻すときは「編集」を押して「状況」を選び直し、「保存」してください。</p>
       </div>
       <form id="case-form" class="case-form" autocomplete="off">
+        <!-- 登録済みの案件は表示のみ。「編集」を押すと入力できる（新規は最初から入力できる） -->
+        <fieldset id="case-fields" class="case-fields">
         <section>
           <h3>基本情報</h3>
           <div class="grid2">
@@ -92,11 +97,10 @@
           <textarea name="detail" rows="6" class="detail-text"
             placeholder="目的、検体・サンプル、手法、納品物、スケジュール、特記事項など"></textarea>
         </section>
+        </fieldset>
         <p class="error" id="case-error"></p>
         <div class="form-actions">
-          <span class="spacer"></span>
           <button type="button" data-close>閉じる</button>
-          <button type="submit" class="primary" id="btn-save">保存</button>
         </div>
       </form>
 
@@ -186,7 +190,7 @@
     <form id="form-finish" method="dialog">
       <h2>案件の終了</h2>
       <p>案件 <strong id="finish-target"></strong> を終了し、アーカイブ（カンバンの一番右）へ移します。<br>
-        戻すときは、案件を開いて「状況」を選び直して保存してください。<br>
+        戻すときは、案件を開いて「編集」を押し、「状況」を選び直して保存してください。<br>
         終了した案件は、写しを案件履歴に永続保管します（あとで削除しても残ります）。</p>
       <label><span>確認のため、案件番号 <strong id="finish-no"></strong> を入力してください</span>
         <input name="confirm" autocomplete="off">

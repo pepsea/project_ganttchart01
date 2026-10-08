@@ -48,7 +48,7 @@ MASTERS = {
         ("SELECT COUNT(*) FROM platforms WHERE EXISTS (SELECT 1 FROM json_each(platforms.areas) WHERE value = ?)", "基盤"),
         ("SELECT COUNT(*) FROM services WHERE EXISTS (SELECT 1 FROM json_each(services.areas) WHERE value = ?)", "サービス"),
         ("SELECT COUNT(*) FROM documents WHERE EXISTS (SELECT 1 FROM json_each(documents.areas) WHERE value = ?)", "共有資料"),
-        ("SELECT COUNT(*) FROM ref_links WHERE EXISTS (SELECT 1 FROM json_each(ref_links.areas) WHERE value = ?)", "参考リンク"),
+        ("SELECT COUNT(*) FROM ref_links WHERE EXISTS (SELECT 1 FROM json_each(ref_links.areas) WHERE value = ?)", "自社リンク・ナレッジ"),
         ("SELECT COUNT(*) FROM person_notes WHERE EXISTS (SELECT 1 FROM json_each(person_notes.areas) WHERE value = ?)", "個人の担当領域"),
     ]),
     # ガントチャートの PJ名 = 案件番号（case_nos）または 基盤番号（platforms）
@@ -348,6 +348,11 @@ def documents_page():
 @app.get("/links", include_in_schema=False)
 def links_page():
     return FileResponse(STATIC_DIR / "links.html")
+
+
+@app.get("/knowledge", include_in_schema=False)
+def knowledge_page():
+    return FileResponse(STATIC_DIR / "knowledge.html")
 
 
 @app.get("/groups", include_in_schema=False)

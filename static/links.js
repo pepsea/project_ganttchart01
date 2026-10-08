@@ -1,7 +1,8 @@
 "use strict";
 
-// 参考リンク: 自社サービスの WEB リンク / その他の参考リンク
+// 自社リンク（グループサイト・自社サイト）とナレッジ（ナレッジ・参考リンク）で共通。欄は画面にある一覧（id="list-xxx"）で決まる
 const $ = (sel, root = document) => root.querySelector(sel);
+const CATS = [...document.querySelectorAll(".link-list[id^='list-']")].map((u) => u.id.slice(5));
 const state = { links: [], areas: [], q: "", area: "", editing: null };
 // 領域の色（ほかの画面と同じ）
 const areaColor = (a) => {
@@ -48,7 +49,7 @@ function toast(msg, isErr = false) {
 // ------------------------------------------------------------ 一覧
 function render() {
   const q = state.q.trim().toLowerCase();
-  for (const cat of ["tech", "own", "other"]) {
+  for (const cat of CATS) {
     const all = state.links.filter((l) => l.category === cat);
     const list = all.filter((l) => (!state.area || l.areas.includes(state.area)) &&
       (!q || [l.title, l.note, l.url, ...l.areas].some((v) => (v || "").toLowerCase().includes(q))));
@@ -113,11 +114,18 @@ async function reorder(category, ids) {
 
 // ------------------------------------------------------------ 追加・編集
 const form = $("#form-link");
-function openDialog(l = null, category = "own") {
+// 名前の入力例は欄ごとに変える（option の data-placeholder。無ければ元の例）
+const titlePlaceholder = form.title.placeholder;
+function syncTitlePlaceholder() {
+  form.title.placeholder = form.category.selectedOptions[0]?.dataset.placeholder || titlePlaceholder;
+}
+form.category.addEventListener("change", syncTitlePlaceholder);
+function openDialog(l = null, category = CATS[0]) {
   state.editing = l;
   form.reset();
   form.category.value = l?.category || category;
   form.title.value = l?.title || "";
+  syncTitlePlaceholder();
   form.url.value = l?.url || "";
   form.note.value = l?.note || "";
   // 領域（複数選択）

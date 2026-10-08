@@ -750,8 +750,20 @@ function renderFreeRows(links) {
 const freeLinks = () => [...$("#free-link-rows").children].map((r) => r._get()).filter((l) => l.url);
 $("#btn-add-free").addEventListener("click", () => addFreeRow().focus());
 
+// 基本情報〜案件詳細の編集モード: 登録済みの案件は表示のみで開き、「編集」で入力できるようにする
+function setEditing(on) {
+  $("#case-fields").disabled = !on;
+  $("#btn-edit").hidden = on;
+  $("#btn-save").hidden = !on;
+}
+$("#btn-edit").addEventListener("click", () => {
+  setEditing(true);
+  form.name.focus();
+});
+
 function openDrawer(c = null) {
   state.current = c;
+  setEditing(!c);
   form.reset();
   renderFreeRows([]);
   $("#case-error").textContent = "";
@@ -774,7 +786,7 @@ function openDrawer(c = null) {
       "box_url", "teams_url", "overview_url", "plan_url", "contact"]) form[k].value = c[k] || "";
     renderFreeRows(c.links);
     renderAreaChecks(c.areas);
-    $("#case-top-actions").hidden = false;
+    $("#btn-copy-link").hidden = false;
     $("#btn-delete").hidden = false;
     $("#btn-finish").hidden = c.status === ARCHIVE;
     $("#archive-note").hidden = c.status !== ARCHIVE;
@@ -788,7 +800,7 @@ function openDrawer(c = null) {
     $("#d-title").textContent = "案件追加";
     sel.value = state.status || "打診"; // 案件追加の初期値は「打診」（状況で絞り込み中ならその状況）
     renderAreaChecks(state.area ? [state.area] : []);
-    $("#case-top-actions").hidden = true;
+    $("#btn-copy-link").hidden = true; // 新規は上の「保存」だけ出す
     $("#btn-delete").hidden = true;
     $("#btn-finish").hidden = true;
     $("#archive-note").hidden = true;

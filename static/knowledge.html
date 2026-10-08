@@ -18,8 +18,8 @@
       <a href="/records" title="メモ・議論">メモ</a>
       <a href="/services">サービス</a>
       <a href="/documents" title="共有資料">資料</a>
-      <a href="/links" class="active">自社リンク</a>
-      <a href="/knowledge">ナレッジ</a>
+      <a href="/links">自社リンク</a>
+      <a href="/knowledge" class="active">ナレッジ</a>
       <a href="/admin">管理</a>
       <a href="/backup" title="バックアップ">BU</a>
     </nav>
@@ -31,22 +31,22 @@
   </header>
 
   <main class="links-main">
-    <!-- 左: グループサイト（category = own。もとの WEB リンク（自社サービス）） -->
-    <section class="link-section own">
+    <!-- 左: ナレッジ -->
+    <section class="link-section knowledge">
       <div class="sec-head">
-        <h2>グループサイト <span class="sec-desc">グループ関連のウエブリンク</span></h2>
-        <button class="primary" data-add="own">＋ 追加</button>
+        <h2>ナレッジ <span class="sec-desc">自社で収集・調査した知識</span></h2>
+        <button class="primary" data-add="knowledge">＋ 追加</button>
       </div>
-      <ul id="list-own" class="link-list"></ul>
+      <ul id="list-knowledge" class="link-list"></ul>
     </section>
 
-    <!-- 右: 自社サイト（category = tech。もとの自社技術リンク）。その他参考は「ナレッジ」の右（参考リンク）へ移した -->
-    <section class="link-section tech">
+    <!-- 右: 参考リンク（もとの「WEB リンク（その他参考）」） -->
+    <section class="link-section other">
       <div class="sec-head">
-        <h2>自社サイト <span class="sec-desc">Axcelead関連のウエブリンク</span></h2>
-        <button class="primary" data-add="tech">＋ 追加</button>
+        <h2>参考リンク <span class="sec-desc">参考になるウエブサイト</span></h2>
+        <button class="primary" data-add="other">＋ 追加</button>
       </div>
-      <ul id="list-tech" class="link-list"></ul>
+      <ul id="list-other" class="link-list"></ul>
     </section>
   </main>
 
@@ -58,8 +58,8 @@
       <h2 id="link-title">リンクを追加</h2>
       <label><span>欄</span>
         <select name="category">
-          <option value="own" data-placeholder="例: グループ関連のサイト">グループサイト（左）</option>
-          <option value="tech" data-placeholder="例: Axcelead関連のサイト">自社サイト（右）</option>
+          <option value="knowledge" data-placeholder="例: 自社で収集した情報リンク">ナレッジ（左）</option>
+          <option value="other" data-placeholder="例: 参考になるウエブサイト">参考リンク（右）</option>
         </select>
       </label>
       <label><span>名前 <span class="req">*</span></span><input name="title" required placeholder="例: 受託解析サービス 公式サイト"></label>

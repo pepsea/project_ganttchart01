@@ -33,7 +33,7 @@ router = APIRouter(prefix="/api", tags=["ログ"])
 # 操作の名前（画面に出す説明）: パスの先頭の部分から決める
 RESOURCES = {
     "tasks": "タスク", "cases": "案件", "platforms": "基盤技術", "services": "サービス", "documents": "共有資料",
-    "links": "参考リンク", "groups": "グループ", "people": "個人", "records": "メモ・議論", "masters": "選択肢",
+    "links": "自社リンク・ナレッジ", "groups": "グループ", "people": "個人", "records": "メモ・議論", "masters": "選択肢",
     "admin": "管理・バックアップ", "import": "タスク", "export.csv": "タスク", "logs": "ログ",
 }
 VERBS = {"POST": "追加", "PUT": "更新", "PATCH": "更新", "DELETE": "削除", "GET": "取得"}

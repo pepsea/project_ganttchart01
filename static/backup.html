@@ -16,12 +16,13 @@
       <a href="/platforms">基盤技術</a>
       <a href="/groups">グループ</a>
       <a href="/people">個人</a>
-      <a href="/records">メモ・議論</a>
+      <a href="/records" title="メモ・議論">メモ</a>
       <a href="/services">サービス</a>
-      <a href="/documents">共有資料</a>
-      <a href="/links">参考リンク</a>
+      <a href="/documents" title="共有資料">資料</a>
+      <a href="/links">自社リンク</a>
+      <a href="/knowledge">ナレッジ</a>
       <a href="/admin">管理</a>
-      <a href="/backup" class="active">バックアップ</a>
+      <a href="/backup" class="active" title="バックアップ">BU</a>
     </nav>
     <a href="/logout" class="logout" title="ログアウト">ログアウト</a>
     <p class="admin-lead">全データのバックアップ・復元と、データごとの CSV エクスポート・インポートを行います。</p>
@@ -31,7 +32,7 @@
     <!-- バックアップ・復元（全データ） -->
     <section class="admin-card backup-card">
       <header>
-        <h2>バックアップ <span class="count">全データ（ガントチャート・案件管理・基盤技術・グループ目標・サービス・共有資料・参考リンク・選択肢・設定）</span></h2>
+        <h2>バックアップ <span class="count">全データ（ガントチャート・案件管理・基盤技術・グループ目標・サービス・共有資料・自社リンク・ナレッジ・選択肢・設定）</span></h2>
         <p class="desc">すべての記録を 1 つのファイル（JSON）に保存し、そのファイルから元に戻せます。サーバーにも毎日 1 回、夜 12 時に自動で保存しています（作成から約 1 か月で自動削除。アプリの起動時には保存しません。アップデートの前は「今すぐバックアップを作る」か update.sh でバックアップを作ります）。サーバーのバックアップはダウンロードでき、手元のファイルをサーバーにアップロードすることもできます。</p>
       </header>
       <div class="backup-body">
