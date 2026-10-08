@@ -371,7 +371,7 @@ function renderHeader(trackW) {
   const W = state.dayW;
   const row = el("div", "g-row g-head");
   const left = el("div", "g-left");
-  const heads = [[""], ["PJ名"], ["タスク"], ["担当者", 1], ["優先度", 1], ["終了日", 1]];
+  const heads = [[""], ["PJ名"], ["タスク"], ["担当者", 1], ["優先", 1], ["終了日", 1]];
   heads.forEach(([h, detail], i) => {
     const cell = el("div", detail ? "col-detail" : "", h);
     const key = [null, "pj", "task", "assignee", null, "end"][i] || null;
