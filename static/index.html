@@ -40,8 +40,8 @@
       <span class="sep"></span>
       <label class="filter">表示
         <select id="zoom">
-          <option value="26" selected>日</option>
-          <option value="14">週</option>
+          <option value="26">日</option>
+          <option value="14" selected>週</option>
           <option value="6">月</option>
         </select>
       </label>
@@ -60,6 +60,7 @@
     <!-- 右: 個人ごとのタスク状況（折りたためる） -->
     <aside id="side" class="side" aria-label="個人ごとのタスク状況">
       <button type="button" id="side-toggle" class="side-toggle" title="個人ごとのタスク状況を開閉">◀ 個人別</button>
+      <div class="side-resizer" id="side-resizer" title="ドラッグで幅を変更（ダブルクリックで元の幅）"></div>
       <div class="side-panel" id="side-panel">
         <div class="side-head"><b>個人ごとのタスク状況</b>
           <span class="side-legend"><i class="c-wait">予定</i><i class="c-act">実施中</i><i class="c-soon">3日以内</i><i class="c-over">超過</i></span></div>
@@ -99,6 +100,8 @@
         <button type="button" class="copy-btn" id="task-link" hidden
           title="このタスクを開くリンクだけをコピー">🔗 リンクのみ</button>
         <span class="spacer"></span>
+        <button type="button" class="danger-btn" id="task-delete" hidden title="このタスクを削除（本日の日付の入力が必要）">🗑 削除</button>
+        <button type="button" class="done-act" id="task-done" hidden>✓ 完了</button>
         <button type="button" data-close>キャンセル</button>
         <button type="submit" class="primary" id="task-submit">追加</button>
       </div>
