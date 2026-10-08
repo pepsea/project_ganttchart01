@@ -411,6 +411,10 @@ dialog textarea {
   resize: vertical;
 }
 #dlg-task { width: min(560px, 92vw); }
+#dlg-task .dlg-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+#dlg-task .dlg-head h2 { margin: 0; }
+#dlg-task .head-actions { display: flex; gap: 6px; }
+#dlg-task .head-actions button { padding: 2px 8px; font-size: 12px; }
 .task-meta { margin: -8px 0 12px; color: var(--muted); font-size: 12px; }
 .task-meta .st-overdue { color: var(--today); font-weight: 600; }
 .task-meta .st-soon { color: #b56d00; font-weight: 600; }
@@ -660,3 +664,6 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 button.done-act { color: #1f7a4f; border-color: #2fa36b; }
 button.done-act:hover { background: #e3f5ec; }
 #form-task .actions { flex-wrap: wrap; row-gap: 8px; } /* 下のボタンが増えても収まるように折り返す */
+
+/* バーをドラッグ中の日付表示（ポインタの近くに浮かせる） */
+.drag-tip { position: fixed; z-index: 1000; pointer-events: none; padding: 3px 8px; border-radius: 5px; background: #1f2430; color: #fff; font-size: 12px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,.3); font-variant-numeric: tabular-nums; }

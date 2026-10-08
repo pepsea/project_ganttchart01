@@ -567,6 +567,9 @@ function syncDateCell(cell, task, name) {
   if (name === "end_date") $(".cal", cell).textContent = shortDate(task.end_date);
 }
 
+// 2026/10/05(月) 形式（ドラッグ中の表示用。年は常に出す）
+const dateLabel = (ms) => `${fmtDate(ms).replaceAll("-", "/")}(${WEEKDAYS[new Date(ms).getUTCDay()]})`;
+
 // 幅を抑えた日付表示: 今年なら 10/05(月)、それ以外は 2027/01/05
 function shortDate(str) {
   const d = new Date(parseDate(str));
@@ -698,10 +701,11 @@ async function saveField(task, row, name, value) {
 
 // 行を部分更新（フォーカスを保ったまま）。
 // 表示範囲外・フィルター外になった、並び順（終了日順）や担当者の選択肢が変わった場合は全体を再描画。
-function refreshRow(task, row) {
+// keepOrder = true（バーのドラッグ後）は、並び順が変わっても行を動かさずその場で更新する（次に全体を描き直すまで順番はそのまま）。
+function refreshRow(task, row, keepOrder = false) {
   const list = visibleTasks();
   const rows = gantt.querySelectorAll(".g-row[data-id]");
-  const orderChanged = rows.length !== list.length || rows[list.indexOf(task)] !== row;
+  const orderChanged = !keepOrder && (rows.length !== list.length || rows[list.indexOf(task)] !== row);
   const known = new Set(state.tasks.filter((t) => t !== task).flatMap(assigneesOf));
   const newAssignee = assigneesOf(task).some((n) => !known.has(n));
   if (!inRange(task) || !list.includes(task) || orderChanged || newAssignee) return rerenderKeepScroll();
@@ -714,6 +718,7 @@ function refreshRow(task, row) {
   const bar = $(".bar", row);
   placeBar(bar, task.start_date, task.end_date);
   updateBarText(bar, task);
+  if (keepOrder) renderSide(); // 期限が変わると右の個人別の件数も変わる
 }
 
 function centerDate() {
@@ -782,6 +787,16 @@ function startDrag(e, bar, task) {
   const row = bar.closest(".g-row");
   const endInp = field(row, "end_date");
 
+  // ドラッグ中は、いまの開始日〜終了日をポインタの近くに表示する
+  const tip = el("div", "drag-tip");
+  document.body.append(tip);
+  const showTip = (ev) => {
+    tip.textContent = `${dateLabel(ns)} 〜 ${dateLabel(ne)}（${Math.round((ne - ns) / DAY_MS) + 1} 日間）`;
+    tip.style.left = `${Math.min(ev.clientX + 14, window.innerWidth - tip.offsetWidth - 8)}px`;
+    tip.style.top = `${Math.max(4, ev.clientY - 34)}px`;
+  };
+  showTip(e);
+
   const onMove = (ev) => {
     const dd = Math.round((ev.clientX - x0) / state.dayW) * DAY_MS;
     if (mode === "move") { ns = s0 + dd; ne = e0 + dd; }
@@ -790,12 +805,14 @@ function startDrag(e, bar, task) {
     placeBar(bar, fmtDate(ns), fmtDate(ne));
     endInp.value = fmtDate(ne);
     $('[data-cell="end_date"] .cal', row).textContent = shortDate(fmtDate(ne));
+    showTip(ev);
   };
   const onUp = async () => {
     bar.removeEventListener("pointermove", onMove);
     bar.removeEventListener("pointerup", onUp);
     bar.removeEventListener("pointercancel", onUp);
     bar.classList.remove("dragging");
+    tip.remove();
     if (ns === s0 && ne === e0) return;
     const prev = { ...task };
     try {
@@ -805,7 +822,7 @@ function startDrag(e, bar, task) {
       Object.assign(task, prev);
       toast(err.message, true);
     }
-    refreshRow(task, row);
+    refreshRow(task, row, true); // 動かしても行の順番は変えない
   };
   bar.addEventListener("pointermove", onMove);
   bar.addEventListener("pointerup", onUp);
