@@ -454,11 +454,11 @@ function renderBackground(trackW) {
     const d = new Date(state.rangeStart + i * DAY_MS);
     const dow = d.getUTCDay();
     const weekend = W >= 10 && (dow === 0 || dow === 6);
-    const monthStart = d.getUTCDate() === 1;
-    if (!weekend && !monthStart) continue;
+    const monthEnd = new Date(d.getTime() + DAY_MS).getUTCDate() === 1; // 月末日の右端に線を引く
+    if (!weekend && !monthEnd) continue;
     const col = el("div", "bg-col");
     if (weekend) col.classList.add("weekend");
-    if (monthStart) col.classList.add("month-start");
+    if (monthEnd) col.classList.add("month-end");
     pos(col, i * W, W);
     layer.append(col);
   }

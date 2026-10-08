@@ -199,7 +199,7 @@ button.primary:hover { filter: brightness(1.08); }
 }
 .bg-col { position: absolute; top: 0; bottom: 0; }
 .bg-col.weekend { background: var(--weekend); }
-.bg-col.month-start { border-left: 1px solid var(--line-strong); }
+.bg-col.month-end { border-right: 2px solid #7b87a1; } /* 月末（その月の最終日の右端） */
 .today-line {
   position: absolute;
   top: 0; bottom: 0;
