@@ -410,7 +410,11 @@ dialog textarea {
   line-height: 1.6;
   resize: vertical;
 }
-#dlg-task { width: min(660px, 92vw); } /* 下のボタンが 1 行に収まる幅 */
+#dlg-task { width: min(560px, 92vw); }
+#dlg-task .dlg-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+#dlg-task .dlg-head h2 { margin: 0; }
+#dlg-task .head-actions { display: flex; gap: 6px; }
+#dlg-task .head-actions button { padding: 2px 8px; font-size: 12px; }
 .task-meta { margin: -8px 0 12px; color: var(--muted); font-size: 12px; }
 .task-meta .st-overdue { color: var(--today); font-weight: 600; }
 .task-meta .st-soon { color: #b56d00; font-weight: 600; }

@@ -74,7 +74,13 @@
   <!-- タスク追加 / 詳細 -->
   <dialog id="dlg-task">
     <form id="form-task" method="dialog">
-      <h2 id="task-title">タスク追加</h2>
+      <div class="dlg-head">
+        <h2 id="task-title">タスク追加</h2>
+        <span class="head-actions">
+          <button type="button" class="danger-btn" id="task-delete" hidden title="このタスクを削除（本日の日付の入力が必要）">🗑 削除</button>
+          <button type="button" class="done-act" id="task-done" hidden>✓ 完了</button>
+        </span>
+      </div>
       <p id="task-meta" class="task-meta" hidden></p>
       <label>領域 <select name="area" required></select></label>
       <label><span>PJ名</span>
@@ -100,8 +106,6 @@
         <button type="button" class="copy-btn" id="task-link" hidden
           title="このタスクを開くリンクだけをコピー">🔗 リンクのみ</button>
         <span class="spacer"></span>
-        <button type="button" class="danger-btn" id="task-delete" hidden title="このタスクを削除（本日の日付の入力が必要）">🗑 削除</button>
-        <button type="button" class="done-act" id="task-done" hidden>✓ 完了</button>
         <button type="button" data-close>キャンセル</button>
         <button type="submit" class="primary" id="task-submit">追加</button>
       </div>
