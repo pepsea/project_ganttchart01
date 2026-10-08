@@ -98,7 +98,7 @@ button.primary:hover { filter: brightness(1.08); }
   width: var(--left-w);
   flex: 0 0 var(--left-w);
   display: grid;
-  grid-template-columns: var(--w-area, 190px) var(--w-pj, 130px) var(--w-task, 120px) var(--w-assignee, 56px) 56px 40px var(--w-end, 76px) 64px;
+  grid-template-columns: var(--w-area, 190px) var(--w-pj, 130px) var(--w-task, 120px) var(--w-assignee, 56px) 56px var(--w-end, 76px);
   align-items: center;
   background: var(--panel);
   border-right: 1px solid var(--line-strong);
@@ -319,7 +319,7 @@ dialog label.radio { flex-direction: row; align-items: flex-start; gap: 6px; col
 .toast.err { background: var(--today); }
 
 /* 列を折りたたむ */
-.gantt.compact .g-left { grid-template-columns: var(--w-area, 190px) var(--w-pj, 130px) var(--w-task, 120px) 64px; }
+.gantt.compact .g-left { grid-template-columns: var(--w-area, 190px) var(--w-pj, 130px) var(--w-task, 120px); }
 .gantt.compact .g-left > .col-detail { display: none; }
 .proj-cell { height: 100%; }
 .proj-cell select { border-right: 1px solid var(--line); }
@@ -364,8 +364,7 @@ button.danger-btn:disabled { opacity: .4; cursor: not-allowed; }
   border: 0;
   padding: 0;
 }
-.g-head .g-left > div.col-detail:nth-child(6),
-.g-head .g-left > div.col-detail:nth-child(7) { justify-content: center; padding: 0 0 8px; }
+.g-head .g-left > div.col-detail:nth-child(6) { justify-content: center; padding: 0 0 8px; }
 
 /* 期限による色分け（タスク名の背景） */
 .g-left input[data-field="task"][data-status="overdue"] { background: #ffd4d4; color: #a3161b; font-weight: 600; }
@@ -526,6 +525,10 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 .g-body .scroller { min-width: 0; }
 .side { display: flex; flex-shrink: 0; border-left: 1px solid var(--line); background: var(--panel); }
 .side-toggle { border: 0; border-radius: 0; border-right: 1px solid var(--line); writing-mode: vertical-rl; padding: 10px 4px; color: var(--muted); font-size: 12px; }
+.side { position: relative; }
+.side-resizer { width: 6px; flex: 0 0 6px; cursor: col-resize; background: transparent; border-right: 1px solid var(--line); touch-action: none; }
+.side-resizer:hover, .side-resizer.active { background: var(--accent); opacity: .5; }
+.side.collapsed .side-resizer { display: none; }
 .side-panel { width: 250px; overflow-y: auto; padding: 8px; }
 .side.collapsed .side-panel { display: none; }
 .side-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
@@ -651,3 +654,7 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 .g-left .ro-cell[data-kind="case"]::before { content: "案"; color: #5f6672; }
 .g-left .ro-cell[data-kind="platform"]::before { content: "基"; color: #4d8a63; }
 .g-left .ro-cell[data-kind]:hover { filter: brightness(.96); }
+
+button.done-act { color: #1f7a4f; border-color: #2fa36b; }
+button.done-act:hover { background: #e3f5ec; }
+#form-task .actions { flex-wrap: wrap; row-gap: 8px; } /* 下のボタンが増えても収まるように折り返す */

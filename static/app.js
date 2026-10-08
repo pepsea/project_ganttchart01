@@ -34,8 +34,8 @@ const colW = (() => {
     return { ...COL_W_DEFAULT };
   }
 })();
-// 列: 領域 + PJ名 + タスク + (担当者 + 優先度 56 + 開始 40 + 終了日) + 削除 34
-const leftW = () => colW.area + colW.pj + colW.task + 64 + (state.compact ? 0 : colW.assignee + 56 + 40 + colW.end);
+// 列: 領域 + PJ名 + タスク + (担当者 + 優先度 56 + 終了日)
+const leftW = () => colW.area + colW.pj + colW.task + (state.compact ? 0 : colW.assignee + 56 + colW.end);
 const saveColW = () => {
   try { localStorage.setItem("gantt.colW2", JSON.stringify(colW)); } catch (_) { /* 記憶できなくても幅は変わる */ }
 };
@@ -335,6 +335,35 @@ const setSide = (open) => {
   $("#side-toggle").textContent = open ? "▶ 閉じる" : "◀ 個人別";
   try { localStorage.setItem("gantt.side", open ? "1" : "0"); } catch {}
 };
+// 右パネルの幅: 左端をドラッグして変更（ブラウザに記憶）
+const SIDE_W_DEFAULT = 250, SIDE_W_MIN = 180, SIDE_W_MAX = 700;
+const sidePanel = $("#side-panel");
+const setSideW = (w, save) => {
+  w = Math.min(SIDE_W_MAX, Math.max(SIDE_W_MIN, Math.round(w)));
+  sidePanel.style.width = `${w}px`;
+  if (save) try { localStorage.setItem("gantt.sideW", String(w)); } catch {}
+};
+(() => { let w = SIDE_W_DEFAULT; try { w = Number(localStorage.getItem("gantt.sideW")) || w; } catch {} setSideW(w); })();
+$("#side-resizer").addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  const h = e.currentTarget, x0 = e.clientX, w0 = sidePanel.offsetWidth;
+  h.setPointerCapture(e.pointerId);
+  h.classList.add("active");
+  document.body.classList.add("resizing");
+  const move = (ev) => setSideW(w0 + x0 - ev.clientX); // 左へ動かすと広がる
+  const up = () => {
+    h.removeEventListener("pointermove", move);
+    h.removeEventListener("pointerup", up);
+    h.removeEventListener("pointercancel", up);
+    h.classList.remove("active");
+    document.body.classList.remove("resizing");
+    setSideW(sidePanel.offsetWidth, true);
+  };
+  h.addEventListener("pointermove", move);
+  h.addEventListener("pointerup", up);
+  h.addEventListener("pointercancel", up);
+});
+$("#side-resizer").addEventListener("dblclick", () => setSideW(SIDE_W_DEFAULT, true));
 $("#side-toggle").addEventListener("click", () => setSide(sideEl.classList.contains("collapsed")));
 (() => { let v = "1"; try { v = localStorage.getItem("gantt.side") ?? "1"; } catch {} setSide(v === "1"); })();
 
@@ -342,12 +371,12 @@ function renderHeader(trackW) {
   const W = state.dayW;
   const row = el("div", "g-row g-head");
   const left = el("div", "g-left");
-  const heads = [[""], ["PJ名"], ["タスク"], ["担当者", 1], ["優先度", 1], ["開始", 1], ["終了日", 1], [""]];
+  const heads = [[""], ["PJ名"], ["タスク"], ["担当者", 1], ["優先度", 1], ["終了日", 1]];
   heads.forEach(([h, detail], i) => {
     const cell = el("div", detail ? "col-detail" : "", h);
-    const key = [null, "pj", "task", "assignee", null, null, "end"][i] || null;
+    const key = [null, "pj", "task", "assignee", null, "end"][i] || null;
     // 見出しをクリックで並び替え（▲昇順 ▼降順。3 回目で初期の並びに戻る）
-    const sortKey = [null, "pj", "task", "assignee", "priority", "start", "end"][i] || null;
+    const sortKey = [null, "pj", "task", "assignee", "priority", "end"][i] || null;
     if (sortKey) {
       cell.classList.add("sortable");
       cell.title = "クリックで並び替え（もう一度で逆順、3 回目で元の並び＝終了日順）";
@@ -500,26 +529,12 @@ function renderRow(task, trackW) {
   prio.addEventListener("click", () => openTaskDialog(task));
   syncPrioCell(prio, task);
 
-  const start = dateCell(task, row, "start_date");
   const end = dateCell(task, row, "end_date");
   for (const e of [assignee, prio]) e.classList.add("col-detail");
 
-  const del = el("button", "del", "🗑");
-  del.title = "削除";
-  del.addEventListener("click", () => deleteTask(task));
-
-  // 完了ボタン: 完了にするとグレーアウトして一番下へ。1 週間後に自動で削除（もう一度押すと完了を取り消す）
-  const done = el("button", "done-btn", task.completed_at ? "↩" : "✓");
-  done.type = "button";
-  done.title = task.completed_at
-    ? `完了を取り消す（完了 ${task.completed_at.slice(0, 16)}。${doneDeleteLabel(task)}に自動で削除）`
-    : "完了にする（グレーアウトして一番下へ。1 週間後に自動で削除）";
-  done.addEventListener("click", () => toggleDone(task));
-  const tail = el("div", "row-actions");
-  tail.append(done, del);
   row.classList.toggle("done", !!task.completed_at);
 
-  left.append(areaCell, projCell, name, assignee, prio, start, end, tail);
+  left.append(areaCell, projCell, name, assignee, prio, end);
 
   const track = el("div", "g-track");
   track.style.width = `${trackW}px`;
@@ -529,15 +544,13 @@ function renderRow(task, trackW) {
   return row;
 }
 
-// 開始日はカレンダーアイコンのみ、終了日は日付を表示。クリックでカレンダーを開く。
-const CAL_ICON = `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="12" rx="2" fill="none" stroke="currentColor"/><path d="M1.5 6h13M5 1v3M11 1v3" stroke="currentColor" fill="none"/></svg>`;
+// 終了日は日付を表示。クリックでカレンダーを開く（開始日は表に出さず、バーのドラッグかタスク詳細で変更）。
 
 function dateCell(task, row, name) {
   const cell = el("div", "date-cell col-detail");
   cell.dataset.cell = name;
-  const btn = el("button", name === "end_date" ? "cal cal-text" : "cal");
+  const btn = el("button", "cal cal-text");
   btn.type = "button";
-  if (name === "start_date") btn.innerHTML = CAL_ICON;
   const inp = input("date", task[name], name, (v) => { if (v) saveField(task, row, name, v); else inp.value = task[name]; });
   inp.tabIndex = -1;
   btn.addEventListener("click", () => {
@@ -549,8 +562,7 @@ function dateCell(task, row, name) {
 }
 
 function syncDateCell(cell, task, name) {
-  const label = name === "start_date" ? "開始日" : "終了日";
-  cell.title = `${label}: ${task[name]}（クリックで変更）`;
+  cell.title = `終了日: ${task[name]}（クリックで変更）`;
   cell.dataset.status = name === "end_date" ? deadlineStatus(task) : "";
   if (name === "end_date") $(".cal", cell).textContent = shortDate(task.end_date);
 }
@@ -688,13 +700,11 @@ function refreshRow(task, row) {
   const newAssignee = assigneesOf(task).some((n) => !known.has(n));
   if (!inRange(task) || !list.includes(task) || orderChanged || newAssignee) return rerenderKeepScroll();
   row.style.setProperty("--area-color", areaColor(task.area));
-  for (const name of ["start_date", "end_date"]) {
-    field(row, name).value = task[name];
-  }
+  field(row, "end_date").value = task.end_date;
   syncReadonlyCells(row, task, field(row, "area"), field(row, "project"), field(row, "assignee"));
   syncTaskCell(field(row, "task"), task);
   syncPrioCell(field(row, "priority"), task);
-  for (const name of ["start_date", "end_date"]) syncDateCell($(`[data-cell="${name}"]`, row), task, name);
+  syncDateCell($(`[data-cell="end_date"]`, row), task, "end_date");
   const bar = $(".bar", row);
   placeBar(bar, task.start_date, task.end_date);
   updateBarText(bar, task);
@@ -764,7 +774,6 @@ function startDrag(e, bar, task) {
   bar.classList.add("dragging");
 
   const row = bar.closest(".g-row");
-  const startInp = field(row, "start_date");
   const endInp = field(row, "end_date");
 
   const onMove = (ev) => {
@@ -773,7 +782,6 @@ function startDrag(e, bar, task) {
     else if (mode === "left") { ns = Math.min(s0 + dd, e0); ne = e0; }
     else { ns = s0; ne = Math.max(e0 + dd, s0); }
     placeBar(bar, fmtDate(ns), fmtDate(ne));
-    startInp.value = fmtDate(ns);
     endInp.value = fmtDate(ne);
     $('[data-cell="end_date"] .cal', row).textContent = shortDate(fmtDate(ne));
   };
@@ -897,11 +905,29 @@ function openTaskDialog(task = null) {
   }
   $("#task-error").textContent = "";
   syncTaskPjLink();
+  const doneBtn = $("#task-done");
+  $("#task-delete").hidden = !task;
+  doneBtn.hidden = !task;
+  if (task) doneBtn.textContent = task.completed_at ? "↩ 完了を取り消す" : "✓ 完了";
   $("#dlg-task").showModal();
   (task ? form.detail : form.task).focus();
 }
 
 $("#btn-add").addEventListener("click", () => openTaskDialog());
+
+// 詳細画面の下のボタン: 完了（グレーアウトして一番下へ。1 週間後に自動で削除。もう一度押すと取り消し）/ 削除（日付の入力で確認）
+$("#task-done").addEventListener("click", async () => {
+  const task = editing;
+  if (!task) return;
+  $("#dlg-task").close();
+  await toggleDone(task);
+});
+$("#task-delete").addEventListener("click", () => {
+  const task = editing;
+  if (!task) return;
+  $("#dlg-task").close();
+  deleteTask(task);
+});
 
 $("#form-task").addEventListener("submit", async (e) => {
   e.preventDefault();
