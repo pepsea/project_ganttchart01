@@ -585,6 +585,10 @@ function deadlineStatus(task) {
   return "";
 }
 
+// 種類（案件 / 基盤 / その他）。PJ名なしは ""（表の印はなし。バーの色は「その他」＝白）
+const pjKind = (task) =>
+  !task.project ? "" : state.pj.cases.includes(task.project) ? "case" : state.pj.platforms.includes(task.project) ? "platform" : "other";
+
 // 表のセル（表示のみ）: 領域・PJ名・担当者
 function syncReadonlyCells(row, task, areaCell, projCell, assigneeCell) {
   assigneeCell.textContent = assigneeText(task) || "—";
@@ -595,7 +599,7 @@ function syncReadonlyCells(row, task, areaCell, projCell, assigneeCell) {
   projCell.textContent = pjText(task.project) || "—";
   projCell.classList.toggle("empty", !task.project);
   // 種類（案件 / 基盤 / その他）: 頭に印（案・基）と、ごく薄い背景
-  const kind = !task.project ? "" : state.pj.cases.includes(task.project) ? "case" : state.pj.platforms.includes(task.project) ? "platform" : "other";
+  const kind = pjKind(task);
   if (kind) projCell.dataset.kind = kind; else delete projCell.dataset.kind;
   projCell.title = `PJ名: ${pjText(task.project) || "なし"}（修正はクリックしてタスク詳細で）`;
 }
@@ -621,7 +625,8 @@ const snippet = (text, n = 200) => (text.length > n ? text.slice(0, n) + "…" :
 
 function renderBar(task) {
   const bar = el("div", "bar");
-  bar.innerHTML = `<span class="handle l"></span><span class="label"></span><span class="bar-tip"></span><span class="handle r"></span>`;
+  // タスク名・PJ名/担当者はバーの右側に出す（バーの色は案件・基盤・その他で分ける）
+  bar.innerHTML = `<span class="handle l"></span><span class="bar-out"><span class="label"></span><span class="bar-tip"></span></span><span class="handle r"></span>`;
   placeBar(bar, task.start_date, task.end_date);
   updateBarText(bar, task);
   bar.addEventListener("pointerdown", (e) => startDrag(e, bar, task));
@@ -629,6 +634,7 @@ function renderBar(task) {
 }
 
 function updateBarText(bar, task) {
+  bar.dataset.kind = pjKind(task) || "other";
   const label = $(".label", bar);
   label.innerHTML = "";
   const dot = el("span", "prio-dot");
