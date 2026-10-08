@@ -410,7 +410,7 @@ dialog textarea {
   line-height: 1.6;
   resize: vertical;
 }
-#dlg-task { width: min(560px, 92vw); }
+#dlg-task { width: min(660px, 92vw); } /* 下のボタンが 1 行に収まる幅 */
 .task-meta { margin: -8px 0 12px; color: var(--muted); font-size: 12px; }
 .task-meta .st-overdue { color: var(--today); font-weight: 600; }
 .task-meta .st-soon { color: #b56d00; font-weight: 600; }
