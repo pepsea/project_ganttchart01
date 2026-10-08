@@ -234,7 +234,7 @@ button.primary:hover { filter: brightness(1.08); }
 .bar[data-kind="platform"] { background: #fff2b3; border-color: #e0c850; }
 .bar[data-kind="other"] { background: #fff; border-color: #b8bec9; }
 .bar.dragging { cursor: grabbing; opacity: .85; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
-.bar .bar-out { position: absolute; left: 100%; top: 0; margin-left: 6px; display: flex; align-items: center; pointer-events: none; }
+.bar .bar-out { position: absolute; left: 0; top: 0; padding-left: 6px; /* タスク名の先頭をバーの左端にそろえ、長い名前は右へはみ出す */ display: flex; align-items: center; pointer-events: none; }
 .bar .label { color: var(--text); }
 .bar .handle {
   position: absolute; top: 0; bottom: 0; width: 8px;
