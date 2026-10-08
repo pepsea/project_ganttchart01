@@ -14,7 +14,7 @@ const state = {
   filter: { areas: "", projects: "", assignees: "" },
   q: "", // キーワード検索（PJ名・タスク名・担当者・領域）
   compact: false,
-  dayW: 26,
+  dayW: 14, // 初期表示は週（日 26・週 14・月 6）
   rangeStart: 0, // UTC ms
   days: 0,
 };
@@ -1319,7 +1319,7 @@ function viewUrl() {
   if (state.filter.assignees) p.set("who", state.filter.assignees === NO_ASSIGNEE ? "none" : state.filter.assignees);
   if (state.q) p.set("q", state.q);
   if (state.compact) p.set("compact", "1");
-  if (state.dayW !== 26) p.set("zoom", String(state.dayW));
+  if (state.dayW !== 14) p.set("zoom", String(state.dayW));
   if (cal.on) { p.set("view", "cal"); p.set("cal", `${cal.y}-${String(cal.m + 1).padStart(2, "0")}`); }
   const qs = p.toString();
   return `${location.origin}/${qs ? `?${qs}` : ""}`;
