@@ -173,11 +173,25 @@ const newerFirst = (a, b) => (b.created_at || "").localeCompare(a.created_at || 
 const byBoard = (a, b) => (b.status_changed_at || "").localeCompare(a.status_changed_at || "") || newerFirst(a, b);
 
 // ------------------------------------------------------------ 描画
+// 再描画（編集・保存・状況の変更のあと）でも、スクロールの位置は保つ（同じ表示の形のとき）
+let renderedView = "";
 function render() {
+  const keep = renderedView === state.view ? {
+    top: view.scrollTop, left: view.scrollLeft,
+    cols: Object.fromEntries([...view.querySelectorAll(".col-body")].map((b) => [b.parentElement.dataset.status, b.scrollTop])),
+    wrap: (() => { const w = view.querySelector(".table-wrap"); return w ? [w.scrollTop, w.scrollLeft] : null; })(),
+  } : null;
   view.innerHTML = "";
   if (state.view === "board") renderBoard();
   else if (state.view === "list") renderList();
   else renderTimeline();
+  renderedView = state.view;
+  if (!keep) return;
+  view.scrollTop = keep.top;
+  view.scrollLeft = keep.left;
+  view.querySelectorAll(".col-body").forEach((b) => { b.scrollTop = keep.cols[b.parentElement.dataset.status] || 0; });
+  const w = view.querySelector(".table-wrap");
+  if (w && keep.wrap) { w.scrollTop = keep.wrap[0]; w.scrollLeft = keep.wrap[1]; }
 }
 
 function areaChips(c) {
@@ -234,6 +248,7 @@ function renderBoard() {
   const statuses = state.status ? [state.status] : state.statuses.filter((s) => s !== "キャンセル" || state.showCancel);
   for (const s of statuses) {
     const col = el("div", "col");
+    col.dataset.status = s;
     if (s === "キャンセル") col.classList.add("cancel");
     if (s === ARCHIVE) col.classList.add("archive");
     col.style.setProperty("--c", STATUS_COLOR[s]);
