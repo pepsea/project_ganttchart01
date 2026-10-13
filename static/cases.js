@@ -1162,6 +1162,24 @@ function refreshPersonFilter() {
   sel.value = state.person;
 }
 
+// ---- 他の画面（ガントチャートなど）へ移って戻ってきたとき、スクロールの位置と絞り込みを元に戻す
+const SNAP_KEY = "cases.snapshot";
+function saveSnapshot() {
+  try {
+    const w = view.querySelector(".table-wrap");
+    sessionStorage.setItem(SNAP_KEY, JSON.stringify({
+      view: state.view, top: view.scrollTop, left: view.scrollLeft,
+      cols: Object.fromEntries([...view.querySelectorAll(".col-body")].map((b) => [b.parentElement.dataset.status, b.scrollTop])),
+      wrap: w ? [w.scrollTop, w.scrollLeft] : null,
+      q: state.q, area: state.area, person: state.person, showCancel: state.showCancel,
+    }));
+  } catch (_) { /* 記憶できなくても動く */ }
+}
+function readSnapshot() {
+  try { return JSON.parse(sessionStorage.getItem(SNAP_KEY) || "null"); } catch (_) { return null; }
+}
+window.addEventListener("pagehide", saveSnapshot);
+
 function setView(v) {
   state.view = v;
   store.set("cases.view", v);
@@ -1190,7 +1208,23 @@ $("#f-cancel").addEventListener("change", (e) => {
     // URL パラメータ: ?case=案件番号 でその案件の詳細を開く（ガントチャートからの移動用）、?q= で検索
     const params = new URLSearchParams(location.search);
     state.q = params.get("q") || "";
+    // 戻ってきたとき（ガントチャートの「← 案件に戻る」・ブラウザの戻る）は、直前の絞り込みとスクロールを復元する
+    const comingBack = !params.get("q") && (params.get("case") || params.get("id") || params.get("pj") ||
+      performance.getEntriesByType("navigation")[0]?.type === "back_forward");
+    const snap = comingBack ? readSnapshot() : null;
+    if (snap) {
+      state.q = snap.q || "";
+      state.area = snap.area || "";
+      state.person = snap.person || "";
+      state.showCancel = !!snap.showCancel;
+      $("#f-area").value = state.area;
+      $("#f-cancel").checked = state.showCancel;
+    }
     await Promise.all([loadCases(), loadMasters()]);
+    if (snap) { // 担当者の選択肢は読み込み後に作られる
+      state.person = snap.person || "";
+      refreshPersonFilter();
+    }
     const saved = store.get("cases.view");
     const target = params.get("case") || params.get("pj");
     const hits = target ? state.cases.filter((c) => c.case_no === target) : [];
@@ -1199,6 +1233,13 @@ $("#f-cancel").addEventListener("change", (e) => {
     if (target && !found) state.q = target; // 案件が無い・同じ番号で試験が複数ある場合は検索語として扱う
     $("#q").value = state.q;
     setView(["board", "list", "timeline"].includes(saved) ? saved : "board");
+    if (snap && snap.view === state.view) {
+      view.scrollTop = snap.top;
+      view.scrollLeft = snap.left;
+      view.querySelectorAll(".col-body").forEach((b) => { b.scrollTop = snap.cols?.[b.parentElement.dataset.status] || 0; });
+      const w = view.querySelector(".table-wrap");
+      if (w && snap.wrap) { w.scrollTop = snap.wrap[0]; w.scrollLeft = snap.wrap[1]; }
+    }
     if (found) openDrawer(found);
   } catch (err) {
     toast(`読み込みに失敗しました: ${err.message}`, true);
