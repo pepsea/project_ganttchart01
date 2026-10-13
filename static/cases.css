@@ -475,6 +475,8 @@ a.link-ic:hover { filter: brightness(1.12); color: #fff; }
 .case-task-table td.soon { color: #b56d00; font-weight: 700; }
 .case-task-table td.t-name.overdue { background: #ffd4d4; color: #a3161b; }
 .case-task-table td.t-name.soon { background: #ffe2b3; color: #8a5100; }
+.case-task-table tr.done { opacity: .5; filter: grayscale(1); } /* 完了したタスク: ガントチャートと同じ（グレーアウト・取り消し線） */
+.case-task-table tr.done .t-name { text-decoration: line-through; }
 .case-task-table td.prio { font-weight: 700; }
 .case-task-table td.prio[data-v="高"] { color: var(--prio-high); }
 .case-task-table td.prio[data-v="中"] { color: #b37400; }

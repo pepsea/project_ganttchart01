@@ -969,7 +969,8 @@ async function loadCaseTasks(c) {
   box.innerHTML = "";
   box.append(el("p", "hint", "読み込み中…"));
   const tasks = (await api("/api/tasks")).filter((t) => t.project === c.case_no)
-    .sort((a, b) => a.end_date.localeCompare(b.end_date) || a.start_date.localeCompare(b.start_date));
+    // 完了したタスクは一番下（ガントチャートと同じ）
+    .sort((a, b) => !!a.completed_at - !!b.completed_at || a.end_date.localeCompare(b.end_date) || a.start_date.localeCompare(b.start_date));
   if (state.current?.id !== c.id) return; // 読み込み中に別の案件へ切り替えた場合
   $("#case-task-count").textContent = `${tasks.length} 件`;
   box.innerHTML = "";
@@ -982,12 +983,14 @@ async function loadCaseTasks(c) {
   const tbody = el("tbody");
   const md = (s) => `${Number(s.slice(5, 7))}/${Number(s.slice(8, 10))}`;
   for (const t of tasks) {
-    const tr = el("tr");
+    const finished = !!t.completed_at;
+    const tr = el("tr", finished ? "done" : "");
     const left = Math.round((parseDate(t.end_date) - todayMs()) / DAY_MS);
-    const due = left < 0 ? "overdue" : left <= 3 ? "soon" : "";
+    const due = finished ? "" : left < 0 ? "overdue" : left <= 3 ? "soon" : ""; // 完了したタスクは期限の色を付けない
     const td = (text, cls = "") => { const x = el("td", cls, text); tr.append(x); return x; };
-    const name = td(t.task, due ? `t-name ${due}` : "t-name");
+    const name = td(finished ? `✓ ${t.task}` : t.task, due ? `t-name ${due}` : "t-name");
     if (t.detail) name.title = t.detail;
+    if (finished) name.title = `完了（${t.completed_at.slice(0, 10).replaceAll("-", "/")}）${t.detail ? "\n\n" + t.detail : ""}`;
     td(t.area, "nowrap");
     td((t.assignee || "").split(" ").filter(Boolean).join("・") || "—", "nowrap");
     const pr = td(t.priority, "nowrap prio");
