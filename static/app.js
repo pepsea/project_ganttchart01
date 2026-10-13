@@ -924,7 +924,7 @@ function openTaskDialog(task = null) {
     if (state.filter.assignees && state.filter.assignees !== NO_ASSIGNEE) form.assignee.value = state.filter.assignees;
     const t = todayMs();
     form.start_date.value = fmtDate(t);
-    form.end_date.value = fmtDate(t + 6 * DAY_MS);
+    form.end_date.value = fmtDate(t + 2 * DAY_MS); // 標準の期間は 3 日間（今日〜2 日後）
   }
   $("#task-error").textContent = "";
   syncTaskPjLink();
