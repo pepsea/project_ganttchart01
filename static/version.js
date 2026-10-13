@@ -1,6 +1,6 @@
 "use strict";
 
-// 画面の右上（ログアウトの隣）にバージョンを表示する。クリックすると更新履歴（CHANGELOG.md）を表示する
+// 画面の右上（ログアウトの隣）にバージョンを表示する。クリックすると更新日時だけを表示する
 (async () => {
   const logout = document.querySelector(".toolbar .logout, a.logout");
   if (!logout) return;
@@ -14,42 +14,24 @@
   a.className = "app-version";
   a.href = "#";
   a.textContent = `v${v.version}`;
-  a.title = `バージョン ${v.version}${v.commit ? `（コミット ${v.commit}）` : ""}${v.built ? `\nビルド ${v.built}` : ""}\nクリックで更新履歴`;
+  a.title = "クリックで更新日時";
   logout.before(a);
 
-  let dlg = null;
-  a.addEventListener("click", async (e) => {
+  // 更新日時の小さな表示（もう一度クリック・ほかをクリック・Esc で閉じる）
+  let pop = null;
+  const close = () => { if (pop) { pop.remove(); pop = null; } };
+  a.addEventListener("click", (e) => {
     e.preventDefault();
-    if (!dlg) {
-      dlg = document.createElement("dialog");
-      dlg.className = "version-dialog";
-      const close = document.createElement("button");
-      close.type = "button";
-      close.textContent = "閉じる";
-      close.addEventListener("click", () => dlg.close());
-      const body = document.createElement("div");
-      body.className = "md version-body";
-      if (!window.mdToHtml) {
-        await new Promise((resolve) => {
-          const s = document.createElement("script");
-          s.src = "/static/markdown.js";
-          s.onload = resolve;
-          s.onerror = resolve;
-          document.head.append(s);
-        });
-      }
-      body.innerHTML = window.mdToHtml ? window.mdToHtml(v.changelog || "更新履歴はありません") : "";
-      if (!window.mdToHtml) body.textContent = v.changelog || "更新履歴はありません";
-      const meta = document.createElement("p");
-      meta.className = "hint";
-      meta.textContent = `いまのバージョン: ${v.version}${v.commit ? `　コミット: ${v.commit}` : ""}${v.built ? `　ビルド: ${v.built}` : ""}`;
-      const actions = document.createElement("div");
-      actions.className = "actions";
-      actions.append(close);
-      dlg.append(meta, body, actions);
-      document.body.append(dlg);
-      dlg.addEventListener("click", (ev) => { if (ev.target === dlg) dlg.close(); });
-    }
-    dlg.showModal();
+    e.stopPropagation();
+    if (pop) return close();
+    pop = document.createElement("div");
+    pop.className = "version-pop";
+    pop.textContent = v.updated ? `更新日時 ${v.updated.replaceAll("-", "/")}` : "更新日時は不明です";
+    const r = a.getBoundingClientRect();
+    pop.style.top = `${r.bottom + 6}px`;
+    pop.style.right = `${Math.max(8, window.innerWidth - r.right)}px`;
+    document.body.append(pop);
   });
+  document.addEventListener("click", close);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
 })();

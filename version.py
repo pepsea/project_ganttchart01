@@ -1,12 +1,13 @@
 """アプリのバージョン情報
 
 - バージョン番号は VERSION ファイル（1.0.0 の形）で管理する。更新履歴は CHANGELOG.md
-- 画面の右上（ログアウトの隣）に表示し、クリックで更新履歴を見られる
-- どのコミット・いつ作ったかも、分かるときは表示する（Docker のビルド時に GIT_COMMIT / BUILD_DATE を渡す。update.sh が渡す）
+- 画面の右上（ログアウトの隣）に表示し、クリックで更新日時を見られる（更新履歴は CHANGELOG.md に残す。画面には出さない）
+- 更新日時は、Docker のビルド時に渡す BUILD_DATE（update.sh が渡す）。無いときは VERSION ファイルの更新日時
 """
 
 import os
 import subprocess
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -29,12 +30,22 @@ def _git(*args: str) -> str:
         return ""
 
 
+def _updated() -> str:
+    """更新日時: ビルド時に渡された日時。無ければ VERSION ファイルの更新日時"""
+    built = os.environ.get("APP_BUILT") or ""
+    if built:
+        return built
+    try:
+        return datetime.fromtimestamp((BASE_DIR / "VERSION").stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+    except OSError:
+        return ""
+
+
 def info() -> dict:
     return {
         "version": _read("VERSION", "0.0.0"),
         "commit": os.environ.get("APP_COMMIT") or _git("rev-parse", "--short", "HEAD"),
-        "built": os.environ.get("APP_BUILT") or "",
-        "changelog": _read("CHANGELOG.md"),
+        "updated": _updated(),
     }
 
 

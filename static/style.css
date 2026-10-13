@@ -613,14 +613,10 @@ a.back-btn:hover { filter: brightness(1.1); color: #fff; }
 .g-row.done:hover { opacity: .7; }
 .cal-bar.done { background: #e5e7eb !important; border-left-color: #9ca3af; color: #6b7280; text-decoration: line-through; }
 
-/* バージョン表示（ログアウトの隣）と更新履歴 */
+/* バージョン表示（ログアウトの隣）。クリックで更新日時 */
 .app-version { font-size: 11.5px; color: var(--muted); text-decoration: none; padding: 1px 7px; border: 1px solid var(--line-strong); border-radius: 999px; white-space: nowrap; order: 1; }
 .app-version:hover { color: var(--accent); border-color: var(--accent); }
-.version-dialog { width: min(640px, 94vw); max-height: 80vh; overflow: auto; }
-.version-dialog .md { font-size: 13.5px; line-height: 1.7; }
-.version-dialog .md h1 { font-size: 18px; } .version-dialog .md h2 { font-size: 16px; } .version-dialog .md h3 { font-size: 14px; }
-.version-dialog .md ul { padding-left: 1.4em; }
-.version-dialog .md code { background: #efd0d5; color: #8b1e2d; border-radius: 4px; padding: 1px 6px; font-size: .92em; }
+.version-pop { position: fixed; z-index: 100; background: #fff; border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 6px 20px rgba(20, 30, 50, .18); padding: 6px 12px; font-size: 12.5px; white-space: nowrap; }
 
 /* 検索できるプルダウン（searchselect.js） */
 .ss-native { display: none !important; }
