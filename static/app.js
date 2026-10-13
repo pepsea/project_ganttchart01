@@ -924,7 +924,14 @@ function openTaskDialog(task = null) {
     if (state.filter.assignees && state.filter.assignees !== NO_ASSIGNEE) form.assignee.value = state.filter.assignees;
     const t = todayMs();
     form.start_date.value = fmtDate(t);
-    form.end_date.value = fmtDate(t + 3 * DAY_MS); // 標準の終了日は今日から 3 日後
+    // 標準の終了日は今日から 3 営業日後（土日は数えない。祝日は考慮しない）
+    let e = t;
+    for (let n = 0; n < 3; ) {
+      e += DAY_MS;
+      const dow = new Date(e).getUTCDay();
+      if (dow !== 0 && dow !== 6) n++;
+    }
+    form.end_date.value = fmtDate(e);
   }
   $("#task-error").textContent = "";
   syncTaskPjLink();
