@@ -1274,14 +1274,14 @@ function renderMonthly(p) {
 
 // ---- タスク（表示のみ）: ガントチャートで PJ名 = 基盤番号 のタスク。編集はガントチャートで行う
 // ガントチャートのタスク（PJ名 = 基盤番号）: ガントチャートと同じ形で表示（表示のみ。編集はガントチャートで）
-// 左: タスク名（実施中 = 青、3 日以内 = オレンジ、超過 = 赤）・担当者・開始日・終了日・残り日数
+// 左: タスク名（実施中 = 青、3 営業日以内 = オレンジ、超過 = 赤）・担当者・開始日・終了日・残り日数
 // 右: 日付の帯（領域の色）、今日の線、土日
 function renderTasks(p, tasks) {
   const sec = el("section", "pf-section pf-tasks");
   const h = el("h3", "", "ガントチャート");
   h.append(el("span", "hint", `${tasks.length} 件（表示のみ。追加・編集はガントチャートで）`));
   const legend = el("span", "pg-legend");
-  for (const [cls, label] of [["overdue", "期限超過"], ["soon", "期限3日以内"], ["active", "実施中"]]) {
+  for (const [cls, label] of [["overdue", "期限超過"], ["soon", "期限3営業日以内"], ["active", "実施中"]]) {
     const x = el("span", cls);
     x.append(el("i"), label);
     legend.append(x);
@@ -1352,13 +1352,14 @@ function renderTasks(p, tasks) {
   body.append(bg);
   for (const t of tasks) {
     const left = daysLeft(t.end_date);
-    const due = left < 0 ? "overdue" : left <= 3 ? "soon" : "";
+    const wd = workDaysLeft(parseDate(t.end_date)); // 営業日（土日を除く）
+    const due = left < 0 ? "overdue" : wd <= 3 ? "soon" : "";
     const active = !due && daysLeft(t.start_date) <= 0 ? "active" : ""; // 実施中 = 今日が開始日〜終了日の間
     const row = el("div", "pg-row");
     const lc = el("div", "pg-left");
     const name = el("span", `t-name ${due || active}`.trim(), t.task);
     name.title = `${t.task}${t.detail ? "\n\n" + t.detail : ""}`;
-    const rest = left < 0 ? `${-left} 日超過` : left === 0 ? "今日まで" : `あと ${left} 日`;
+    const rest = left < 0 ? `${Math.max(1, -wd)} 営業日超過` : left === 0 ? "今日まで" : `あと ${wd} 営業日`;
     const rc = el("span", `days-left${left < 0 ? " over" : left <= 7 ? " near" : ""}`, rest);
     lc.append(name, el("span", "who", (t.assignee || "").split(" ").filter(Boolean).join("・") || "—"), el("span", "dt", slashDate(t.start_date)),
       el("span", "dt", slashDate(t.end_date)), rc);

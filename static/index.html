@@ -63,7 +63,7 @@
       <div class="side-resizer" id="side-resizer" title="ドラッグで幅を変更（ダブルクリックで元の幅）"></div>
       <div class="side-panel" id="side-panel">
         <div class="side-head"><b>個人ごとのタスク状況</b>
-          <span class="side-legend"><i class="c-wait">予定</i><i class="c-act">実施中</i><i class="c-soon">3日以内</i><i class="c-over">超過</i></span></div>
+          <span class="side-legend"><i class="c-wait">予定</i><i class="c-act">実施中</i><i class="c-soon" title="期限まで 3 営業日以内（土日を除く）">3営業日</i><i class="c-over">超過</i></span></div>
         <div id="side-list"></div>
       </div>
     </aside>
@@ -133,6 +133,7 @@
 
   <script src="/static/clipboard.js"></script>
   <script src="/static/searchselect.js"></script>
+  <script src="/static/workdays.js"></script>
   <script src="/static/app.js"></script>
   <script src="/static/ctrlenter.js"></script>
   <script src="/static/errlog.js"></script>

@@ -1001,7 +1001,8 @@ async function loadCaseTasks(c) {
     const finished = !!t.completed_at;
     const tr = el("tr", finished ? "done" : "");
     const left = Math.round((parseDate(t.end_date) - todayMs()) / DAY_MS);
-    const due = finished ? "" : left < 0 ? "overdue" : left <= 3 ? "soon" : ""; // 完了したタスクは期限の色を付けない
+    const wd = workDaysLeft(parseDate(t.end_date)); // 営業日（土日を除く）
+    const due = finished ? "" : left < 0 ? "overdue" : wd <= 3 ? "soon" : ""; // 完了したタスクは期限の色を付けない
     const td = (text, cls = "") => { const x = el("td", cls, text); tr.append(x); return x; };
     const name = td(finished ? `✓ ${t.task}` : t.task, due ? `t-name ${due}` : "t-name");
     if (t.detail) name.title = t.detail;

@@ -17,7 +17,7 @@ from db import get_db
 
 router = APIRouter(prefix="/api/people", tags=["個人の担当"])
 
-SOON_DAYS = 3  # ガントチャートと同じ: 終了日の 3 日前からオレンジ
+SOON_DAYS = 3  # ガントチャートと同じ: 終了日の 3 営業日前（土日を除く）からオレンジ
 
 
 def init_db() -> None:
@@ -81,15 +81,24 @@ def _role(name: str, pl: str, members: str) -> str | None:
     return None
 
 
+def add_workdays(d: date, n: int) -> date:
+    """d の n 営業日後（土日は数えない。祝日は考慮しない）"""
+    while n > 0:
+        d += timedelta(days=1)
+        if d.weekday() < 5:
+            n -= 1
+    return d
+
+
 def task_state(start: str, end: str, today: date | None = None, completed: str = "") -> str:
-    """done = 完了 / overdue = 期限超過 / soon = 期限 3 日以内 / active = 実施中 / waiting = 開始前"""
+    """done = 完了 / overdue = 期限超過 / soon = 期限 3 営業日以内 / active = 実施中 / waiting = 開始前"""
     if completed:
         return "done"
     today = today or date.today()
     s, e = date.fromisoformat(start), date.fromisoformat(end)
     if e < today:
         return "overdue"
-    if e <= today + timedelta(days=SOON_DAYS):
+    if e <= add_workdays(today, SOON_DAYS):
         return "soon"
     if s <= today:
         return "active"

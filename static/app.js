@@ -77,7 +77,7 @@ function startColResize(e, key) {
   handle.addEventListener("pointerup", up);
   handle.addEventListener("pointercancel", up);
 }
-const SOON_DAYS = 3; // 期限の 3 日前からオレンジ
+const SOON_DAYS = 3; // 期限の 3 営業日前（土日を除く）からオレンジ
 
 // ------------------------------------------------------------ 日付ユーティリティ（UTC で計算）
 const parseDate = (s) => {
@@ -298,7 +298,7 @@ function renderSide() {
     const left = Math.round((parseDate(t.end_date) - today) / DAY_MS);
     const kinds = [];
     if (left < 0) kinds.push("over");
-    else if (left <= SOON_DAYS) kinds.push("soon");
+    else if (workDaysLeft(parseDate(t.end_date), today) <= SOON_DAYS) kinds.push("soon");
     if (isActive(t)) kinds.push("act");
     if (!kinds.length && parseDate(t.start_date) > today) kinds.push("wait"); // 予定あり・実施前（開始日がまだ先）
     if (!kinds.length) continue;
@@ -323,7 +323,7 @@ function renderSide() {
     const key = name === NO_PERSON ? NO_ASSIGNEE : name;
     const on = state.filter.assignees === key;
     head.classList.toggle("on", on);
-    head.title = `${name}: 予定（実施前） ${e.wait}・実施中 ${e.act}・3日以内 ${e.soon}・超過 ${e.over}（クリックでガントチャートを${on ? "全員表示に戻す" : "この人に絞る"}）`;
+    head.title = `${name}: 予定（実施前） ${e.wait}・実施中 ${e.act}・3営業日以内 ${e.soon}・超過 ${e.over}（クリックでガントチャートを${on ? "全員表示に戻す" : "この人に絞る"}）`;
     head.addEventListener("click", () => setAssigneeFilter(on ? "" : key));
     box.append(head);
     list.append(box);
@@ -579,12 +579,12 @@ function shortDate(str) {
     : `${d.getUTCFullYear()}/${md}`;
 }
 
-// 期限状態: overdue = 終了日を過ぎた / soon = 終了日まで 3 日以内
+// 期限状態: overdue = 終了日を過ぎた / soon = 終了日まで 3 営業日以内（土日は数えない）
 function deadlineStatus(task) {
   if (task.completed_at) return ""; // 完了したタスクは期限の色をつけない
   const left = Math.round((parseDate(task.end_date) - todayMs()) / DAY_MS);
   if (left < 0) return "overdue";
-  if (left <= SOON_DAYS) return "soon";
+  if (workDaysLeft(parseDate(task.end_date)) <= SOON_DAYS) return "soon";
   return "";
 }
 
@@ -607,7 +607,7 @@ function syncReadonlyCells(row, task, areaCell, projCell, assigneeCell) {
   projCell.title = `PJ名: ${pjText(task.project) || "なし"}（修正はクリックしてタスク詳細で）`;
 }
 
-// 実施中 = 今日が開始日〜終了日の間（期限超過・3 日以内の色を優先）
+// 実施中 = 今日が開始日〜終了日の間（期限超過・3 営業日以内の色を優先）
 const isActive = (task) => !task.completed_at && parseDate(task.start_date) <= todayMs() && todayMs() <= parseDate(task.end_date);
 
 function syncPrioCell(cell, task) {
@@ -645,7 +645,7 @@ function updateBarText(bar, task) {
   label.append(dot, document.createTextNode(task.task));
   $(".bar-tip", bar).textContent = [pjText(task.project), assigneeText(task)].filter(Boolean).join(" / ");
   const status = deadlineStatus(task);
-  const note = status === "overdue" ? "【期限超過】\n" : status === "soon" ? "【期限まで3日以内】\n" : "";
+  const note = status === "overdue" ? "【期限超過】\n" : status === "soon" ? "【期限まで3営業日以内】\n" : "";
   bar.title = `${note}${task.task}\n領域: ${task.area} / PJ: ${pjText(task.project) || "-"}\n担当: ${assigneeText(task) || "-"} / 優先度: ${task.priority}\n${task.start_date} 〜 ${task.end_date}${task.detail ? "\n\n" + snippet(task.detail) : ""}`;
 }
 
@@ -905,10 +905,11 @@ function openTaskDialog(task = null) {
     }
     const st = deadlineStatus(task);
     const days = Math.round((parseDate(task.end_date) - todayMs()) / DAY_MS);
+    const wd = workDaysLeft(parseDate(task.end_date)); // 営業日（土日を除く）
     meta.innerHTML = "";
     meta.append(`ID: ${task.id}　`);
     const s = el("span", st ? `st-${st}` : "",
-      days < 0 ? `期限超過（${-days} 日経過）` : days === 0 ? "本日が期限" : `期限まであと ${days} 日`);
+      days < 0 ? `期限超過（${Math.max(1, -wd)} 営業日経過）` : days === 0 ? "本日が期限" : `期限まであと ${wd} 営業日`);
     meta.append(s);
     meta.hidden = false;
   } else {
@@ -1042,7 +1043,8 @@ $("#task-copy").addEventListener("click", async () => {
   const t = editing;
   if (!t) return;
   const left = Math.round((parseDate(t.end_date) - todayMs()) / DAY_MS);
-  const rest = left < 0 ? `${-left} 日超過` : left === 0 ? "今日まで" : `あと ${left} 日`;
+  const wd = workDaysLeft(parseDate(t.end_date));
+  const rest = left < 0 ? `${Math.max(1, -wd)} 営業日超過` : left === 0 ? "今日まで" : `あと ${wd} 営業日`;
   const url = taskUrl(t);
   const text = [
     `【タスク】${t.task}`,
