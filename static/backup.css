@@ -29,3 +29,4 @@ a.export-item:hover { background: #eef3ff; }
 .export-item .row .button { font-size: 12px; padding: 4px 10px; }
 .primary-link { background: var(--accent); border-color: var(--accent) !important; color: #fff !important; }
 .csv-card { overflow: visible; }
+#dlg-import .import-safety { margin: 8px 0; padding: 6px 10px; border-radius: 6px; background: #eef6ee; color: #25603a; font-size: 12.5px; }

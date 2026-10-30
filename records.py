@@ -10,10 +10,11 @@
 import asyncio
 import json
 
-from fastapi import APIRouter, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field
 
 import auth
+from backup import import_guard
 from csvutil import csv_response, read_csv, split_list
 from db import get_db
 
@@ -127,7 +128,7 @@ def export_csv() -> Response:
 
 
 @router.post("/import")
-async def import_csv(file: UploadFile = File(...)) -> dict:
+async def import_csv(file: UploadFile = File(...), _guard: None = Depends(import_guard)) -> dict:
     """記録 CSV を取り込む。タイトルと作成日時が同じ記録は更新（空欄のセルは今の値のまま）、無ければ追加。
     「状態」が「アーカイブ」ならアーカイブとして保存。1 行でもエラーがあれば何も取り込まない。"""
     rows = read_csv(await file.read(), ["タイトル"])

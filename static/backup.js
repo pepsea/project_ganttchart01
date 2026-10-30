@@ -40,7 +40,7 @@ async function api(path, options = {}) {
 // ガントチャートと同じ領域の色
 
 // ------------------------------------------------------------ バックアップ・復元
-const KIND_LABEL = { auto: "自動（毎日 0 時）", manual: "手動", "pre-restore": "復元前", startup: "起動時", upload: "アップロード" };
+const KIND_LABEL = { auto: "自動（毎日 0 時）", manual: "手動", "pre-restore": "復元前", "pre-import": "CSV取り込み前", startup: "起動時", upload: "アップロード" };
 const fmtSize = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
 const fmtTime = (s) => s.replace("T", " ").slice(0, 16);
 let restoreTarget = null; // { file } または { name }
@@ -385,17 +385,49 @@ importFile.addEventListener("change", () => {
   f.querySelector('input[value="append"]').checked = true;
   f.confirm.value = "";
   $("#replace-confirm").hidden = true;
+  // 取り込みの確認: 本日の日付（8 桁）を入力しないと押せない
+  $("#import-date").textContent = todayDigits();
+  f.confirm_date.value = "";
+  f.querySelector("button[type=submit]").disabled = true;
   $("#dlg-import").showModal();
+  f.confirm_date.focus();
+});
+const todayDigits = () => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`; };
+const digitsOf = (v) => v.normalize("NFKC").replace(/\D/g, ""); // 全角数字・区切り文字も許容
+$("#form-import").confirm_date.addEventListener("input", (e) => {
+  $("#form-import button[type=submit]").disabled = digitsOf(e.target.value) !== todayDigits();
 });
 $("#form-import").addEventListener("change", (e) => {
   if (e.target.name === "mode") $("#replace-confirm").hidden = e.target.value !== "replace";
 });
 $("#dlg-import [data-close]").addEventListener("click", () => $("#dlg-import").close());
+// 取り込み前のデータを CSV でダウンロードする（ファイル名: データ名_取り込み前_日時.csv）
+async function downloadPreImportCsv(ds) {
+  const res = await fetch(ds.exports[0].url);
+  if (res.status === 401) { location.href = "/login?next=/backup"; throw new Error("ログインが必要です"); }
+  if (!res.ok) throw new Error(`エクスポートに失敗しました（${res.status}）`);
+  const blob = await res.blob();
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${ds.name}_取り込み前_${stamp}.csv`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+
 $("#form-import").addEventListener("submit", async (e) => {
   e.preventDefault();
   const ds = importDs;
   const f = e.target;
-  let url = ds.importUrl;
+  if (digitsOf(f.confirm_date.value) !== todayDigits()) {
+    $("#import-error").textContent = `確認のため、本日の日付（${todayDigits()}）を入力してください`;
+    return;
+  }
+  const params = new URLSearchParams({ confirm_date: digitsOf(f.confirm_date.value) });
   if (ds.mode) {
     const mode = new FormData(f).get("mode");
     const confirmText = f.confirm.value.trim();
@@ -403,10 +435,20 @@ $("#form-import").addEventListener("submit", async (e) => {
       $("#import-error").textContent = "置き換えを実行するには確認欄に「置き換え」と入力してください";
       return;
     }
-    url += `?mode=${mode}&confirm=${encodeURIComponent(confirmText)}`;
+    params.set("mode", mode);
+    params.set("confirm", confirmText);
   }
+  const url = `${ds.importUrl}?${params}`;
   const btn = f.querySelector("button[type=submit]");
   btn.disabled = true;
+  // 取り込む前に、いまのデータを CSV でダウンロード（エクスポートの先頭の項目 = 取り込み直せる全データ）。保存できなければ取り込まない
+  try {
+    await downloadPreImportCsv(ds);
+  } catch (err) {
+    $("#import-error").textContent = `取り込み前のデータの CSV を保存できなかったため、取り込みを中止しました: ${err.message}`;
+    btn.disabled = false;
+    return;
+  }
   const fd = new FormData();
   fd.append("file", importFile.files[0]);
   try {
@@ -416,7 +458,7 @@ $("#form-import").addEventListener("submit", async (e) => {
     if (!res.ok) throw new Error(typeof d.detail === "string" ? d.detail : "取り込みに失敗しました");
     $("#dlg-import").close();
     await loadBackups(); // 件数の表示を更新
-    toast(`${ds.name} インポート完了: ${ds.summary(d)}`);
+    toast(`${ds.name} インポート完了: ${ds.summary(d)}（取り込み前の状態はサーバーに自動保存済み）`);
   } catch (err) {
     $("#import-error").textContent = err.message;
   } finally {

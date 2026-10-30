@@ -15,10 +15,11 @@ import sqlite3
 from datetime import date, datetime, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field, field_validator
 
 import auth
+from backup import import_guard
 from csvutil import decode_csv, parse_date
 from db import ensure_master, get_db, sample_data_enabled
 
@@ -632,7 +633,7 @@ BACKUP_KINDS = ("基盤", "リンク", "目標", "ディスカッション", "�
 
 
 @router.post("/import")
-async def import_csv(file: UploadFile = File(...)) -> dict:
+async def import_csv(file: UploadFile = File(...), _guard: None = Depends(import_guard)) -> dict:
     """基盤技術の CSV を取り込む（1 行でもエラーがあれば何も取り込まない）。
 
     - 全データ（バックアップ）: 「種別」列（基盤 / 目標 / ディスカッション / 月報）の行をそれぞれ取り込む。

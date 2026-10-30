@@ -8,11 +8,12 @@ import sqlite3
 from datetime import date, datetime, timedelta
 from typing import Literal
 
-from fastapi import APIRouter, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 from csvutil import csv_response, decode_csv, parse_date, read_csv
 
+from backup import import_guard
 from db import DB_PATH, ensure_master, get_db, sample_data_enabled
 
 router = APIRouter(prefix="/api/cases", tags=["案件管理"])
@@ -729,7 +730,7 @@ def _import_log_list(raw: bytes, kind: str) -> dict:
 
 
 @router.post("/import")
-async def import_csv(file: UploadFile = File(...)) -> dict:
+async def import_csv(file: UploadFile = File(...), _guard: None = Depends(import_guard)) -> dict:
     """案件 CSV を取り込む（案件番号と試験名が一致すれば更新、なければ追加）。
 
     - 既存案件の更新時、CSV に無い列・空欄のセルは既存の値を保持する（誤って消さないため）

@@ -124,10 +124,14 @@
           <input name="confirm" autocomplete="off">
         </label>
       </div>
+      <p class="import-safety">取り込みの<strong>直前の状態は、サーバーに自動でバックアップ</strong>されます（一覧の「復元」で取り込み前に戻せます）。あわせて、<strong>取り込み前のデータの CSV（エクスポート）も同時にダウンロード</strong>されます。</p>
+      <label><span>確認のため、本日の日付 <strong id="import-date"></strong>（8 桁）を入力してください</span>
+        <input name="confirm_date" autocomplete="off" inputmode="numeric" placeholder="例: 20261030">
+      </label>
       <p class="error" id="import-error"></p>
       <div class="actions">
         <button type="button" data-close>キャンセル</button>
-        <button type="submit" class="primary">CSV インポート</button>
+        <button type="submit" class="primary" disabled>CSV インポート</button>
       </div>
     </form>
   </dialog>

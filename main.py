@@ -11,7 +11,7 @@ from typing import Literal
 from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -594,6 +594,7 @@ async def import_csv(
     file: UploadFile = File(...),
     mode: Literal["append", "replace"] = "append",
     confirm: str = "",
+    _guard: None = Depends(backup.import_guard),
 ) -> dict:
     """CSV を取り込む。
 
