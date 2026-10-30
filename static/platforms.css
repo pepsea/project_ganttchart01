@@ -529,6 +529,7 @@ table.tasks td.t-name.active { background: #dbe8ff; color: #1f4fbf; font-weight:
 .pg-legend .overdue i { background: #ffd4d4; border: 1px solid #e5484d; }
 .pg-legend .soon i { background: #ffe2b3; border: 1px solid #f5a524; }
 .pg-legend .active i { background: #dbe8ff; border: 1px solid #3b6fe0; }
+.pg-legend .finished i { background: #e5e7eb; border: 1px solid #9ca3af; }
 .pg-scroll { overflow-x: auto; border: 1px solid var(--line-strong); border-radius: 8px; }
 .pg { --left-w: 520px; width: calc(var(--left-w) + var(--track-w)); position: relative; font-size: 12.5px; }
 .pg-row { display: flex; height: 30px; border-bottom: 1px solid #d3d8e0; }
@@ -566,6 +567,10 @@ table.tasks td.t-name.active { background: #dbe8ff; color: #1f4fbf; font-weight:
 .pg-bar .lbl { overflow: hidden; text-overflow: ellipsis; }
 .pg-body .pg-left .t-name, .pg-bar { cursor: pointer; }
 .pg-body .pg-left .t-name:hover { text-decoration: underline; }
+/* 完了したタスク: ガントチャートと同じ（グレーアウト・取り消し線） */
+.pg-row.done { opacity: .5; filter: grayscale(1); }
+.pg-row.done .pg-left .t-name, .pg-row.done .pg-bar .lbl { text-decoration: line-through; }
+.pg-row.done:hover { opacity: .75; }
 
 /* 基盤一覧の並び替え（見出しをクリック） */
 table.pf-table th.sortable { cursor: pointer; user-select: none; }
