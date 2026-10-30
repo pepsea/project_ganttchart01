@@ -441,7 +441,9 @@ function renderDetail() {
     root.append(el("p", "hint pf-empty", "左の一覧から基盤を選択してください。"));
     return;
   }
-  const tasks = state.tasks.filter((t) => t.project === p.name).sort((a, b) => a.end_date.localeCompare(b.end_date));
+  // 完了したタスクは一番下（ガントチャートと同じ）
+  const tasks = state.tasks.filter((t) => t.project === p.name)
+    .sort((a, b) => !!a.completed_at - !!b.completed_at || a.end_date.localeCompare(b.end_date));
 
   // 編集モードのバー
   const modeBar = el("div", `mode-bar ${state.editing ? "on" : ""}`);
@@ -1279,9 +1281,10 @@ function renderMonthly(p) {
 function renderTasks(p, tasks) {
   const sec = el("section", "pf-section pf-tasks");
   const h = el("h3", "", "ガントチャート");
-  h.append(el("span", "hint", `${tasks.length} 件（表示のみ。追加・編集はガントチャートで）`));
+  const doneN = tasks.filter((t) => t.completed_at).length;
+  h.append(el("span", "hint", `${tasks.length} 件${doneN ? `（うち完了 ${doneN} 件）` : ""}（表示のみ。追加・編集はガントチャートで）`));
   const legend = el("span", "pg-legend");
-  for (const [cls, label] of [["overdue", "期限超過"], ["soon", "期限3営業日以内"], ["active", "実施中"]]) {
+  for (const [cls, label] of [["overdue", "期限超過"], ["soon", "期限3営業日以内"], ["active", "実施中"], ["finished", "完了"]]) {
     const x = el("span", cls);
     x.append(el("i"), label);
     legend.append(x);
@@ -1351,16 +1354,20 @@ function renderTasks(p, tasks) {
   const body = el("div", "pg-body");
   body.append(bg);
   for (const t of tasks) {
+    const finished = !!t.completed_at;
     const left = daysLeft(t.end_date);
     const wd = workDaysLeft(parseDate(t.end_date)); // 営業日（土日を除く）
-    const due = left < 0 ? "overdue" : wd <= 3 ? "soon" : "";
-    const active = !due && daysLeft(t.start_date) <= 0 ? "active" : ""; // 実施中 = 今日が開始日〜終了日の間
-    const row = el("div", "pg-row");
+    // 完了したタスクは期限・実施中の色を付けない（ガントチャートと同じ）
+    const due = finished ? "" : left < 0 ? "overdue" : wd <= 3 ? "soon" : "";
+    const active = !finished && !due && daysLeft(t.start_date) <= 0 ? "active" : ""; // 実施中 = 今日が開始日〜終了日の間
+    const row = el("div", finished ? "pg-row done" : "pg-row");
     const lc = el("div", "pg-left");
-    const name = el("span", `t-name ${due || active}`.trim(), t.task);
-    name.title = `${t.task}${t.detail ? "\n\n" + t.detail : ""}`;
-    const rest = left < 0 ? `${Math.max(1, -wd)} 営業日超過` : left === 0 ? "今日まで" : `あと ${wd} 営業日`;
-    const rc = el("span", `days-left${left < 0 ? " over" : left <= 7 ? " near" : ""}`, rest);
+    const name = el("span", `t-name ${due || active}`.trim(), finished ? `✓ ${t.task}` : t.task);
+    const doneDay = finished ? t.completed_at.slice(0, 10).replaceAll("-", "/") : "";
+    name.title = `${finished ? `完了（${doneDay}）\n` : ""}${t.task}${t.detail ? "\n\n" + t.detail : ""}`;
+    const rest = finished ? `完了 ${Number(t.completed_at.slice(5, 7))}/${Number(t.completed_at.slice(8, 10))}`
+      : left < 0 ? `${Math.max(1, -wd)} 営業日超過` : left === 0 ? "今日まで" : `あと ${wd} 営業日`;
+    const rc = el("span", `days-left${finished ? "" : left < 0 ? " over" : left <= 7 ? " near" : ""}`, rest);
     lc.append(name, el("span", "who", (t.assignee || "").split(" ").filter(Boolean).join("・") || "—"), el("span", "dt", slashDate(t.start_date)),
       el("span", "dt", slashDate(t.end_date)), rc);
     const track = el("div", "pg-track");
