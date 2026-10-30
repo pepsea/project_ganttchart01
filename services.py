@@ -46,10 +46,16 @@ def init_db() -> None:
                    platforms    TEXT NOT NULL DEFAULT '[]',-- 関連する基盤番号（JSON 配列）
                    goal         TEXT NOT NULL DEFAULT '',  -- サービスのゴール
                    issues       TEXT NOT NULL DEFAULT '',  -- 課題
+                   sort_order   INTEGER NOT NULL DEFAULT 0,-- 表示順（ドラッグで入れ替え。小さいほど上）
                    created_at   TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
                    updated_at   TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
                )"""
         )
+        # 既存のデータベースには表示順の列を追加し、それまでの並び（サービス番号順）で振る
+        if "sort_order" not in {c["name"] for c in db.execute("PRAGMA table_info(services)")}:
+            db.execute("ALTER TABLE services ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0")
+            for n, row in enumerate(db.execute("SELECT id FROM services ORDER BY service_no, id").fetchall(), start=1):
+                db.execute("UPDATE services SET sort_order = ? WHERE id = ?", (n, row["id"]))
         # 画面の設定値（キーと値）。サービス画面の親リンクなど
         db.execute("""CREATE TABLE IF NOT EXISTS app_settings (
                           key   TEXT PRIMARY KEY,
@@ -206,10 +212,43 @@ def write(db: sqlite3.Connection, sql: str, params: tuple, no: str):
 
 # ---------------------------------------------------------------- API
 
+def _next_order(db: sqlite3.Connection) -> int:
+    """新しいサービスは一覧の一番下に置く"""
+    return db.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM services").fetchone()[0]
+
+
+class ReorderIn(BaseModel):
+    ids: list[int]
+
+
+@router.post("/reorder")
+def reorder_services(r: ReorderIn) -> list[dict]:
+    """サービス一覧の順番をまとめて保存（ドラッグ＆ドロップ）。ids は全サービスを新しい順番で"""
+    with get_db() as db:
+        current = {row["id"] for row in db.execute("SELECT id FROM services")}
+        if set(r.ids) != current or len(r.ids) != len(current):
+            raise HTTPException(409, "サービスの一覧が変わっています。画面を読み込み直してから並べ替えてください")
+        for n, sid in enumerate(r.ids, start=1):
+            db.execute("UPDATE services SET sort_order = ? WHERE id = ?", (n, sid))
+    return list_services()
+
+
+@router.post("/packages/reorder")
+def reorder_packages(r: ReorderIn) -> list[dict]:
+    """主要サービスパッケージの順番をまとめて保存（ドラッグ＆ドロップ）"""
+    with get_db() as db:
+        current = {row["id"] for row in db.execute("SELECT id FROM service_packages")}
+        if set(r.ids) != current or len(r.ids) != len(current):
+            raise HTTPException(409, "パッケージの一覧が変わっています。画面を読み込み直してから並べ替えてください")
+        for n, pid in enumerate(r.ids, start=1):
+            db.execute("UPDATE service_packages SET sort_order = ? WHERE id = ?", (n, pid))
+    return list_packages()
+
+
 @router.get("")
 def list_services() -> list[dict]:
     with get_db() as db:
-        return attach_links(db, "service", [to_service(r) for r in db.execute("SELECT * FROM services ORDER BY service_no, id")])
+        return attach_links(db, "service", [to_service(r) for r in db.execute("SELECT * FROM services ORDER BY sort_order, service_no, id")])
 
 
 # ---------------------------------------------------------------- 親リンク（サービス画面の一番上）
@@ -428,7 +467,8 @@ async def import_csv(file: UploadFile = File(...), _guard: None = Depends(import
                                " WHERE id=?", (*new, row["id"]))
                 updated += 1
             else:
-                db.execute(f"INSERT INTO services({', '.join(COLS)}) VALUES ({', '.join('?' * len(COLS))})", svc.values())
+                db.execute(f"INSERT INTO services({', '.join(COLS)}, sort_order) VALUES ({', '.join('?' * len(COLS))}, ?)",
+                           (*svc.values(), _next_order(db)))
                 added += 1
     return {"added": added, "updated": updated}
 
@@ -439,8 +479,8 @@ def create_service(s: ServiceIn) -> dict:
         check_platforms(db, s)
         for a in s.areas:
             ensure_master(db, "areas", a)
-        cur = write(db, f"INSERT INTO services({', '.join(COLS)}) VALUES ({', '.join('?' * len(COLS))})",
-                    s.values(), s.service_no)
+        cur = write(db, f"INSERT INTO services({', '.join(COLS)}, sort_order) VALUES ({', '.join('?' * len(COLS))}, ?)",
+                    (*s.values(), _next_order(db)), s.service_no)
         save_links(db, "service", cur.lastrowid, s.extra_links)
         return fetch(db, cur.lastrowid)
 

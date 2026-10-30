@@ -83,6 +83,14 @@ function linkBtn(label, url) {
   return a;
 }
 
+// ------------------------------------------------------------ 順番の入れ替え（ドラッグ＆ドロップ）
+async function reorder(url, ids, key) {
+  try {
+    state[key] = await api(url, { method: "POST", body: JSON.stringify({ ids }) });
+    if (key === "services") render(); else renderPackages();
+  } catch (err) { toast(err.message, true); }
+}
+
 // ------------------------------------------------------------ 絞り込み
 function filtered() {
   const q = state.q.trim().toLowerCase();
@@ -190,7 +198,16 @@ function renderRow(s) {
   const l1 = el("div", "svc-l1");
   l1.title = open ? "クリックで閉じる" : "クリックで詳細を表示";
   l1.addEventListener("click", toggle);
-  l1.append(el("span", "caret", open ? "▼" : "▶"), el("span", "svc-no", s.service_no), el("span", "svc-name", s.name));
+  // 順番はドラッグ＆ドロップで入れ替え（検索・絞り込み中は不可）
+  const filtering = !!(state.q.trim() || state.area || state.person);
+  const handle = dragHandle(!filtering);
+  l1.append(handle, el("span", "caret", open ? "▼" : "▶"), el("span", "svc-no", s.service_no), el("span", "svc-name", s.name));
+  if (!filtering) {
+    enableDragSort(sec, handle, {
+      group: "service", id: s.id, ids: () => state.services.map((x) => x.id),
+      onDrop: (ids) => reorder("/api/services/reorder", ids, "services"),
+    });
+  }
   const areas = el("span", "tags");
   for (const a of s.areas) {
     const t = el("span", "area-tag", a);
@@ -417,7 +434,7 @@ $("#form-parent").addEventListener("submit", async (e) => {
   }
 });
 
-// ------------------------------------------------------------ 主要サービスパッケージ（左 1/3）
+// ------------------------------------------------------------ 主要サービスパッケージ（右 1/3）
 function renderPackages() {
   const box = $("#pkg-list");
   box.innerHTML = "";
@@ -428,7 +445,12 @@ function renderPackages() {
   for (const pkg of state.packages) {
     const card = el("div", "pkg-card");
     const top = el("div", "pkg-top");
-    top.append(el("div", "pkg-name", pkg.name));
+    const handle = dragHandle(true);
+    top.append(handle, el("div", "pkg-name", pkg.name));
+    enableDragSort(card, handle, {
+      group: "package", id: pkg.id, ids: () => state.packages.map((x) => x.id),
+      onDrop: (ids) => reorder("/api/services/packages/reorder", ids, "packages"),
+    });
     const edit = el("button", "edit-btn", "✎");
     edit.title = "パッケージを編集";
     edit.addEventListener("click", () => openPackageDialog(pkg));
