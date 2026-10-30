@@ -9,12 +9,13 @@ import re
 import sqlite3
 from datetime import datetime
 
-from fastapi import APIRouter, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from typing import Literal
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 import auth
+from backup import import_guard
 from csvutil import csv_response, read_csv, split_list
 from db import ensure_master, get_db
 
@@ -199,7 +200,7 @@ def export_csv() -> Response:
 
 
 @router.post("/import")
-async def import_csv(file: UploadFile = File(...)) -> dict:
+async def import_csv(file: UploadFile = File(...), _guard: None = Depends(import_guard)) -> dict:
     """資料 CSV を取り込む。欄と資料名が同じ資料は更新（空欄のセルは今の値のまま）、無ければ追加。
     1 行でもエラーがあれば何も取り込まない。"""
     rows = read_csv(await file.read(), ["資料名"])

@@ -12,10 +12,11 @@ import re
 import sqlite3
 from datetime import datetime
 
-from fastapi import APIRouter, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 import auth
+from backup import import_guard
 import groups
 from csvutil import decode_csv
 from db import ensure_master, get_db
@@ -413,7 +414,7 @@ def export_csv(area: str = "", person: str = "") -> Response:
 
 
 @router.post("/import")
-async def import_csv(file: UploadFile = File(...)) -> dict:
+async def import_csv(file: UploadFile = File(...), _guard: None = Depends(import_guard)) -> dict:
     """サービスの CSV を取り込む（サービス番号が一致すれば更新、なければ追加）。
 
     - 更新時、CSV に無い列・空欄のセルは元の値のまま（誤って消さないため）

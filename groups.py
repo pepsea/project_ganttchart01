@@ -13,10 +13,11 @@ import sqlite3
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 import auth
+from backup import import_guard
 from csvutil import csv_response, parse_date, read_csv, split_list
 from db import get_db
 
@@ -676,7 +677,7 @@ def export_csv() -> Response:
 
 
 @router.post("/import")
-async def import_csv(file: UploadFile = File(...)) -> dict:
+async def import_csv(file: UploadFile = File(...), _guard: None = Depends(import_guard)) -> dict:
     """グループ目標 CSV を取り込む（1 行でもエラーがあれば何も取り込まない）。
     - グループ: グループ名が同じなら更新（空欄のセルは今の値のまま）、無ければ追加
     - 目標: 同じグループ・年度・目標なら更新、無ければ追加 / 達成したいこと: 同じグループ・年度・内容なら更新、無ければ追加

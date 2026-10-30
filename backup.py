@@ -2,6 +2,7 @@
 
 - バックアップは JSON（全テーブルの全行）。テーブル・列はデータベースから自動で読み取るので、今後項目が増えても対象になる
 - 復元は全データの置き換え。パスワードが必要で、直前の状態を自動でサーバーに保存してから実行する
+- CSV インポートは、本日の日付（YYYYMMDD）の入力が必要で、直前の状態を自動でサーバーに保存してから実行する（import_guard。各インポート API が共通で使う）
 - サーバーには毎日 1 回、夜 12 時（0 時台）に自動でバックアップを保存する（その時間にアプリが止まっていた日は保存しない）
 - サーバー上のバックアップは、作成から KEEP_DAYS 日（約 1 か月）を過ぎたら自動で削除する（最新の 1 つは残す）
 - バックアップは管理サイトからいつでも作れる（「今すぐバックアップを作る」）。一覧の「復元」でいつでも戻せる
@@ -14,6 +15,7 @@ import asyncio
 import json
 import re
 import sqlite3
+import unicodedata
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
@@ -31,7 +33,8 @@ VERSION = 1
 AUTO_KEEP = 40  # 自動バックアップ（毎日 0 時）を残す数の上限（KEEP_DAYS を過ぎたものは別に自動削除）
 KEEP_DAYS = 31  # サーバー上のバックアップを残す日数（約 1 か月）。これより古いものは自動で削除
 STARTUP_KEEP = 10
-NAME_RE = re.compile(r"^(auto|manual|pre-restore|startup|upload)-\d{8}-\d{6}\.json$")
+PRE_IMPORT_KEEP = 20  # CSV 取り込み直前のバックアップを残す数の上限（KEEP_DAYS を過ぎたものは別に自動削除）
+NAME_RE = re.compile(r"^(auto|manual|pre-restore|pre-import|startup|upload)-\d{8}-\d{6}\.json$")
 MIGRATIONS: list = []  # main.py が登録する（テーブルの作成・列の追加）
 # 形を変えたテーブル: {新テーブル: (旧テーブル, 旧→新へ写す SQL)}。main.py が登録する。
 # 新テーブルを含まない古いバックアップを復元したときは、復元した旧テーブルから作り直す
@@ -149,19 +152,23 @@ def restore(data: dict) -> list[dict]:
     return summary(data)
 
 
+def _kind_and_stamp(name: str) -> tuple[str, str]:
+    """ファイル名（種類-YYYYmmdd-HHMMSS.json）から、種類と日時の部分"""
+    m = re.match(r"^(.+)-(\d{8}-\d{6})\.json$", name)
+    return (m.group(1), m.group(2)) if m else (name, "")
+
+
 def list_server_backups() -> list[dict]:
     if not BACKUP_DIR.exists():
         return []
     items = []
-    for f in sorted(BACKUP_DIR.glob("*.json"), reverse=True):
+    for f in BACKUP_DIR.glob("*.json"):
         if NAME_RE.match(f.name):
             st = f.stat()
-            items.append({"name": f.name, "kind": f.name.split("-")[0] if not f.name.startswith("pre-restore")
-                          else "pre-restore", "size": st.st_size,
+            items.append({"name": f.name, "kind": _kind_and_stamp(f.name)[0], "size": st.st_size,
                           "expires_at": ((_created(f.name) or datetime.fromtimestamp(st.st_mtime)) + timedelta(days=KEEP_DAYS)).isoformat(timespec="seconds"),
                           "created_at": datetime.fromtimestamp(st.st_mtime).isoformat(timespec="seconds")})
-    return sorted(items, key=lambda x: x["name"].split("-", 1)[-1] if not x["name"].startswith("pre-restore")
-                  else x["name"][len("pre-restore-"):], reverse=True)
+    return sorted(items, key=lambda x: _kind_and_stamp(x["name"])[1], reverse=True)  # 新しい順
 
 
 def _server_file(name: str):
@@ -229,6 +236,23 @@ async def auto_backup_loop() -> None:
         except Exception as e:  # noqa: BLE001  バックアップの失敗でアプリを止めない
             print(f"[backup] 自動バックアップに失敗しました: {e}")
         await asyncio.sleep(60)
+
+
+# ---------------------------------------------------------------- CSV インポートの確認と、直前のバックアップ
+
+def import_guard(response: Response, confirm_date: str = "") -> None:
+    """CSV インポートの共通の入口（各インポート API の Depends）。
+
+    - 確認のため、本日の日付（YYYYMMDD。全角・区切り文字も可）が必要。無ければ取り込まない
+    - 取り込む直前の全データをサーバーに自動で保存する（kind = pre-import。X-Pre-Import-Backup ヘッダーに名前）。
+      取り込みで困ったら、バックアップ一覧の「復元」で取り込み前に戻せる
+    """
+    digits = "".join(ch for ch in unicodedata.normalize("NFKC", confirm_date or "") if ch.isdigit())
+    if digits != f"{datetime.now():%Y%m%d}":
+        raise HTTPException(400, f"CSV を取り込むには、確認のため本日の日付（8 桁、例 {datetime.now():%Y%m%d}）の入力が必要です")
+    name = save_to_server("pre-import")
+    _prune("pre-import", PRE_IMPORT_KEEP)
+    response.headers["X-Pre-Import-Backup"] = name
 
 
 # ---------------------------------------------------------------- API
