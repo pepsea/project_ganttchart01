@@ -126,6 +126,7 @@
 | | box_url / intro_ja_url / intro_en_url | BOX / サービス紹介資料（日本語）/ （英語）のリンク |
 | | platforms | 関連する基盤番号（JSON 配列。`platforms.name`） |
 | | goal / issues | サービスのゴール / 課題 |
+| | sort_order | 一覧の表示順（小さいほど上。ドラッグで入れ替え。v1.12.0 で追加。既存データは追加時にサービス番号順で振る。新しいサービスは一番下） |
 | | created_at / updated_at | 作成・更新日時 |
 
 | `service_packages` | id | 主要サービスパッケージ |
