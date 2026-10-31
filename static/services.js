@@ -446,7 +446,12 @@ function renderPackages() {
     const card = el("div", "pkg-card");
     const top = el("div", "pkg-top");
     const handle = dragHandle(true);
-    top.append(handle, el("div", "pkg-name", pkg.name));
+    // 資料・BOX のリンクは、名前の右側（同じ行）に並べる
+    const links = el("div", "mini-links");
+    links.append(miniLink("パッケージ資料（日）", pkg.intro_ja_url, "パッケージ資料（日本語）"),
+      miniLink("パッケージ資料（英）", pkg.intro_en_url, "パッケージ資料（英語）"), miniLink("BOX", pkg.box_url, "BOX"));
+    for (const lk of pkg.extra_links || []) links.append(miniLink(lk.label || "リンク", lk.url, lk.label || "追加リンク"));
+    top.append(handle, el("div", "pkg-name", pkg.name), links);
     enableDragSort(card, handle, {
       group: "package", id: pkg.id, ids: () => state.packages.map((x) => x.id),
       onDrop: (ids) => reorder("/api/services/packages/reorder", ids, "packages"),
@@ -456,11 +461,6 @@ function renderPackages() {
     edit.addEventListener("click", () => openPackageDialog(pkg));
     top.append(edit);
     card.append(top);
-    const links = el("div", "mini-links");
-    links.append(miniLink("パッケージ資料（日）", pkg.intro_ja_url, "パッケージ資料（日本語）"),
-      miniLink("パッケージ資料（英）", pkg.intro_en_url, "パッケージ資料（英語）"), miniLink("BOX", pkg.box_url, "BOX"));
-    for (const lk of pkg.extra_links || []) links.append(miniLink(lk.label || "リンク", lk.url, lk.label || "追加リンク"));
-    card.append(links);
     // 関連サービスは登録したときだけ表示（未登録なら行ごと出さない）
     const svcs = el("div", "pkg-svcs");
     svcs.append(el("span", "lbl", `関連サービス（${pkg.services.length}）`));

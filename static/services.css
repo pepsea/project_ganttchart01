@@ -216,9 +216,9 @@ body { overflow: hidden; }
   background: #fbfcfe;
 }
 .pkg-card .pkg-top { display: flex; align-items: flex-start; gap: 8px; }
-.pkg-card .pkg-name { font-weight: 700; font-size: 14px; line-height: 1.4; flex: 1; min-width: 0; }
-.pkg-card .edit-btn { flex: 0 0 auto; }
-.pkg-card .mini-links { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 0; }
+.pkg-card .pkg-name { font-weight: 700; font-size: 14px; line-height: 1.4; flex: 0 1 auto; min-width: 0; }
+.pkg-card .edit-btn { flex: 0 0 auto; margin-left: auto; }
+.pkg-card .mini-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 1px 0 0 6px; min-width: 0; }
 .pkg-card .pkg-svcs { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 .pkg-card .pkg-svcs .lbl { font-size: 11px; font-weight: 700; color: var(--muted); display: block; margin-bottom: 4px; }
 .pkg-svc {
