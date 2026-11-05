@@ -78,7 +78,8 @@
 | | updated_at | 基本情報の更新日時 |
 | | area | （未使用。旧・単一領域。起動時に areas へ引き継ぎ） |
 | `platform_goals` | id, platform, title, due_date, status, note, url, sort_order, created_at, updated_at | 目標（状態: 未着手・取組中・達成・保留。note は画面では「内容」と表示（CSV の列名は「メモ」のまま）。url は目標のリンク。sort_order は項目の並び順 = ドラッグ＆ドロップで入れ替え。0 = 未設定） |
-| `platform_goal_tasks` | id, platform, goal_id, title, progress, owner, due_date, note, created_at, updated_at | 目標達成に必要な項目（`platform_goals`）の中の実施内容（リスト）。goal_id = `platform_goals.id`、progress = 進捗率（％。0〜100）。項目の削除時に一緒に削除。画面の「メモ」は「内容」と表示（列名は note のまま） |
+| `platform_goal_tasks` | id, platform, goal_id, title, progress, owner, due_date, note, created_at, updated_at | **（未使用: 画面からは v1.15.0 で外した。既存の記録は消さずに残し、バックアップには含まれる。代わりに `platform_goal_gantt`）** 目標達成に必要な項目（`platform_goals`）の中の実施内容（リスト）。goal_id = `platform_goals.id`、progress = 進捗率（％。0〜100）。項目の削除時に一緒に削除。画面の「メモ」は「内容」と表示（列名は note のまま） |
+| `platform_goal_gantt` | id, platform, goal_id, year, start_slot, end_slot, title, due_date, owner, detail, created_at, updated_at | 目標達成に必要な項目（`platform_goals`）の月単位ガント（v1.15.0 で追加。画面: 項目の詳細の「ガント」）。1 年 = 12 か月 × 4 分割 = 48 区画。start_slot / end_slot = 0〜47（区画 = (月 − 1) × 4 + 分割 0〜3。分割 = 1〜7 日・8〜14 日・15〜21 日・22 日〜末）、end_slot ≧ start_slot。year = その区画の年。due_date = 期限（任意）、owner = 担当者（半角スペース区切り）、detail = 詳細（Markdown）。goal_id = `platform_goals.id`。項目・基盤の削除時に一緒に削除 |
 | `platform_goal_notes` | id, platform, goal_id, note_date, body, created_at, updated_at | **（未使用: 画面からは v1.14.0 で外した。既存の記録は消さずに残し、バックアップには含まれる）** 目標達成に必要な項目（`platform_goals`）ごとの定期的な議論の記録（以前の画面: 項目の詳細の「議論の記録」）。goal_id = `platform_goals.id`、note_date = 議論の日付（同じ日に複数可）。項目の削除時に一緒に削除 |
 | `platform_topics` | id, platform, meeting_date, title, body, created_at, updated_at | ディスカッション |
 | `platform_monthly` | id, platform, month, body, updated_at | 基盤の月報（基盤×月で一意） |

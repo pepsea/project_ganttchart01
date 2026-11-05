@@ -16,7 +16,7 @@ from datetime import date, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 import auth
 from backup import import_guard
@@ -85,6 +85,23 @@ def init_db() -> None:
                    owner      TEXT NOT NULL DEFAULT '',    -- 担当者（半角スペース区切り）
                    due_date   TEXT,                   -- 期限（任意）
                    note       TEXT NOT NULL DEFAULT '',
+                   created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                   updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+               )"""
+        )
+        # 目標達成に必要な項目（platform_goals）の月単位ガント（1 年 = 12 か月 × 4 分割 = 48 区画）
+        db.execute(
+            """CREATE TABLE IF NOT EXISTS platform_goal_gantt (
+                   id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                   platform   TEXT NOT NULL,          -- 基盤番号（platforms.name）
+                   goal_id    INTEGER NOT NULL,       -- 項目（platform_goals.id）
+                   year       INTEGER NOT NULL,       -- 年（その年の 48 区画のどこか）
+                   start_slot INTEGER NOT NULL,       -- 開始の区画（0〜47。(月 - 1) × 4 + 分割 0〜3）
+                   end_slot   INTEGER NOT NULL,       -- 終了の区画（開始以上）
+                   title      TEXT NOT NULL,          -- タイトル
+                   due_date   TEXT,                   -- 期限（任意）
+                   owner      TEXT NOT NULL DEFAULT '',    -- 担当者（半角スペース区切り）
+                   detail     TEXT NOT NULL DEFAULT '',    -- 詳細（Markdown）
                    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
                    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
                )"""
@@ -269,6 +286,33 @@ class GoalTaskIn(BaseModel):
     @classmethod
     def strip(cls, v):
         return v.strip() if isinstance(v, str) else v
+
+
+class GoalGanttIn(BaseModel):
+    """項目の月単位ガントの 1 行。1 年 = 12 か月 × 4 分割 = 48 区画（0〜47）。区画 = (月 - 1) × 4 + 分割（0〜3）"""
+    year: int = Field(ge=2000, le=2100)
+    start_slot: int = Field(ge=0, le=47)
+    end_slot: int = Field(ge=0, le=47)
+    title: str = Field(min_length=1)
+    due_date: date | None = None   # 期限（任意）
+    owner: str = ""                # 担当者（半角スペース区切り）
+    detail: str = ""               # 詳細（Markdown）
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def strip(cls, v):
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("owner", mode="before")
+    @classmethod
+    def owner_spaces(cls, v):
+        return " ".join(v.split()) if isinstance(v, str) else v  # 全角スペース・連続スペースも 1 つの半角スペースに
+
+    @model_validator(mode="after")
+    def order(self):
+        if self.end_slot < self.start_slot:
+            raise ValueError("終了は開始より後にしてください")
+        return self
 
 
 # ---------------------------------------------------------------- helpers
@@ -822,6 +866,7 @@ async def delete_goal(name: str, goal_id: int, body: ConfirmIn) -> Response:
             raise HTTPException(404, "目標が見つかりません")
         db.execute("DELETE FROM platform_goal_tasks WHERE goal_id=? AND platform=?", (goal_id, name))  # 項目の中の実施内容も一緒に削除
         db.execute("DELETE FROM platform_goal_notes WHERE goal_id=? AND platform=?", (goal_id, name))  # 議論の記録も一緒に削除
+        db.execute("DELETE FROM platform_goal_gantt WHERE goal_id=? AND platform=?", (goal_id, name))  # ガントも一緒に削除
     return Response(status_code=204)
 
 
@@ -867,6 +912,51 @@ async def delete_goal_task(name: str, task_id: int, body: ConfirmIn) -> Response
     with get_db() as db:
         if db.execute("DELETE FROM platform_goal_tasks WHERE id=? AND platform=?", (task_id, name)).rowcount == 0:
             raise HTTPException(404, "実施内容が見つかりません")
+    return Response(status_code=204)
+
+
+# ---------------------------------------------------------------- 項目の月単位ガント（1 年 = 12 か月 × 4 分割）
+
+def _gantt_values(g: GoalGanttIn) -> tuple:
+    return (g.year, g.start_slot, g.end_slot, g.title, g.due_date.isoformat() if g.due_date else None, g.owner, g.detail.strip())
+
+
+@router.get("/{name}/goal-gantt")
+def list_goal_gantt(name: str) -> list[dict]:
+    """基盤の全項目のガント（項目 → 年 → 開始の早い順）"""
+    with get_db() as db:
+        fetch_platform(db, name)
+        return [dict(r) for r in db.execute(
+            "SELECT * FROM platform_goal_gantt WHERE platform = ? ORDER BY goal_id, year, start_slot, id", (name,))]
+
+
+@router.post("/{name}/goals/{goal_id}/gantt", status_code=201)
+def add_goal_gantt(name: str, goal_id: int, g: GoalGanttIn) -> dict:
+    with get_db() as db:
+        if not db.execute("SELECT 1 FROM platform_goals WHERE id=? AND platform=?", (goal_id, name)).fetchone():
+            raise HTTPException(404, "項目が見つかりません")
+        cur = db.execute("INSERT INTO platform_goal_gantt(platform, goal_id, year, start_slot, end_slot, title, due_date, owner, detail)"
+                         " VALUES (?,?,?,?,?,?,?,?,?)", (name, goal_id, *_gantt_values(g)))
+        return dict(db.execute("SELECT * FROM platform_goal_gantt WHERE id = ?", (cur.lastrowid,)).fetchone())
+
+
+@router.put("/{name}/goal-gantt/{gantt_id}")
+def update_goal_gantt(name: str, gantt_id: int, g: GoalGanttIn) -> dict:
+    with get_db() as db:
+        cur = db.execute("UPDATE platform_goal_gantt SET year=?, start_slot=?, end_slot=?, title=?, due_date=?, owner=?, detail=?,"
+                         " updated_at=datetime('now','localtime') WHERE id=? AND platform=?", (*_gantt_values(g), gantt_id, name))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "ガントの項目が見つかりません")
+        return dict(db.execute("SELECT * FROM platform_goal_gantt WHERE id = ?", (gantt_id,)).fetchone())
+
+
+@router.delete("/{name}/goal-gantt/{gantt_id}", status_code=204)
+async def delete_goal_gantt(name: str, gantt_id: int, body: ConfirmIn) -> Response:
+    """ガントの項目の削除（パスワード必須）"""
+    await require_password(body)
+    with get_db() as db:
+        if db.execute("DELETE FROM platform_goal_gantt WHERE id=? AND platform=?", (gantt_id, name)).rowcount == 0:
+            raise HTTPException(404, "ガントの項目が見つかりません")
     return Response(status_code=204)
 
 

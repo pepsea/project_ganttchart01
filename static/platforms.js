@@ -18,8 +18,11 @@ const state = {
   filterPerson: "", // PL またはメンバーで絞り込み
   current: null, // 選択中の基盤番号
   goals: [],
-  goalTasks: [], // 項目の中の実施内容（進捗率つき）
-  panelEdit: null, // 右の窓の中で編集中のもの { kind: "goal" | "task", id }（id = null は追加）
+  goalGantt: [], // 項目の月単位ガント（1 年 = 12 か月 × 4 分割）
+  ganttYear: new Date().getFullYear(), // ガントで表示している年
+  openGantt: null, // 詳細を開いているガントの行 id
+  ganttDraft: null, // いちばん下の枠をドラッグして引いた期間 { start, end }（追加のフォームの初期値）
+  panelEdit: null, // 右の窓の中で編集中のもの { kind: "goal" | "gantt", id }（id = null は追加）
   panelGoal: null, // 右の詳細の窓で開いている項目の id
   openTask: null,
   topics: [],
@@ -376,8 +379,8 @@ async function select(name) {
   else history.replaceState(null, "", url);
   const base = `/api/platforms/${enc(name)}`;
   if (fromList) { state.panelGoal = null; state.openTask = null; state.panelEdit = null; panelDrafts.clear(); }
-  [state.goals, state.goalTasks, state.topics, state.monthly] = await Promise.all(
-    [api(`${base}/goals`), api(`${base}/goal-tasks`), api(`${base}/topics`), api(`${base}/monthly`)]);
+  [state.goals, state.goalGantt, state.topics, state.monthly] = await Promise.all(
+    [api(`${base}/goals`), api(`${base}/goal-gantt`), api(`${base}/topics`), api(`${base}/monthly`)]);
   renderList();
   renderDetail();
   const p = state.platforms.find((x) => x.name === name);
@@ -719,8 +722,8 @@ async function refreshAfterChange(kind) {
   const keep = state.dirty ? collectUnsaved() : null;
   const base = `/api/platforms/${enc(state.current)}`;
   if (kind === "tasks") state.tasks = await api("/api/tasks");
-  else if (kind === "goalTasks") state.goalTasks = await api(`${base}/goal-tasks`);
-  else if (kind === "goals") [state.goals, state.goalTasks] = await Promise.all([api(`${base}/goals`), api(`${base}/goal-tasks`)]);
+  else if (kind === "goalGantt") state.goalGantt = await api(`${base}/goal-gantt`);
+  else if (kind === "goals") [state.goals, state.goalGantt] = await Promise.all([api(`${base}/goals`), api(`${base}/goal-gantt`)]);
   else if (kind) state[kind] = await api(`${base}/${kind}`);
   state.platforms = await api("/api/platforms");
   renderList();
@@ -729,24 +732,15 @@ async function refreshAfterChange(kind) {
 }
 
 // ---- 目標: 一覧で読みやすく表示し、目標をクリックすると編集画面を開く
-const progClass = (p) => (p >= 100 ? "p3" : p >= 70 ? "p2" : p >= 30 ? "p1" : "p0");
-function progBar(p) {
-  const bar = el("div", `prog ${progClass(p)}`);
-  const fill = el("i");
-  fill.style.width = `${p}%`;
-  bar.append(fill);
-  return bar;
-}
-const goalTasksOf = (id) => state.goalTasks.filter((t) => t.goal_id === id);
-const avgProgress = (list) => (list.length ? Math.round(list.reduce((n, t) => n + t.progress, 0) / list.length) : 0);
+const ganttOf = (goalId) => state.goalGantt.filter((x) => x.goal_id === goalId);
 
-// 1 項目 1 行（グループの「目標達成に必要な項目」と同じ構造）。クリックすると右に詳細の窓が開き、中に実施内容をリストで表示
+// 1 項目 1 行（グループの「目標達成に必要な項目」と同じ構造）。クリックすると右に詳細の窓が開き、中に月単位のガントを表示
 function renderGoals(p) {
   const sec = el("section", "pf-section pf-goals");
   const h = el("h3", "", "目標達成に必要な項目");
   const done = state.goals.filter((g) => g.status === "達成").length;
   h.append(el("span", "count-badge", `${done} / ${state.goals.length} 達成`));
-  h.append(el("span", "hint", "全体目標を達成するための項目です。クリックすると詳細（実施内容と進捗率）を開きます"));
+  h.append(el("span", "hint", "全体目標を達成するための項目です。クリックすると詳細（月単位のガント）を開きます"));
   const add = el("button", "primary right", "＋ 項目を追加");
   add.type = "button";
   add.addEventListener("click", () => openGoalPanel("new", { kind: "goal", id: null }));
@@ -772,10 +766,9 @@ function renderGoals(p) {
     main.append(el("span", "g-title", g.title));
     if (safeUrl(g.url)) main.append(linkButton("リンク", g.url, "項目のリンク"));
     if (g.note) main.append(el("span", "g-note", g.note.replace(/\s*\n\s*/g, "　").trim()));
-    const tasks = goalTasksOf(g.id);
+    const rows = ganttOf(g.id);
     const sum = el("div", "t-sum");
-    sum.append(el("div", "lbl", tasks.length ? `実施内容 ${tasks.length} 件・${avgProgress(tasks)}%` : "実施内容なし"));
-    if (tasks.length) sum.append(progBar(avgProgress(tasks)));
+    sum.append(el("div", "lbl", rows.length ? `ガント ${rows.length} 件` : "ガントなし"));
     const d = el("span", `g-due ${due}`, g.due_date ? `期限 ${slashDate(g.due_date)}` : "");
     if (due) d.title = due === "overdue" ? `期限超過（${-daysLeft(g.due_date)} 日経過）` : `期限まであと ${daysLeft(g.due_date)} 日`;
     // 並び替え: 行の左のつまみ（⠿）をドラッグして好きな位置へ
@@ -804,7 +797,7 @@ async function reorderGoals(p, ids) {
   await refreshAfterChange("goals");
 }
 
-// 項目の詳細（右の窓）: 項目の内容・実施内容（バー = 進捗率。％で色が変わる）。（「議論の記録」は v1.14.0 で画面から外した。データは残してある）
+// 項目の詳細（右の窓）: 項目の内容・月単位のガント（1 年 = 12 か月 × 4 分割）。（「議論の記録」は v1.14.0 で画面から外した。データは残してある）
 // 編集はポップアップを開かず、窓の中でその場に書く（state.panelEdit = 編集中のもの）
 // 窓の中の編集を切り替える（null = 編集をやめる）
 function setPanelEdit(next) {
@@ -861,45 +854,267 @@ function goalForm(p, g) {
   return form;
 }
 
-// 実施内容の入力欄。t = null なら追加
-function goalTaskForm(p, g, t) {
-  const key = editKey({ kind: "task", id: t?.id });
+// ------------------------------------------------------------ 項目の月単位ガント
+// 横軸 = 1 年（12 か月）。各月を 4 分割（1〜7 日・8〜14 日・15〜21 日・22 日〜末）して 48 区画。
+// 区画の番号 = (月 - 1) × 4 + 分割（0〜3）。行の追加は、いちばん下の枠をドラッグして期間を引く（フォームの選択でも指定できる）。
+// 行は タイトル・期限・担当者・詳細（Markdown）を持つ。バーはドラッグで移動、両端のドラッグで期間を変更。
+const GANTT_SLOTS = 48;
+const SLOT_DAYS = ["1〜7日", "8〜14日", "15〜21日", "22日〜末"];
+const slotMonth = (slot) => Math.floor(slot / 4) + 1;
+const slotText = (slot) => `${slotMonth(slot)}月 ${SLOT_DAYS[slot % 4]}`;
+const ganttRangeText = (g) => (g.start_slot === g.end_slot ? slotText(g.start_slot) : `${slotText(g.start_slot)} 〜 ${slotText(g.end_slot)}`);
+// 日付 → その年の区画（年が違えば null）
+function dateSlot(str, year) {
+  const [y, m, d] = str.split("-").map(Number);
+  return y === year ? (m - 1) * 4 + (d <= 7 ? 0 : d <= 14 ? 1 : d <= 21 ? 2 : 3) : null;
+}
+const ganttBody = (g, over) => ({
+  year: g.year, start_slot: g.start_slot, end_slot: g.end_slot, title: g.title, due_date: g.due_date || null,
+  owner: g.owner || "", detail: g.detail || "", ...over,
+});
+const clampSlot = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+
+// 行の入力欄。g = null なら追加（state.ganttDraft = いちばん下の枠をドラッグして引いた期間）
+function ganttForm(p, goal, g) {
+  const key = editKey({ kind: "gantt", id: g?.id });
   const form = el("form", "gpn-form");
   form.autocomplete = "off";
-  const title = panelInput("title", { required: true, placeholder: "例: 解析パイプラインの検証" });
-  const range = panelInput("progress", { type: "range", min: 0, max: 100, step: 5 });
-  const pc = el("b", "", "");
-  const rl = panelField("進捗率 ", range);
-  rl.firstChild.append(pc);
-  range.addEventListener("input", () => { pc.textContent = `${range.value}%`; });
-  const grid = el("div", "gpn-grid");
-  grid.append(panelField("担当者（複数はスペース区切り）", panelInput("owner", { placeholder: "例: 高橋 鈴木" })),
-    panelField("期限", panelInput("due_date", { type: "date" })));
-  form.append(panelField("実施内容 *", title), rl, grid, panelField("内容", panelInput("note", { tag: "textarea", rows: 3 })));
+  const title = panelInput("title", { required: true, placeholder: "例: サンプル受領・QC" });
+  const slotSelect = (name) => {
+    const wrap = el("span", "gg-slot-sel");
+    const m = panelInput(`${name}_m`, { tag: "select" });
+    for (let i = 1; i <= 12; i++) m.append(new Option(`${i}月`, String(i)));
+    const q = panelInput(`${name}_q`, { tag: "select" });
+    SLOT_DAYS.forEach((d, i) => q.append(new Option(`${i + 1}（${d}）`, String(i))));
+    wrap.append(m, q);
+    return wrap;
+  };
+  const year = panelInput("year", { type: "number", min: 2000, max: 2100, step: 1, required: true });
+  const grid1 = el("div", "gpn-grid");
+  grid1.append(panelField("年", year), panelField("期限", panelInput("due_date", { type: "date" })));
+  form.append(panelField("タイトル *", title), grid1,
+    panelField("開始（月・4 分割のどこか）", slotSelect("s")), panelField("終了", slotSelect("e")),
+    panelField("担当者（複数はスペース区切り）", panelInput("owner", { placeholder: "例: 高橋 鈴木" })),
+    panelField("詳細（Markdown で書けます）", panelInput("detail", { tag: "textarea", rows: 6, placeholder: "- 箇条書き\n- **太字**\n- 表・リンクも書けます" })));
+  enableMarkdownEditing(form.elements.namedItem("detail")); // 箇条書きの Enter・Tab などの入力補助
   const cancel = () => setPanelEdit(null);
   const err = panelActions(form, {
-    submitLabel: t ? "保存" : "追加", onCancel: cancel,
-    onDelete: t && (() => confirmPasswordDelete(`/api/platforms/${enc(p.name)}/goal-tasks/${t.id}`, "実施内容", `実施内容: ${t.title}`, "goalTasks")),
+    submitLabel: g ? "保存" : "追加", onCancel: cancel,
+    onDelete: g && (() => confirmPasswordDelete(`/api/platforms/${enc(p.name)}/goal-gantt/${g.id}`, "ガントの行", `ガント: ${g.title}`, "goalGantt")),
   });
-  bindPanelForm(form, key, { title: t?.title, progress: t ? t.progress : 0, owner: t?.owner, due_date: t?.due_date, note: t?.note }, cancel);
-  pc.textContent = `${range.value}%`;
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  const draft = !g && state.ganttDraft;
+  const today = new Date();
+  const todaySlot = state.ganttYear === today.getFullYear() ? dateSlot(fmtDate(todayMs()), state.ganttYear) : 0;
+  const s0 = g ? g.start_slot : draft ? draft.start : todaySlot;
+  const e0 = g ? g.end_slot : draft ? draft.end : todaySlot;
+  state.ganttDraft = null;
+  bindPanelForm(form, key, {
+    title: g?.title, year: g ? g.year : state.ganttYear, due_date: g?.due_date, owner: g?.owner, detail: g?.detail,
+    s_m: slotMonth(s0), s_q: s0 % 4, e_m: slotMonth(e0), e_q: e0 % 4,
+  }, cancel);
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
     const v = (n) => form.elements.namedItem(n).value;
-    const body = { title: v("title").trim(), progress: Number(v("progress")), owner: v("owner").trim(), due_date: v("due_date") || null, note: v("note") };
-    if (!body.title) { err.textContent = "実施内容を入力してください"; return; }
+    const body = {
+      year: Number(v("year")), start_slot: (Number(v("s_m")) - 1) * 4 + Number(v("s_q")), end_slot: (Number(v("e_m")) - 1) * 4 + Number(v("e_q")),
+      title: v("title").trim(), due_date: v("due_date") || null, owner: v("owner").trim(), detail: v("detail"),
+    };
+    if (!body.title) { err.textContent = "タイトルを入力してください"; return; }
+    if (body.end_slot < body.start_slot) { err.textContent = "終了は開始と同じか、それより後にしてください"; return; }
     try {
-      const saved = await api(t ? `/api/platforms/${enc(p.name)}/goal-tasks/${t.id}` : `/api/platforms/${enc(p.name)}/goals/${g.id}/tasks`,
-        { method: t ? "PUT" : "POST", body: JSON.stringify(body) });
+      const url = `/api/platforms/${enc(p.name)}`;
+      const saved = await api(g ? `${url}/goal-gantt/${g.id}` : `${url}/goals/${goal.id}/gantt`, { method: g ? "PUT" : "POST", body: JSON.stringify(body) });
       panelDrafts.delete(key);
       state.panelEdit = null;
-      state.openTask = saved.id;
-      await refreshAfterChange("goalTasks");
-      toast(t ? "保存しました" : "追加しました");
+      state.openGantt = saved.id;
+      state.ganttYear = saved.year;
+      await refreshAfterChange("goalGantt");
+      toast(g ? "保存しました" : "追加しました");
     } catch (ex) { err.textContent = ex.message; }
   });
   focusLater(title);
   return form;
+}
+
+// バーのドラッグ: 中央 = 移動、左右の端 = 期間の変更（区画に吸着）。動かさずに離したら詳細の開閉
+function startGanttDrag(ev, bar, g, w) {
+  if (ev.button !== 0) return;
+  ev.preventDefault();
+  const mode = ev.target.classList.contains("l") ? "l" : ev.target.classList.contains("r") ? "r" : "move";
+  const x0 = ev.clientX;
+  const len = g.end_slot - g.start_slot;
+  let s = g.start_slot, e = g.end_slot, moved = false;
+  bar.setPointerCapture(ev.pointerId);
+  bar.classList.add("dragging");
+  const place = () => {
+    bar.style.left = `${s * w + 1}px`;
+    bar.style.width = `${(e - s + 1) * w - 2}px`;
+    bar.title = `${g.title}\n${ganttRangeText({ start_slot: s, end_slot: e })}`;
+  };
+  const move = (m) => {
+    if (Math.abs(m.clientX - x0) > 3) moved = true;
+    const d = Math.round((m.clientX - x0) / w);
+    if (mode === "move") { s = clampSlot(g.start_slot + d, 0, GANTT_SLOTS - 1 - len); e = s + len; }
+    else if (mode === "l") { s = clampSlot(g.start_slot + d, 0, g.end_slot); e = g.end_slot; }
+    else { s = g.start_slot; e = clampSlot(g.end_slot + d, g.start_slot, GANTT_SLOTS - 1); }
+    place();
+  };
+  const up = async () => {
+    bar.removeEventListener("pointermove", move);
+    bar.removeEventListener("pointerup", up);
+    bar.removeEventListener("pointercancel", up);
+    bar.classList.remove("dragging");
+    if (!moved) { state.openGantt = state.openGantt === g.id ? null : g.id; renderDetail(); return; }
+    if (s === g.start_slot && e === g.end_slot) return;
+    try {
+      await api(`/api/platforms/${enc(state.current)}/goal-gantt/${g.id}`, { method: "PUT", body: JSON.stringify(ganttBody(g, { start_slot: s, end_slot: e })) });
+      toast(`${ganttRangeText({ start_slot: s, end_slot: e })} に変更しました`);
+    } catch (err) { toast(err.message, true); }
+    await refreshAfterChange("goalGantt");
+  };
+  bar.addEventListener("pointermove", move);
+  bar.addEventListener("pointerup", up);
+  bar.addEventListener("pointercancel", up);
+}
+
+// いちばん下の枠をドラッグして、新しい行の期間を引く → 追加のフォームが開く
+function startGanttDraw(ev, track, w) {
+  if (ev.button !== 0 || state.panelEdit) return;
+  ev.preventDefault();
+  const slotAt = (x) => clampSlot(Math.floor((x - track.getBoundingClientRect().left) / w), 0, GANTT_SLOTS - 1);
+  const a = slotAt(ev.clientX);
+  let b = a;
+  const sel = el("div", "gg-sel");
+  track.append(sel);
+  track.setPointerCapture(ev.pointerId);
+  const paint = () => {
+    sel.style.left = `${Math.min(a, b) * w}px`;
+    sel.style.width = `${(Math.abs(b - a) + 1) * w}px`;
+    sel.textContent = ganttRangeText({ start_slot: Math.min(a, b), end_slot: Math.max(a, b) });
+  };
+  paint();
+  const move = (m) => { b = slotAt(m.clientX); paint(); };
+  const up = () => {
+    track.removeEventListener("pointermove", move);
+    track.removeEventListener("pointerup", up);
+    track.removeEventListener("pointercancel", up);
+    sel.remove();
+    state.ganttDraft = { start: Math.min(a, b), end: Math.max(a, b) };
+    setPanelEdit({ kind: "gantt", id: null });
+  };
+  track.addEventListener("pointermove", move);
+  track.addEventListener("pointerup", up);
+  track.addEventListener("pointercancel", up);
+}
+
+function renderGantt(box, p, goal, editing) {
+  const year = state.ganttYear;
+  const all = ganttOf(goal.id);
+  const rows = all.filter((x) => x.year === year);
+
+  // 見出し: ガント・件数・年の切り替え・追加
+  const ah = el("div", "gpn-ah");
+  ah.append(el("b", "", "ガント"), el("span", "count-badge", `${rows.length} 件${all.length !== rows.length ? `（全 ${all.length} 件）` : ""}`), el("span", "spacer"));
+  const yearNav = el("span", "gg-year");
+  const yb = (label, d, title) => {
+    const b = el("button", "", label);
+    b.type = "button";
+    b.title = title;
+    b.addEventListener("click", () => { state.ganttYear += d; renderDetail(); });
+    return b;
+  };
+  yearNav.append(yb("◀", -1, "前の年"), el("b", "", `${year}年`), yb("▶", 1, "次の年"));
+  ah.append(yearNav);
+  const add = el("button", "primary", "＋ 追加");
+  add.type = "button";
+  add.disabled = editing("gantt", null);
+  add.addEventListener("click", () => setPanelEdit({ kind: "gantt", id: null }));
+  ah.append(add);
+  box.append(ah);
+  if (editing("gantt", null)) box.append(ganttForm(p, goal, null));
+
+  // 1 年が窓の幅に収まるように、1 区画の幅を決める（狭いときは横にスクロール）
+  const w = Math.max(6, Math.floor((box.clientWidth - 4) / GANTT_SLOTS));
+  const wrap = el("div", "gg-wrap");
+  const grid = el("div", "gg");
+  grid.style.width = `${w * GANTT_SLOTS}px`;
+  grid.style.setProperty("--sw", `${w}px`);
+  const head = el("div", "gg-head");
+  for (let m = 0; m < 12; m++) {
+    const c = el("div", "gg-month", `${m + 1}月`);
+    c.style.left = `${m * 4 * w}px`;
+    c.style.width = `${4 * w}px`;
+    c.title = `${m + 1}月（4 分割: ${SLOT_DAYS.join("・")}）`;
+    head.append(c);
+  }
+  grid.append(head);
+  const body = el("div", "gg-body");
+  const today = new Date();
+  if (year === today.getFullYear()) {
+    const t = el("div", "gg-today");
+    t.style.left = `${dateSlot(fmtDate(todayMs()), year) * w + w / 2}px`;
+    t.title = "今日";
+    body.append(t);
+  }
+  for (const g of rows) {
+    const row = el("div", "gg-row");
+    row.dataset.id = g.id;
+    const track = el("div", "gg-track");
+    const bar = el("div", `gg-bar${state.openGantt === g.id ? " open" : ""}`);
+    bar.style.left = `${g.start_slot * w + 1}px`;
+    bar.style.width = `${(g.end_slot - g.start_slot + 1) * w - 2}px`;
+    bar.title = `${g.title}\n${ganttRangeText(g)}${g.due_date ? `\n期限 ${slashDate(g.due_date)}` : ""}${g.owner ? `\n担当 ${g.owner.split(" ").join("・")}` : ""}\n（ドラッグで移動・両端で期間を変更。クリックで詳細）`;
+    bar.append(el("span", "handle l"), el("span", "handle r"));
+    // タイトルと担当者は、バーの左端から右へ（長いときは枠の外へ続く）
+    bar.append(el("span", "gg-label", `${g.title}${g.owner ? ` / ${g.owner.split(" ").join("・")}` : ""}`));
+    bar.addEventListener("pointerdown", (ev) => startGanttDrag(ev, bar, g, w));
+    track.append(bar);
+    const ds = g.due_date ? dateSlot(g.due_date, year) : null;
+    if (ds !== null) {
+      const d = el("span", `gg-due${g.due_date < fmtDate(todayMs()) ? " over" : ""}`, "◆");
+      d.style.left = `${ds * w + w / 2 - 6}px`;
+      d.title = `期限 ${slashDate(g.due_date)}`;
+      track.append(d);
+    }
+    row.append(track);
+    body.append(row);
+    // 詳細（クリックで開く）/ 編集
+    if (editing("gantt", g.id)) {
+      const f = el("div", "gg-detail");
+      f.append(ganttForm(p, goal, g));
+      body.append(f);
+    } else if (state.openGantt === g.id) {
+      const d = el("div", "gg-detail");
+      d.append(el("h4", "", g.title));
+      const dl = el("dl", "gpn-facts");
+      const fact = (k, v, cls = "") => { if (v) dl.append(el("dt", "", k), el("dd", cls, v)); };
+      fact("期間", ganttRangeText(g));
+      fact("期限", g.due_date ? slashDate(g.due_date) : "", g.due_date && g.due_date < fmtDate(todayMs()) ? "overdue" : "");
+      fact("担当者", g.owner ? g.owner.split(" ").join("・") : "");
+      d.append(dl);
+      if (g.detail) {
+        const md = el("div", "md gg-md");
+        md.innerHTML = window.mdToHtml(g.detail); // Markdown で書いた詳細を表示用に変換（HTML はエスケープ済み）
+        d.append(md);
+      }
+      const eb = el("button", "", "✎ 編集");
+      eb.type = "button";
+      eb.addEventListener("click", () => setPanelEdit({ kind: "gantt", id: g.id }));
+      d.append(eb);
+      body.append(d);
+    }
+  }
+  // いちばん下の枠: ドラッグして新しい行の期間を引く
+  const draw = el("div", "gg-row gg-new");
+  const dtrack = el("div", "gg-track");
+  dtrack.append(el("span", "gg-hint", state.panelEdit ? "" : "ここをドラッグして、新しい行の期間を引く"));
+  dtrack.addEventListener("pointerdown", (ev) => startGanttDraw(ev, dtrack, w));
+  draw.append(dtrack);
+  body.append(draw);
+  grid.append(body);
+  wrap.append(grid);
+  box.append(wrap);
+  if (!rows.length) box.append(el("p", "hint", `${year}年のガントはまだありません。上の「＋ 追加」か、枠のドラッグで登録できます。`));
 }
 
 function renderGoalPanel() {
@@ -912,7 +1127,7 @@ function renderGoalPanel() {
   if (panel.hidden) { state.panelEdit = null; panelDrafts.clear(); return; }
   const ed = state.panelEdit;
   // 編集中のものが消えていたら（削除など）編集をやめる
-  if (ed?.kind === "task" && ed.id && !state.goalTasks.some((t) => t.id === ed.id)) {
+  if (ed?.kind === "gantt" && ed.id && !state.goalGantt.some((t) => t.id === ed.id)) {
     panelDrafts.delete(editKey(ed));
     state.panelEdit = null;
   }
@@ -959,63 +1174,13 @@ function renderGoalPanel() {
     box.append(edit);
   }
 
-  // 実施内容
-  const tasks = goalTasksOf(g.id);
-  const ah = el("div", "gpn-ah");
-  ah.append(el("b", "", "実施内容"), el("span", "count-badge", `${tasks.length} 件${tasks.length ? `・進捗率 ${avgProgress(tasks)}%` : ""}`), el("span", "spacer"));
-  const add = el("button", "primary", "＋ 実施内容を追加");
-  add.type = "button";
-  add.disabled = editing("task", null);
-  add.addEventListener("click", () => setPanelEdit({ kind: "task", id: null }));
-  ah.append(add);
-  box.append(ah);
-  if (editing("task", null)) box.append(goalTaskForm(p, g, null));
-  if (tasks.length) {
-    box.append(progBar(avgProgress(tasks)));
-    const legend = el("div", "gpn-legend");
-    legend.innerHTML = '<span class="p0"><i></i>〜29%</span><span class="p1"><i></i>30〜69%</span><span class="p2"><i></i>70〜99%</span><span class="p3"><i></i>100%</span>';
-    box.append(legend);
-  } else if (!editing("task", null)) {
-    box.append(el("p", "hint", "まだ実施内容がありません。「＋ 実施内容を追加」から登録してください。"));
-  }
-  for (const t of tasks) {
-    const item = el("div", "gpn-ach");
-    if (editing("task", t.id)) {
-      item.append(goalTaskForm(p, g, t));
-      box.append(item);
-      continue;
-    }
-    const row = el("button", `gpn-bar ${progClass(t.progress)}`);
-    row.type = "button";
-    row.title = "クリックで詳細";
-    const lab = el("span", "lab");
-    lab.append(el("span", "nm", t.title), el("span", "pc", `${t.progress}%`));
-    row.append(lab, progBar(t.progress));
-    row.addEventListener("click", () => { state.openTask = state.openTask === t.id ? null : t.id; renderDetail(); });
-    item.append(row);
-    if (state.openTask === t.id) {
-      const d = el("div", "gpn-ach-detail");
-      const dl = el("dl", "gpn-facts");
-      const f2 = (k, v, cls = "") => { if (v) dl.append(el("dt", "", k), el("dd", cls, v)); };
-      f2("進捗率", `${t.progress}%`);
-      f2("担当者", t.owner ? t.owner.split(" ").join("・") : "");
-      f2("期限", t.due_date ? slashDate(t.due_date) : "");
-      f2("内容", t.note, "pre");
-      d.append(dl);
-      const eb = el("button", "", "✎ 編集");
-      eb.type = "button";
-      eb.addEventListener("click", () => setPanelEdit({ kind: "task", id: t.id }));
-      d.append(eb);
-      item.append(d);
-    }
-    box.append(item);
-  }
+  renderGantt(box, p, g, editing);
 
   box.scrollTop = scroll;
 }
 
 // 窓の幅: 左端をドラッグして変えられる
-enablePanelResize($("#goal-panel"), $("#goal-panel-resize"), "platforms.panelWidth");
+enablePanelResize($("#goal-panel"), $("#goal-panel-resize"), "platforms.panelWidth", () => { if (!state.panelEdit) renderDetail(); }); // 幅が変わったらガントの区画の幅も合わせる
 
 
 // 目標・月報の削除: パスワードを入力して確認（サーバー側でも検証）
