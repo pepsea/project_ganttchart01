@@ -753,6 +753,11 @@ a.back-group:hover { filter: brightness(1.1); color: #fff; }
 .gg-bar .handle.l { left: 0; }
 .gg-bar .handle.r { right: 0; }
 .gg-label { position: absolute; left: 5px; top: 0; line-height: 18px; white-space: nowrap; color: var(--text); font-size: 11px; pointer-events: none; } /* バーの左端から右へ（長いときは枠の外へ続く） */
+/* 項目に設定された期限: 線と、それ以降のグレーの半透明の覆い */
+.gg-after { position: absolute; top: 0; bottom: 0; background: rgba(110, 118, 135, .32); z-index: 2; pointer-events: none; }
+.gg-duel { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid #374151; z-index: 3; pointer-events: none; }
+.gg-duel::before { content: attr(data-label); position: absolute; top: 1px; right: 4px; padding: 0 3px; border-radius: 3px; background: #374151; color: #fff; font-size: 9px; line-height: 13px; white-space: nowrap; }
+.gg-legend .st-due i { background: rgba(110, 118, 135, .32); border-color: #374151; }
 .gg-today { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--today); opacity: .6; z-index: 2; pointer-events: none; }
 .gg-new .gg-track { cursor: crosshair; background-color: #fafbfc; }
 .gg-hint { position: absolute; left: 6px; line-height: 25px; color: var(--muted); font-size: 11px; pointer-events: none; white-space: nowrap; }

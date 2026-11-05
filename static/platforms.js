@@ -1051,6 +1051,10 @@ function renderGantt(box, p, goal, editing) {
     first = Math.min(first, ggMonthNo(ggMs(g.start_date)) - 1);
     last = Math.max(last, ggMonthNo(ggMs(g.end_date)) + 2);
   }
+  if (goal.due_date) { // 項目に設定された期限も範囲に入れる
+    first = Math.min(first, ggMonthNo(ggMs(goal.due_date)) - 1);
+    last = Math.max(last, ggMonthNo(ggMs(goal.due_date)) + 2);
+  }
   const months = last - first + 1;
   const geo = ggGeo(first, w);
 
@@ -1075,6 +1079,11 @@ function renderGantt(box, p, goal, editing) {
   for (const k of ["active", "soon", "over", "future"]) {
     const x = el("span", `st-${k}`);
     x.append(el("i"), GG_STATUS_TEXT[k]);
+    legend.append(x);
+  }
+  if (goal.due_date) {
+    const x = el("span", "st-due");
+    x.append(el("i"), `項目の期限 ${slashDate(goal.due_date)}（以降はグレー）`);
     legend.append(x);
   }
   box.append(legend);
@@ -1117,6 +1126,23 @@ function renderGantt(box, p, goal, editing) {
   tl.style.left = `${geo.xAt(today)}px`;
   tl.title = "今日";
   body.append(tl);
+  // 項目に設定された期限: 期限の日の終わりに線を引き、それ以降をグレーの半透明で覆う（操作はそのまま通る）
+  if (goal.due_date) {
+    const total = w * 4 * months;
+    const xd = Math.max(0, Math.min(total, geo.xAt(ggMs(goal.due_date) + DAY_MS)));
+    if (xd < total) {
+      const after = el("div", "gg-after");
+      after.style.left = `${xd}px`;
+      after.style.width = `${total - xd}px`;
+      after.title = `項目の期限（${slashDate(goal.due_date)}）以降`;
+      body.append(after);
+    }
+    const dl = el("div", "gg-duel");
+    dl.style.left = `${xd}px`;
+    dl.dataset.label = "期限";
+    dl.title = `項目の期限 ${slashDate(goal.due_date)}`;
+    body.append(dl);
+  }
   for (const g of rows) {
     const row = el("div", "gg-row");
     row.dataset.id = g.id;
