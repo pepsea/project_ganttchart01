@@ -67,7 +67,7 @@ function panelActions(form, { submitLabel, onCancel, onDelete }) {
 const focusLater = (input) => requestAnimationFrame(() => input.focus());
 
 // 窓の幅: 左端のつまみをドラッグして変えられる（幅はブラウザに保存。ダブルクリックで元の幅）
-function enablePanelResize(panel, handle, storeKey) {
+function enablePanelResize(panel, handle, storeKey, onResized = null) {
   const get = () => { try { return localStorage.getItem(storeKey); } catch (_) { return null; } };
   const set = (v) => { try { localStorage.setItem(storeKey, v); } catch (_) { /* ignore */ } };
   const clamp = (w) => Math.max(320, Math.min(w, window.innerWidth - 40));
@@ -83,11 +83,12 @@ function enablePanelResize(panel, handle, storeKey) {
       handle.removeEventListener("pointermove", move);
       document.body.classList.remove("gpn-resizing");
       set(String(parseInt(panel.style.width, 10)));
+      if (onResized) onResized();
     };
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", up, { once: true });
     handle.addEventListener("pointercancel", up, { once: true });
   });
-  handle.addEventListener("dblclick", () => { panel.style.width = ""; set(""); });
-  window.addEventListener("resize", () => { if (panel.style.width) apply(parseInt(panel.style.width, 10)); });
+  handle.addEventListener("dblclick", () => { panel.style.width = ""; set(""); if (onResized) onResized(); });
+  window.addEventListener("resize", () => { if (panel.style.width) apply(parseInt(panel.style.width, 10)); if (onResized) onResized(); });
 }
