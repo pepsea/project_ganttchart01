@@ -1088,11 +1088,13 @@ function renderGantt(box, p, goal, editing) {
   const head = el("div", "gg-head");
   for (let k = 0; k < months; k++) {
     const m = first + k, y = Math.floor(m / 12), mo = m % 12;
-    const wide = w * 4 >= 56; // 1 か月の幅に「2026年11月」が入るか
-    const c = el("div", `gg-month${mo === 0 ? " yr" : ""}`, wide ? `${y}年${mo + 1}月` : mo === 0 ? String(y) : `${mo + 1}月`); // 狭いときは、1 月のところに年だけ出す
+    // 年は「26年4月」の形（西暦 4 桁は使わない）。幅に余裕があれば毎月、狭いときは最初の月と 1 月のところだけ（ほかは「5月」）
+    const yy = String(y % 100).padStart(2, "0");
+    const wide = w * 4 >= 48;
+    const c = el("div", `gg-month${mo === 0 ? " yr" : ""}`, wide || mo === 0 || k === 0 ? `${yy}年${mo + 1}月` : `${mo + 1}月`);
     c.style.left = `${k * 4 * w}px`;
     c.style.width = `${4 * w}px`;
-    c.title = `${y}年${mo + 1}月（4 つの週: ${GG_WEEK_DAYS.join("・")}）`;
+    c.title = `${yy}年${mo + 1}月（4 つの週: ${GG_WEEK_DAYS.join("・")}）`;
     head.append(c);
     for (let q = 0; q < 4; q++) {
       const wcell = el("div", "gg-week", String(q + 1));

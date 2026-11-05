@@ -723,7 +723,7 @@ a.back-group:hover { filter: brightness(1.1); color: #fff; }
 .gg-month.yr { border-left: 2px solid #7b87a1; background: #eef1f7; }
 .gg-week { position: absolute; top: 19px; height: 19px; box-sizing: border-box; text-align: center; line-height: 19px; font-size: 9.5px; color: var(--muted); font-variant-numeric: tabular-nums; overflow: hidden; }
 .gg.narrow .gg-week { font-size: 7.5px; }
-.gg.narrow .gg-month { padding-left: 2px; font-size: 10.5px; }
+.gg.narrow .gg-month { padding-left: 2px; font-size: 9.5px; letter-spacing: -.3px; }
 .gg-mline { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid var(--line-strong); pointer-events: none; }
 .gg-mline.yr { border-left: 2px solid #7b87a1; }
 .gg-body { position: relative; }
