@@ -7,6 +7,7 @@
 """
 
 import asyncio
+import calendar
 import csv
 import io
 import json
@@ -95,9 +96,11 @@ def init_db() -> None:
                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
                    platform   TEXT NOT NULL,          -- 基盤番号（platforms.name）
                    goal_id    INTEGER NOT NULL,       -- 項目（platform_goals.id）
-                   year       INTEGER NOT NULL,       -- 年（その年の 48 区画のどこか）
-                   start_slot INTEGER NOT NULL,       -- 開始の区画（0〜47。(月 - 1) × 4 + 分割 0〜3）
-                   end_slot   INTEGER NOT NULL,       -- 終了の区画（開始以上）
+                   year       INTEGER NOT NULL,       -- （未使用・旧: 月 4 分割の年。開始日の年を入れる）
+                   start_slot INTEGER NOT NULL,       -- （未使用・旧: 月 4 分割の開始の区画 0〜47。開始日から計算して入れる）
+                   end_slot   INTEGER NOT NULL,       -- （未使用・旧: 同・終了の区画。年をまたぐときは 47）
+                   start_date TEXT NOT NULL DEFAULT '',   -- 開始日（週表示。画面では週の月曜にそろえる）
+                   end_date   TEXT NOT NULL DEFAULT '',   -- 終了日（画面では週の日曜にそろえる）
                    title      TEXT NOT NULL,          -- タイトル
                    due_date   TEXT,                   -- 期限（任意）
                    owner      TEXT NOT NULL DEFAULT '',    -- 担当者（半角スペース区切り）
@@ -106,6 +109,15 @@ def init_db() -> None:
                    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
                )"""
         )
+        # v1.15.0 の「月 4 分割の区画」の行に、開始日・終了日を追加し、区画から引き継ぐ（旧列は未使用として残す）
+        gg_cols = {r["name"] for r in db.execute("PRAGMA table_info(platform_goal_gantt)")}
+        for col in ("start_date", "end_date"):
+            if col not in gg_cols:
+                db.execute(f"ALTER TABLE platform_goal_gantt ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
+        for r in db.execute("SELECT id, year, start_slot, end_slot FROM platform_goal_gantt"
+                            " WHERE start_date = '' OR end_date = ''").fetchall():
+            db.execute("UPDATE platform_goal_gantt SET start_date = ?, end_date = ? WHERE id = ?",
+                       (_slot_start(r["year"], r["start_slot"]).isoformat(), _slot_end(r["year"], r["end_slot"]).isoformat(), r["id"]))
         # 目標達成に必要な項目（platform_goals）ごとの定期的な議論の記録（日付つき。同じ日に複数可）
         db.execute(
             """CREATE TABLE IF NOT EXISTS platform_goal_notes (
@@ -288,11 +300,29 @@ class GoalTaskIn(BaseModel):
         return v.strip() if isinstance(v, str) else v
 
 
+# 旧・月 4 分割の区画（0〜47。区画 = (月 - 1) × 4 + 分割 0〜3。分割 = 1〜7 日・8〜14 日・15〜21 日・22 日〜末）⇔ 日付
+def _slot_start(year: int, slot: int) -> date:
+    return date(year, slot // 4 + 1, 1 + 7 * (slot % 4))
+
+
+def _slot_end(year: int, slot: int) -> date:
+    m, q = slot // 4 + 1, slot % 4
+    return date(year, m, 7 * (q + 1) if q < 3 else calendar.monthrange(year, m)[1])
+
+
+def _date_slot(d: date) -> int:
+    return (d.month - 1) * 4 + (0 if d.day <= 7 else 1 if d.day <= 14 else 2 if d.day <= 21 else 3)
+
+
+def _legacy_slots(start: date, end: date) -> tuple[int, int, int]:
+    """旧列（year / start_slot / end_slot）に入れる値。開始日・終了日から計算（年をまたぐときの終了は 47）"""
+    return start.year, _date_slot(start), (_date_slot(end) if end.year == start.year else 47)
+
+
 class GoalGanttIn(BaseModel):
-    """項目の月単位ガントの 1 行。1 年 = 12 か月 × 4 分割 = 48 区画（0〜47）。区画 = (月 - 1) × 4 + 分割（0〜3）"""
-    year: int = Field(ge=2000, le=2100)
-    start_slot: int = Field(ge=0, le=47)
-    end_slot: int = Field(ge=0, le=47)
+    """項目のガントの 1 行（週表示・年をまたいで表示できる）。期間 = 開始日〜終了日（画面では週の単位でそろえる）"""
+    start_date: date
+    end_date: date
     title: str = Field(min_length=1)
     due_date: date | None = None   # 期限（任意）
     owner: str = ""                # 担当者（半角スペース区切り）
@@ -310,8 +340,10 @@ class GoalGanttIn(BaseModel):
 
     @model_validator(mode="after")
     def order(self):
-        if self.end_slot < self.start_slot:
-            raise ValueError("終了は開始より後にしてください")
+        if not (2000 <= self.start_date.year <= 2100 and 2000 <= self.end_date.year <= 2100):
+            raise ValueError("日付は 2000〜2100 年の範囲で入力してください")
+        if self.end_date < self.start_date:
+            raise ValueError("終了日は開始日と同じか、それより後にしてください")
         return self
 
 
@@ -918,7 +950,9 @@ async def delete_goal_task(name: str, task_id: int, body: ConfirmIn) -> Response
 # ---------------------------------------------------------------- 項目の月単位ガント（1 年 = 12 か月 × 4 分割）
 
 def _gantt_values(g: GoalGanttIn) -> tuple:
-    return (g.year, g.start_slot, g.end_slot, g.title, g.due_date.isoformat() if g.due_date else None, g.owner, g.detail.strip())
+    year, s, e = _legacy_slots(g.start_date, g.end_date)
+    return (year, s, e, g.start_date.isoformat(), g.end_date.isoformat(), g.title,
+            g.due_date.isoformat() if g.due_date else None, g.owner, g.detail.strip())
 
 
 @router.get("/{name}/goal-gantt")
@@ -927,7 +961,7 @@ def list_goal_gantt(name: str) -> list[dict]:
     with get_db() as db:
         fetch_platform(db, name)
         return [dict(r) for r in db.execute(
-            "SELECT * FROM platform_goal_gantt WHERE platform = ? ORDER BY goal_id, year, start_slot, id", (name,))]
+            "SELECT * FROM platform_goal_gantt WHERE platform = ? ORDER BY goal_id, start_date, id", (name,))]
 
 
 @router.post("/{name}/goals/{goal_id}/gantt", status_code=201)
@@ -935,15 +969,16 @@ def add_goal_gantt(name: str, goal_id: int, g: GoalGanttIn) -> dict:
     with get_db() as db:
         if not db.execute("SELECT 1 FROM platform_goals WHERE id=? AND platform=?", (goal_id, name)).fetchone():
             raise HTTPException(404, "項目が見つかりません")
-        cur = db.execute("INSERT INTO platform_goal_gantt(platform, goal_id, year, start_slot, end_slot, title, due_date, owner, detail)"
-                         " VALUES (?,?,?,?,?,?,?,?,?)", (name, goal_id, *_gantt_values(g)))
+        cur = db.execute("INSERT INTO platform_goal_gantt(platform, goal_id, year, start_slot, end_slot, start_date, end_date,"
+                         " title, due_date, owner, detail) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (name, goal_id, *_gantt_values(g)))
         return dict(db.execute("SELECT * FROM platform_goal_gantt WHERE id = ?", (cur.lastrowid,)).fetchone())
 
 
 @router.put("/{name}/goal-gantt/{gantt_id}")
 def update_goal_gantt(name: str, gantt_id: int, g: GoalGanttIn) -> dict:
     with get_db() as db:
-        cur = db.execute("UPDATE platform_goal_gantt SET year=?, start_slot=?, end_slot=?, title=?, due_date=?, owner=?, detail=?,"
+        cur = db.execute("UPDATE platform_goal_gantt SET year=?, start_slot=?, end_slot=?, start_date=?, end_date=?, title=?, due_date=?,"
+                         " owner=?, detail=?,"
                          " updated_at=datetime('now','localtime') WHERE id=? AND platform=?", (*_gantt_values(g), gantt_id, name))
         if cur.rowcount == 0:
             raise HTTPException(404, "ガントの項目が見つかりません")
