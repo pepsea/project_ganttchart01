@@ -19,9 +19,9 @@ const state = {
   current: null, // 選択中の基盤番号
   goals: [],
   goalGantt: [], // 項目の月単位ガント（1 年 = 12 か月 × 4 分割）
-  ganttYear: new Date().getFullYear(), // ガントで表示している年
+  ganttAnchor: null, // ガントの左端の日付（ms。スクロール位置の記憶。null = 今日の少し前）
   openGantt: null, // 詳細を開いているガントの行 id
-  ganttDraft: null, // いちばん下の枠をドラッグして引いた期間 { start, end }（追加のフォームの初期値）
+  ganttDraft: null, // いちばん下の枠で引いた（またはクリックした）期間 { start, end }（ms。追加のフォームの初期値）
   panelEdit: null, // 右の窓の中で編集中のもの { kind: "goal" | "gantt", id }（id = null は追加）
   panelGoal: null, // 右の詳細の窓で開いている項目の id
   openTask: null,
@@ -734,13 +734,13 @@ async function refreshAfterChange(kind) {
 // ---- 目標: 一覧で読みやすく表示し、目標をクリックすると編集画面を開く
 const ganttOf = (goalId) => state.goalGantt.filter((x) => x.goal_id === goalId);
 
-// 1 項目 1 行（グループの「目標達成に必要な項目」と同じ構造）。クリックすると右に詳細の窓が開き、中に月単位のガントを表示
+// 1 項目 1 行（グループの「目標達成に必要な項目」と同じ構造）。クリックすると右に詳細の窓が開き、中にガント（月 × 4 週）を表示
 function renderGoals(p) {
   const sec = el("section", "pf-section pf-goals");
   const h = el("h3", "", "目標達成に必要な項目");
   const done = state.goals.filter((g) => g.status === "達成").length;
   h.append(el("span", "count-badge", `${done} / ${state.goals.length} 達成`));
-  h.append(el("span", "hint", "全体目標を達成するための項目です。クリックすると詳細（月単位のガント）を開きます"));
+  h.append(el("span", "hint", "全体目標を達成するための項目です。クリックすると詳細（ガント）を開きます"));
   const add = el("button", "primary right", "＋ 項目を追加");
   add.type = "button";
   add.addEventListener("click", () => openGoalPanel("new", { kind: "goal", id: null }));
@@ -797,7 +797,7 @@ async function reorderGoals(p, ids) {
   await refreshAfterChange("goals");
 }
 
-// 項目の詳細（右の窓）: 項目の内容・月単位のガント（1 年 = 12 か月 × 4 分割）。（「議論の記録」は v1.14.0 で画面から外した。データは残してある）
+// 項目の詳細（右の窓）: 項目の内容・ガント（月ごとに 4 つの週に分けて表示・年をまたいで横にスクロール）。（「議論の記録」は v1.14.0 で画面から外した。データは残してある）
 // 編集はポップアップを開かず、窓の中でその場に書く（state.panelEdit = 編集中のもの）
 // 窓の中の編集を切り替える（null = 編集をやめる）
 function setPanelEdit(next) {
@@ -854,46 +854,65 @@ function goalForm(p, g) {
   return form;
 }
 
-// ------------------------------------------------------------ 項目の月単位ガント
-// 横軸 = 1 年（12 か月）。各月を 4 分割（1〜7 日・8〜14 日・15〜21 日・22 日〜末）して 48 区画。
-// 区画の番号 = (月 - 1) × 4 + 分割（0〜3）。行の追加は、いちばん下の枠をドラッグして期間を引く（フォームの選択でも指定できる）。
-// 行は タイトル・期限・担当者・詳細（Markdown）を持つ。バーはドラッグで移動、両端のドラッグで期間を変更。
-const GANTT_SLOTS = 48;
-const SLOT_DAYS = ["1〜7日", "8〜14日", "15〜21日", "22日〜末"];
-const slotMonth = (slot) => Math.floor(slot / 4) + 1;
-const slotText = (slot) => `${slotMonth(slot)}月 ${SLOT_DAYS[slot % 4]}`;
-const ganttRangeText = (g) => (g.start_slot === g.end_slot ? slotText(g.start_slot) : `${slotText(g.start_slot)} 〜 ${slotText(g.end_slot)}`);
-// 日付 → その年の区画（年が違えば null）
-function dateSlot(str, year) {
-  const [y, m, d] = str.split("-").map(Number);
-  return y === year ? (m - 1) * 4 + (d <= 7 ? 0 : d <= 14 ? 1 : d <= 21 ? 2 : 3) : null;
+// ------------------------------------------------------------ 項目のガント（月ごとに 4 つの週に分けて表示・年をまたいで横にスクロール）
+// 横軸 = 月。各月を 4 つの週（1 週目 = 1〜7 日・2 週目 = 8〜14 日・3 週目 = 15〜21 日・4 週目 = 22 日〜末）に分けた区画で表示する。
+// 期間の入力は、開始日・終了日をカレンダーで入れる（日付そのものを保存）。表示は、開始日・終了日を含む週の区画までバーを引く。
+// 月・年の区切りを見出しに出し、左右にスクロールして年をまたいで見られる（ガントチャートと同じ）。
+// 行は タイトル・期限・担当者・詳細（Markdown）を持つ。追加の期間のデフォルトは 3 か月。
+// バーはドラッグで移動（週の単位）、両端のドラッグで期間を変更、クリックで詳細と編集。
+const GG_COLS_SHOWN = 24; // 窓の幅に、およそ半年分（6 か月 × 4 週）が見えるように 1 区画の幅を決める
+const GG_ADD_MONTHS = 3;  // 追加するときの期間のデフォルト（か月）
+const GG_WEEK_DAYS = ["1〜7日", "8〜14日", "15〜21日", "22日〜末"];
+const ggMs = (str) => parseDate(str);
+// n か月後の日付 − 1 日（例: 11/3 から 3 か月 → 2/2）
+function ggAddMonths(ms, n) {
+  const d = new Date(ms);
+  const t = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1);
+  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n + 1, 0)).getUTCDate();
+  return t + (Math.min(d.getUTCDate(), last) - 1) * DAY_MS - DAY_MS;
 }
-const ganttBody = (g, over) => ({
-  year: g.year, start_slot: g.start_slot, end_slot: g.end_slot, title: g.title, due_date: g.due_date || null,
+const ggMonthNo = (ms) => { const d = new Date(ms); return d.getUTCFullYear() * 12 + d.getUTCMonth(); }; // 月の通し番号
+const ggWeekOf = (day) => (day <= 7 ? 0 : day <= 14 ? 1 : day <= 21 ? 2 : 3);
+const ggRangeText = (g) => `${slashDate(g.start_date)} 〜 ${slashDate(g.end_date)}`;
+const ggBody = (g, over) => ({
+  start_date: g.start_date, end_date: g.end_date, title: g.title, due_date: g.due_date || null,
   owner: g.owner || "", detail: g.detail || "", ...over,
 });
-const clampSlot = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+// 区画（月 × 4 週）⇔ 日付。base = 範囲の先頭の月の通し番号。区画の番号 = (月 - base) × 4 + 週（0〜3）
+function ggGeo(base, w) {
+  const segStart = (i) => { const m = base + Math.floor(i / 4); return Date.UTC(Math.floor(m / 12), m % 12, 1 + 7 * (i % 4)); };
+  const segEnd = (i) => { const m = base + Math.floor(i / 4), q = i % 4; return q < 3 ? Date.UTC(Math.floor(m / 12), m % 12, 7 * (q + 1)) : Date.UTC(Math.floor(m / 12), m % 12 + 1, 0); };
+  const seg = (ms) => (ggMonthNo(ms) - base) * 4 + ggWeekOf(new Date(ms).getUTCDate());
+  // 日付の位置（区画の中の何日目かまで）。期限の ◆ や今日の線に使う
+  const xAt = (ms) => { const i = seg(ms), a = segStart(i); return (i + (ms - a) / (segEnd(i) + DAY_MS - a)) * w; };
+  return { base, w, segStart, segEnd, seg, xAt };
+}
 
-// 行の入力欄。g = null なら追加（state.ganttDraft = いちばん下の枠をドラッグして引いた期間）
+// 行の入力欄。g = null なら追加（state.ganttDraft = ドラッグで引いた期間。無ければ 今日から 3 か月）
 function ganttForm(p, goal, g) {
   const key = editKey({ kind: "gantt", id: g?.id });
   const form = el("form", "gpn-form");
   form.autocomplete = "off";
   const title = panelInput("title", { required: true, placeholder: "例: サンプル受領・QC" });
-  const slotSelect = (name) => {
-    const wrap = el("span", "gg-slot-sel");
-    const m = panelInput(`${name}_m`, { tag: "select" });
-    for (let i = 1; i <= 12; i++) m.append(new Option(`${i}月`, String(i)));
-    const q = panelInput(`${name}_q`, { tag: "select" });
-    SLOT_DAYS.forEach((d, i) => q.append(new Option(`${i + 1}（${d}）`, String(i))));
-    wrap.append(m, q);
-    return wrap;
-  };
-  const year = panelInput("year", { type: "number", min: 2000, max: 2100, step: 1, required: true });
+  const start = panelInput("start_date", { type: "date", required: true });
+  const end = panelInput("end_date", { type: "date", required: true });
   const grid1 = el("div", "gpn-grid");
-  grid1.append(panelField("年", year), panelField("期限", panelInput("due_date", { type: "date" })));
-  form.append(panelField("タイトル *", title), grid1,
-    panelField("開始（月・4 分割のどこか）", slotSelect("s")), panelField("終了", slotSelect("e")),
+  grid1.append(panelField("開始日 *（カレンダーで選ぶ）", start), panelField("終了日 *（カレンダーで選ぶ）", end));
+  // 開始日から何か月か（終了日を入れる近道。デフォルトは 3 か月）
+  const quick = el("div", "gg-quick");
+  quick.append(el("span", "hint", "開始日から"));
+  for (const n of [1, 3, 6, 12]) {
+    const b = el("button", "", n === 12 ? "1 年" : `${n} か月`);
+    b.type = "button";
+    b.addEventListener("click", () => {
+      if (!start.value) return;
+      end.value = fmtDate(ggAddMonths(ggMs(start.value), n));
+      end.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    quick.append(b);
+  }
+  form.append(panelField("タイトル *", title), grid1, quick,
+    panelField("期限", panelInput("due_date", { type: "date" })),
     panelField("担当者（複数はスペース区切り）", panelInput("owner", { placeholder: "例: 高橋 鈴木" })),
     panelField("詳細（Markdown で書けます）", panelInput("detail", { tag: "textarea", rows: 6, placeholder: "- 箇条書き\n- **太字**\n- 表・リンクも書けます" })));
   enableMarkdownEditing(form.elements.namedItem("detail")); // 箇条書きの Enter・Tab などの入力補助
@@ -903,31 +922,27 @@ function ganttForm(p, goal, g) {
     onDelete: g && (() => confirmPasswordDelete(`/api/platforms/${enc(p.name)}/goal-gantt/${g.id}`, "ガントの行", `ガント: ${g.title}`, "goalGantt")),
   });
   const draft = !g && state.ganttDraft;
-  const today = new Date();
-  const todaySlot = state.ganttYear === today.getFullYear() ? dateSlot(fmtDate(todayMs()), state.ganttYear) : 0;
-  const s0 = g ? g.start_slot : draft ? draft.start : todaySlot;
-  const e0 = g ? g.end_slot : draft ? draft.end : todaySlot;
   state.ganttDraft = null;
+  const today = todayMs();
   bindPanelForm(form, key, {
-    title: g?.title, year: g ? g.year : state.ganttYear, due_date: g?.due_date, owner: g?.owner, detail: g?.detail,
-    s_m: slotMonth(s0), s_q: s0 % 4, e_m: slotMonth(e0), e_q: e0 % 4,
+    title: g?.title, due_date: g?.due_date, owner: g?.owner, detail: g?.detail,
+    start_date: g ? g.start_date : fmtDate(draft ? draft.start : today),
+    end_date: g ? g.end_date : fmtDate(draft ? draft.end : ggAddMonths(today, GG_ADD_MONTHS)),
   }, cancel);
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const v = (n) => form.elements.namedItem(n).value;
-    const body = {
-      year: Number(v("year")), start_slot: (Number(v("s_m")) - 1) * 4 + Number(v("s_q")), end_slot: (Number(v("e_m")) - 1) * 4 + Number(v("e_q")),
-      title: v("title").trim(), due_date: v("due_date") || null, owner: v("owner").trim(), detail: v("detail"),
-    };
+    const body = { start_date: v("start_date"), end_date: v("end_date"), title: v("title").trim(), due_date: v("due_date") || null, owner: v("owner").trim(), detail: v("detail") };
     if (!body.title) { err.textContent = "タイトルを入力してください"; return; }
-    if (body.end_slot < body.start_slot) { err.textContent = "終了は開始と同じか、それより後にしてください"; return; }
+    if (!body.start_date || !body.end_date) { err.textContent = "開始日と終了日を入力してください"; return; }
+    if (body.end_date < body.start_date) { err.textContent = "終了日は開始日と同じか、それより後にしてください"; return; }
     try {
       const url = `/api/platforms/${enc(p.name)}`;
       const saved = await api(g ? `${url}/goal-gantt/${g.id}` : `${url}/goals/${goal.id}/gantt`, { method: g ? "PUT" : "POST", body: JSON.stringify(body) });
       panelDrafts.delete(key);
       state.panelEdit = null;
       state.openGantt = saved.id;
-      state.ganttYear = saved.year;
+      state.ganttAnchor = ggMs(saved.start_date) - 30 * DAY_MS; // 保存した行が見える位置へ
       await refreshAfterChange("goalGantt");
       toast(g ? "保存しました" : "追加しました");
     } catch (ex) { err.textContent = ex.message; }
@@ -936,27 +951,27 @@ function ganttForm(p, goal, g) {
   return form;
 }
 
-// バーのドラッグ: 中央 = 移動、左右の端 = 期間の変更（区画に吸着）。動かさずに離したら詳細の開閉
-function startGanttDrag(ev, bar, g, w) {
+// バーのドラッグ: 中央 = 移動、左右の端 = 期間の変更（週の単位。日付は週の区画の端にそろう）。動かさずに離したら詳細の開閉
+function startGanttDrag(ev, bar, g, geo) {
   if (ev.button !== 0) return;
   ev.preventDefault();
   const mode = ev.target.classList.contains("l") ? "l" : ev.target.classList.contains("r") ? "r" : "move";
   const x0 = ev.clientX;
-  const len = g.end_slot - g.start_slot;
-  let s = g.start_slot, e = g.end_slot, moved = false;
+  const si = geo.seg(ggMs(g.start_date)), ei = geo.seg(ggMs(g.end_date));
+  let s = si, e = ei, moved = false;
   bar.setPointerCapture(ev.pointerId);
   bar.classList.add("dragging");
   const place = () => {
-    bar.style.left = `${s * w + 1}px`;
-    bar.style.width = `${(e - s + 1) * w - 2}px`;
-    bar.title = `${g.title}\n${ganttRangeText({ start_slot: s, end_slot: e })}`;
+    bar.style.left = `${s * geo.w}px`;
+    bar.style.width = `${(e - s + 1) * geo.w}px`;
+    bar.title = `${g.title}\n${slashDate(fmtDate(geo.segStart(s)))} 〜 ${slashDate(fmtDate(geo.segEnd(e)))}`;
   };
   const move = (m) => {
     if (Math.abs(m.clientX - x0) > 3) moved = true;
-    const d = Math.round((m.clientX - x0) / w);
-    if (mode === "move") { s = clampSlot(g.start_slot + d, 0, GANTT_SLOTS - 1 - len); e = s + len; }
-    else if (mode === "l") { s = clampSlot(g.start_slot + d, 0, g.end_slot); e = g.end_slot; }
-    else { s = g.start_slot; e = clampSlot(g.end_slot + d, g.start_slot, GANTT_SLOTS - 1); }
+    const d = Math.round((m.clientX - x0) / geo.w);
+    if (mode === "move") { s = Math.max(0, si + d); e = s + (ei - si); }
+    else if (mode === "l") { s = Math.max(0, Math.min(si + d, ei)); e = ei; }
+    else { s = si; e = Math.max(ei + d, si); }
     place();
   };
   const up = async () => {
@@ -965,10 +980,16 @@ function startGanttDrag(ev, bar, g, w) {
     bar.removeEventListener("pointercancel", up);
     bar.classList.remove("dragging");
     if (!moved) { state.openGantt = state.openGantt === g.id ? null : g.id; renderDetail(); return; }
-    if (s === g.start_slot && e === g.end_slot) return;
+    if (s === si && e === ei) return;
+    // 動かした側だけ区画の端にそろえる（動かしていない側の日付は、入れたまま）
+    const body = ggBody(g, {
+      start_date: s === si ? g.start_date : fmtDate(geo.segStart(s)),
+      end_date: e === ei ? g.end_date : fmtDate(geo.segEnd(e)),
+    });
+    if (mode === "move") { body.start_date = fmtDate(geo.segStart(s)); body.end_date = fmtDate(geo.segEnd(e)); }
     try {
-      await api(`/api/platforms/${enc(state.current)}/goal-gantt/${g.id}`, { method: "PUT", body: JSON.stringify(ganttBody(g, { start_slot: s, end_slot: e })) });
-      toast(`${ganttRangeText({ start_slot: s, end_slot: e })} に変更しました`);
+      await api(`/api/platforms/${enc(state.current)}/goal-gantt/${g.id}`, { method: "PUT", body: JSON.stringify(body) });
+      toast(`${slashDate(body.start_date)} 〜 ${slashDate(body.end_date)} に変更しました`);
     } catch (err) { toast(err.message, true); }
     await refreshAfterChange("goalGantt");
   };
@@ -977,29 +998,34 @@ function startGanttDrag(ev, bar, g, w) {
   bar.addEventListener("pointercancel", up);
 }
 
-// いちばん下の枠をドラッグして、新しい行の期間を引く → 追加のフォームが開く
-function startGanttDraw(ev, track, w) {
+// いちばん下の枠: ドラッグで期間を引く（週の区画の単位）。ドラッグせずにクリックしたら、その週から 3 か月のデフォルト → 追加のフォームが開く
+function startGanttDraw(ev, track, geo) {
   if (ev.button !== 0 || state.panelEdit) return;
   ev.preventDefault();
-  const slotAt = (x) => clampSlot(Math.floor((x - track.getBoundingClientRect().left) / w), 0, GANTT_SLOTS - 1);
-  const a = slotAt(ev.clientX);
-  let b = a;
+  const segAt = (x) => Math.max(0, Math.floor((x - track.getBoundingClientRect().left) / geo.w));
+  const a = segAt(ev.clientX);
+  let b = a, moved = false;
   const sel = el("div", "gg-sel");
   track.append(sel);
   track.setPointerCapture(ev.pointerId);
+  const range = () => (moved
+    ? { start: geo.segStart(Math.min(a, b)), end: geo.segEnd(Math.max(a, b)) }
+    : { start: geo.segStart(a), end: ggAddMonths(geo.segStart(a), GG_ADD_MONTHS) });
   const paint = () => {
-    sel.style.left = `${Math.min(a, b) * w}px`;
-    sel.style.width = `${(Math.abs(b - a) + 1) * w}px`;
-    sel.textContent = ganttRangeText({ start_slot: Math.min(a, b), end_slot: Math.max(a, b) });
+    const r = range();
+    const i = geo.seg(r.start), j = geo.seg(r.end);
+    sel.style.left = `${i * geo.w}px`;
+    sel.style.width = `${(j - i + 1) * geo.w}px`;
+    sel.textContent = `${slashDate(fmtDate(r.start))} 〜 ${slashDate(fmtDate(r.end))}`;
   };
   paint();
-  const move = (m) => { b = slotAt(m.clientX); paint(); };
+  const move = (m) => { b = segAt(m.clientX); if (b !== a) moved = true; paint(); };
   const up = () => {
     track.removeEventListener("pointermove", move);
     track.removeEventListener("pointerup", up);
     track.removeEventListener("pointercancel", up);
     sel.remove();
-    state.ganttDraft = { start: Math.min(a, b), end: Math.max(a, b) };
+    state.ganttDraft = range();
     setPanelEdit({ kind: "gantt", id: null });
   };
   track.addEventListener("pointermove", move);
@@ -1008,71 +1034,88 @@ function startGanttDraw(ev, track, w) {
 }
 
 function renderGantt(box, p, goal, editing) {
-  const year = state.ganttYear;
-  const all = ganttOf(goal.id);
-  const rows = all.filter((x) => x.year === year);
+  const rows = ganttOf(goal.id);
+  const today = todayMs();
 
-  // 見出し: ガント・件数・年の切り替え・追加
+  // 横軸の範囲: 今日の 1 か月前（行がもっと前にあればそこから）〜 1 年半先（行がもっと先にあればそこまで）
+  const w = Math.max(10, Math.min(30, Math.floor((box.clientWidth - 4) / GG_COLS_SHOWN)));
+  let first = ggMonthNo(today) - 1;
+  let last = ggMonthNo(today) + 18;
+  for (const g of rows) {
+    first = Math.min(first, ggMonthNo(ggMs(g.start_date)) - 1);
+    last = Math.max(last, ggMonthNo(ggMs(g.end_date)) + 2);
+  }
+  const months = last - first + 1;
+  const geo = ggGeo(first, w);
+
+  // 見出し: ガント・件数・スクロール（3 か月ずつ・今日）・追加
   const ah = el("div", "gpn-ah");
-  ah.append(el("b", "", "ガント"), el("span", "count-badge", `${rows.length} 件${all.length !== rows.length ? `（全 ${all.length} 件）` : ""}`), el("span", "spacer"));
-  const yearNav = el("span", "gg-year");
-  const yb = (label, d, title) => {
-    const b = el("button", "", label);
-    b.type = "button";
-    b.title = title;
-    b.addEventListener("click", () => { state.ganttYear += d; renderDetail(); });
-    return b;
-  };
-  yearNav.append(yb("◀", -1, "前の年"), el("b", "", `${year}年`), yb("▶", 1, "次の年"));
-  ah.append(yearNav);
+  ah.append(el("b", "", "ガント"), el("span", "count-badge", `${rows.length} 件`), el("span", "spacer"));
+  const nav = el("span", "gg-year");
+  const wrap = el("div", "gg-wrap");
+  const nb = (label, title, fn) => { const b = el("button", "", label); b.type = "button"; b.title = title; b.addEventListener("click", fn); return b; };
+  nav.append(nb("◀", "3 か月前へ", () => { wrap.scrollLeft -= 12 * w; }),
+    nb("今日", "今日の位置へ", () => { wrap.scrollLeft = Math.max(0, geo.xAt(today) - 4 * w); }),
+    nb("▶", "3 か月先へ", () => { wrap.scrollLeft += 12 * w; }));
+  ah.append(nav);
   const add = el("button", "primary", "＋ 追加");
   add.type = "button";
+  add.title = `今日から ${GG_ADD_MONTHS} か月のデフォルトで追加（開始日・終了日はカレンダーで変えられます）`;
   add.disabled = editing("gantt", null);
   add.addEventListener("click", () => setPanelEdit({ kind: "gantt", id: null }));
   ah.append(add);
   box.append(ah);
   if (editing("gantt", null)) box.append(ganttForm(p, goal, null));
 
-  // 1 年が窓の幅に収まるように、1 区画の幅を決める（狭いときは横にスクロール）
-  const w = Math.max(6, Math.floor((box.clientWidth - 4) / GANTT_SLOTS));
-  const wrap = el("div", "gg-wrap");
   const grid = el("div", "gg");
-  grid.style.width = `${w * GANTT_SLOTS}px`;
+  grid.style.width = `${w * 4 * months}px`;
   grid.style.setProperty("--sw", `${w}px`);
+  // 見出し 2 段: 上 = 月（年つき）、下 = 週（1〜4）
   const head = el("div", "gg-head");
-  for (let m = 0; m < 12; m++) {
-    const c = el("div", "gg-month", `${m + 1}月`);
-    c.style.left = `${m * 4 * w}px`;
+  for (let k = 0; k < months; k++) {
+    const m = first + k, y = Math.floor(m / 12), mo = m % 12;
+    const c = el("div", `gg-month${mo === 0 ? " yr" : ""}`, w * 4 >= 56 || mo === 0 || k === 0 ? `${y}年${mo + 1}月` : `${mo + 1}月`);
+    c.style.left = `${k * 4 * w}px`;
     c.style.width = `${4 * w}px`;
-    c.title = `${m + 1}月（4 分割: ${SLOT_DAYS.join("・")}）`;
+    c.title = `${y}年${mo + 1}月（4 つの週: ${GG_WEEK_DAYS.join("・")}）`;
     head.append(c);
+    for (let q = 0; q < 4; q++) {
+      const wcell = el("div", "gg-week", String(q + 1));
+      wcell.style.left = `${(k * 4 + q) * w}px`;
+      wcell.style.width = `${w}px`;
+      wcell.title = `${mo + 1}月 ${q + 1} 週目（${GG_WEEK_DAYS[q]}）`;
+      head.append(wcell);
+    }
   }
   grid.append(head);
   const body = el("div", "gg-body");
-  const today = new Date();
-  if (year === today.getFullYear()) {
-    const t = el("div", "gg-today");
-    t.style.left = `${dateSlot(fmtDate(todayMs()), year) * w + w / 2}px`;
-    t.title = "今日";
-    body.append(t);
+  for (let k = 1; k < months; k++) { // 年の区切り（1 月の左）
+    if ((first + k) % 12 === 0) {
+      const ln = el("div", "gg-mline yr");
+      ln.style.left = `${k * 4 * w}px`;
+      body.append(ln);
+    }
   }
+  const tl = el("div", "gg-today");
+  tl.style.left = `${geo.xAt(today)}px`;
+  tl.title = "今日";
+  body.append(tl);
   for (const g of rows) {
     const row = el("div", "gg-row");
     row.dataset.id = g.id;
     const track = el("div", "gg-track");
     const bar = el("div", `gg-bar${state.openGantt === g.id ? " open" : ""}`);
-    bar.style.left = `${g.start_slot * w + 1}px`;
-    bar.style.width = `${(g.end_slot - g.start_slot + 1) * w - 2}px`;
-    bar.title = `${g.title}\n${ganttRangeText(g)}${g.due_date ? `\n期限 ${slashDate(g.due_date)}` : ""}${g.owner ? `\n担当 ${g.owner.split(" ").join("・")}` : ""}\n（ドラッグで移動・両端で期間を変更。クリックで詳細）`;
+    const i = geo.seg(ggMs(g.start_date)), j = geo.seg(ggMs(g.end_date));
+    bar.style.left = `${i * w + 1}px`;
+    bar.style.width = `${(j - i + 1) * w - 2}px`;
+    bar.title = `${g.title}\n${ggRangeText(g)}${g.due_date ? `\n期限 ${slashDate(g.due_date)}` : ""}${g.owner ? `\n担当 ${g.owner.split(" ").join("・")}` : ""}\n（ドラッグで移動・両端で期間を変更。クリックで詳細）`;
     bar.append(el("span", "handle l"), el("span", "handle r"));
-    // タイトルと担当者は、バーの左端から右へ（長いときは枠の外へ続く）
     bar.append(el("span", "gg-label", `${g.title}${g.owner ? ` / ${g.owner.split(" ").join("・")}` : ""}`));
-    bar.addEventListener("pointerdown", (ev) => startGanttDrag(ev, bar, g, w));
+    bar.addEventListener("pointerdown", (ev) => startGanttDrag(ev, bar, g, geo));
     track.append(bar);
-    const ds = g.due_date ? dateSlot(g.due_date, year) : null;
-    if (ds !== null) {
-      const d = el("span", `gg-due${g.due_date < fmtDate(todayMs()) ? " over" : ""}`, "◆");
-      d.style.left = `${ds * w + w / 2 - 6}px`;
+    if (g.due_date) {
+      const d = el("span", `gg-due${g.due_date < fmtDate(today) ? " over" : ""}`, "◆");
+      d.style.left = `${geo.xAt(ggMs(g.due_date)) - 6}px`;
       d.title = `期限 ${slashDate(g.due_date)}`;
       track.append(d);
     }
@@ -1088,8 +1131,8 @@ function renderGantt(box, p, goal, editing) {
       d.append(el("h4", "", g.title));
       const dl = el("dl", "gpn-facts");
       const fact = (k, v, cls = "") => { if (v) dl.append(el("dt", "", k), el("dd", cls, v)); };
-      fact("期間", ganttRangeText(g));
-      fact("期限", g.due_date ? slashDate(g.due_date) : "", g.due_date && g.due_date < fmtDate(todayMs()) ? "overdue" : "");
+      fact("期間", ggRangeText(g));
+      fact("期限", g.due_date ? slashDate(g.due_date) : "", g.due_date && g.due_date < fmtDate(today) ? "overdue" : "");
       fact("担当者", g.owner ? g.owner.split(" ").join("・") : "");
       d.append(dl);
       if (g.detail) {
@@ -1104,17 +1147,24 @@ function renderGantt(box, p, goal, editing) {
       body.append(d);
     }
   }
-  // いちばん下の枠: ドラッグして新しい行の期間を引く
+  // いちばん下の枠: ドラッグして新しい行の期間を引く（クリックだけなら 3 か月）
   const draw = el("div", "gg-row gg-new");
   const dtrack = el("div", "gg-track");
-  dtrack.append(el("span", "gg-hint", state.panelEdit ? "" : "ここをドラッグして、新しい行の期間を引く"));
-  dtrack.addEventListener("pointerdown", (ev) => startGanttDraw(ev, dtrack, w));
+  dtrack.append(el("span", "gg-hint", state.panelEdit ? "" : `ここをドラッグして期間を引く（クリックだけなら ${GG_ADD_MONTHS} か月）`));
+  dtrack.addEventListener("pointerdown", (ev) => startGanttDraw(ev, dtrack, geo));
   draw.append(dtrack);
   body.append(draw);
   grid.append(body);
   wrap.append(grid);
   box.append(wrap);
-  if (!rows.length) box.append(el("p", "hint", `${year}年のガントはまだありません。上の「＋ 追加」か、枠のドラッグで登録できます。`));
+  grid.style.setProperty("--vw", `${wrap.clientWidth}px`); // 詳細・入力欄は、横にスクロールしても窓の幅で左端に留める
+  // 表示位置: 直前に見ていた位置（日付で覚える。行の追加・並び替えで範囲が変わってもずれない）。初めは今日の少し前
+  wrap.scrollLeft = geo.xAt(state.ganttAnchor ?? today - 30 * DAY_MS);
+  wrap.addEventListener("scroll", () => {
+    const i = Math.max(0, Math.floor(wrap.scrollLeft / w));
+    state.ganttAnchor = geo.segStart(i) + ((wrap.scrollLeft / w - i) * (geo.segEnd(i) + DAY_MS - geo.segStart(i)));
+  });
+  if (!rows.length) box.append(el("p", "hint", "ガントはまだありません。上の「＋ 追加」か、枠のドラッグ・クリックで登録できます。"));
 }
 
 function renderGoalPanel() {
