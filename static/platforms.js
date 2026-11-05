@@ -19,8 +19,7 @@ const state = {
   current: null, // 選択中の基盤番号
   goals: [],
   goalTasks: [], // 項目の中の実施内容（進捗率つき）
-  goalNotes: [], // 項目ごとの定期的な議論の記録
-  panelEdit: null, // 右の窓の中で編集中のもの { kind: "goal" | "task" | "note", id }（id = null は追加）
+  panelEdit: null, // 右の窓の中で編集中のもの { kind: "goal" | "task", id }（id = null は追加）
   panelGoal: null, // 右の詳細の窓で開いている項目の id
   openTask: null,
   topics: [],
@@ -377,8 +376,8 @@ async function select(name) {
   else history.replaceState(null, "", url);
   const base = `/api/platforms/${enc(name)}`;
   if (fromList) { state.panelGoal = null; state.openTask = null; state.panelEdit = null; panelDrafts.clear(); }
-  [state.goals, state.goalTasks, state.goalNotes, state.topics, state.monthly] = await Promise.all(
-    [api(`${base}/goals`), api(`${base}/goal-tasks`), api(`${base}/goal-notes`), api(`${base}/topics`), api(`${base}/monthly`)]);
+  [state.goals, state.goalTasks, state.topics, state.monthly] = await Promise.all(
+    [api(`${base}/goals`), api(`${base}/goal-tasks`), api(`${base}/topics`), api(`${base}/monthly`)]);
   renderList();
   renderDetail();
   const p = state.platforms.find((x) => x.name === name);
@@ -721,8 +720,7 @@ async function refreshAfterChange(kind) {
   const base = `/api/platforms/${enc(state.current)}`;
   if (kind === "tasks") state.tasks = await api("/api/tasks");
   else if (kind === "goalTasks") state.goalTasks = await api(`${base}/goal-tasks`);
-  else if (kind === "goalNotes") state.goalNotes = await api(`${base}/goal-notes`);
-  else if (kind === "goals") [state.goals, state.goalTasks, state.goalNotes] = await Promise.all([api(`${base}/goals`), api(`${base}/goal-tasks`), api(`${base}/goal-notes`)]);
+  else if (kind === "goals") [state.goals, state.goalTasks] = await Promise.all([api(`${base}/goals`), api(`${base}/goal-tasks`)]);
   else if (kind) state[kind] = await api(`${base}/${kind}`);
   state.platforms = await api("/api/platforms");
   renderList();
@@ -806,7 +804,7 @@ async function reorderGoals(p, ids) {
   await refreshAfterChange("goals");
 }
 
-// 項目の詳細（右の窓）: 項目の内容・実施内容（バー = 進捗率。％で色が変わる）・定期的な議論の記録。
+// 項目の詳細（右の窓）: 項目の内容・実施内容（バー = 進捗率。％で色が変わる）。（「議論の記録」は v1.14.0 で画面から外した。データは残してある）
 // 編集はポップアップを開かず、窓の中でその場に書く（state.panelEdit = 編集中のもの）
 // 窓の中の編集を切り替える（null = 編集をやめる）
 function setPanelEdit(next) {
@@ -904,38 +902,6 @@ function goalTaskForm(p, g, t) {
   return form;
 }
 
-// 議論の記録の入力欄。n = null なら新規（いつも表示しておく）
-function goalNoteForm(p, g, n) {
-  const key = n ? editKey({ kind: "note", id: n.id }) : `newnote:${g.id}`;
-  const form = el("form", "gpn-form gpn-note-form");
-  form.autocomplete = "off";
-  const date = panelInput("note_date", { type: "date", required: true });
-  const body = panelInput("body", { tag: "textarea", rows: n ? 4 : 3, placeholder: "議論の内容・決定事項・宿題（担当者・期限）など" });
-  form.append(panelField("日付", date, "gpn-date"), body);
-  const cancel = n ? () => setPanelEdit(null) : null;
-  const err = panelActions(form, {
-    submitLabel: n ? "保存" : "記録を追加", onCancel: cancel,
-    onDelete: n && (() => confirmPasswordDelete(`/api/platforms/${enc(p.name)}/goal-notes/${n.id}`, "議論の記録", `${slashDate(n.note_date)} の記録`, "goalNotes")),
-  });
-  bindPanelForm(form, key, { note_date: n ? n.note_date : fmtDate(todayMs()), body: n?.body }, cancel);
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const data = { note_date: date.value, body: body.value.trim() };
-    if (!data.note_date) { err.textContent = "日付を入力してください"; return; }
-    if (!data.body) { err.textContent = "内容を入力してください"; return; }
-    try {
-      await api(n ? `/api/platforms/${enc(p.name)}/goal-notes/${n.id}` : `/api/platforms/${enc(p.name)}/goals/${g.id}/notes`,
-        { method: n ? "PUT" : "POST", body: JSON.stringify(data) });
-      panelDrafts.delete(key);
-      if (n) state.panelEdit = null;
-      await refreshAfterChange("goalNotes");
-      toast(n ? "記録を保存しました" : "記録を追加しました");
-    } catch (ex) { err.textContent = ex.message; }
-  });
-  if (n) focusLater(body);
-  return form;
-}
-
 function renderGoalPanel() {
   const panel = $("#goal-panel");
   const box = $("#goal-panel-body");
@@ -946,8 +912,7 @@ function renderGoalPanel() {
   if (panel.hidden) { state.panelEdit = null; panelDrafts.clear(); return; }
   const ed = state.panelEdit;
   // 編集中のものが消えていたら（削除など）編集をやめる
-  if ((ed?.kind === "task" && ed.id && !state.goalTasks.some((t) => t.id === ed.id)) ||
-      (ed?.kind === "note" && ed.id && !state.goalNotes.some((n) => n.id === ed.id))) {
+  if (ed?.kind === "task" && ed.id && !state.goalTasks.some((t) => t.id === ed.id)) {
     panelDrafts.delete(editKey(ed));
     state.panelEdit = null;
   }
@@ -1046,29 +1011,6 @@ function renderGoalPanel() {
     box.append(item);
   }
 
-  // 定期的な議論の記録（新しい日付が上）
-  const notes = state.goalNotes.filter((n) => n.goal_id === g.id);
-  const nh = el("div", "gpn-ah");
-  nh.append(el("b", "", "議論の記録"), el("span", "count-badge", `${notes.length} 件`), el("span", "spacer"),
-    el("span", "hint", "定期的な議論の内容・決定事項・宿題"));
-  box.append(nh, goalNoteForm(p, g, null));
-  const ol = el("ol", "log-list gpn-notes");
-  for (const n of notes) {
-    const li = el("li");
-    if (editing("note", n.id)) {
-      li.append(goalNoteForm(p, g, n));
-    } else {
-      const lh = el("div", "lh");
-      lh.append(el("b", "", slashDate(n.note_date)), el("span", "upd", `更新 ${n.updated_at.slice(0, 16)}`));
-      const eb = el("button", "", "編集");
-      eb.type = "button";
-      eb.addEventListener("click", () => setPanelEdit({ kind: "note", id: n.id }));
-      lh.append(eb);
-      li.append(lh, el("div", "lb", n.body));
-    }
-    ol.append(li);
-  }
-  if (notes.length) box.append(ol);
   box.scrollTop = scroll;
 }
 
