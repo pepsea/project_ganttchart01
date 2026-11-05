@@ -858,7 +858,7 @@ function goalForm(p, g) {
 // 横軸 = 月。各月を 4 つの週（1 週目 = 1〜7 日・2 週目 = 8〜14 日・3 週目 = 15〜21 日・4 週目 = 22 日〜末）に分けた区画で表示する。
 // 期間の入力は、開始日・終了日をカレンダーで入れる（日付そのものを保存）。表示は、開始日・終了日を含む週の区画までバーを引く。
 // 月・年の区切りを見出しに出し、左右にスクロールして年をまたいで見られる（ガントチャートと同じ）。
-// 行は タイトル・期限・担当者・詳細（Markdown）を持つ。追加の期間のデフォルトは 3 か月。
+// 行は タイトル・担当者・詳細（Markdown）と期間を持つ。期限は決めず、期間の終了日が期限。バーの色: 実施中 = 青、期限まで 1 か月 = オレンジ、期限超過 = 赤、将来の予定 = グレー。追加の期間のデフォルトは 3 か月。
 // バーはドラッグで移動（週の単位）、両端のドラッグで期間を変更、クリックで詳細と編集。
 const GG_COLS_SHOWN = 24; // 窓の幅に、およそ半年分（6 か月 × 4 週）が見えるように 1 区画の幅を決める
 const GG_ADD_MONTHS = 3;  // 追加するときの期間のデフォルト（か月）
@@ -873,9 +873,16 @@ function ggAddMonths(ms, n) {
 }
 const ggMonthNo = (ms) => { const d = new Date(ms); return d.getUTCFullYear() * 12 + d.getUTCMonth(); }; // 月の通し番号
 const ggWeekOf = (day) => (day <= 7 ? 0 : day <= 14 ? 1 : day <= 21 ? 2 : 3);
+// 状態（色）: 期限（= 終了日）を過ぎた = 赤（over）／まだ始まっていない = グレー（future）／実施中のうち、期限まで 1 か月以内 = オレンジ（soon）、それ以外 = 青（active）
+function ggStatus(g, today) {
+  if (ggMs(g.end_date) < today) return "over";
+  if (ggMs(g.start_date) > today) return "future";
+  return ggMs(g.end_date) <= ggAddMonths(today, 1) + DAY_MS ? "soon" : "active";
+}
+const GG_STATUS_TEXT = { over: "期限超過", future: "将来の予定", soon: "期限まで 1 か月以内", active: "実施中" };
 const ggRangeText = (g) => `${slashDate(g.start_date)} 〜 ${slashDate(g.end_date)}`;
 const ggBody = (g, over) => ({
-  start_date: g.start_date, end_date: g.end_date, title: g.title, due_date: g.due_date || null,
+  start_date: g.start_date, end_date: g.end_date, title: g.title,
   owner: g.owner || "", detail: g.detail || "", ...over,
 });
 // 区画（月 × 4 週）⇔ 日付。base = 範囲の先頭の月の通し番号。区画の番号 = (月 - base) × 4 + 週（0〜3）
@@ -897,7 +904,7 @@ function ganttForm(p, goal, g) {
   const start = panelInput("start_date", { type: "date", required: true });
   const end = panelInput("end_date", { type: "date", required: true });
   const grid1 = el("div", "gpn-grid");
-  grid1.append(panelField("開始日 *（カレンダーで選ぶ）", start), panelField("終了日 *（カレンダーで選ぶ）", end));
+  grid1.append(panelField("開始日 *（カレンダーで選ぶ）", start), panelField("終了日 *（= 期限）", end));
   // 開始日から何か月か（終了日を入れる近道。デフォルトは 3 か月）
   const quick = el("div", "gg-quick");
   quick.append(el("span", "hint", "開始日から"));
@@ -912,7 +919,6 @@ function ganttForm(p, goal, g) {
     quick.append(b);
   }
   form.append(panelField("タイトル *", title), grid1, quick,
-    panelField("期限", panelInput("due_date", { type: "date" })),
     panelField("担当者（複数はスペース区切り）", panelInput("owner", { placeholder: "例: 高橋 鈴木" })),
     panelField("詳細（Markdown で書けます）", panelInput("detail", { tag: "textarea", rows: 6, placeholder: "- 箇条書き\n- **太字**\n- 表・リンクも書けます" })));
   enableMarkdownEditing(form.elements.namedItem("detail")); // 箇条書きの Enter・Tab などの入力補助
@@ -925,14 +931,14 @@ function ganttForm(p, goal, g) {
   state.ganttDraft = null;
   const today = todayMs();
   bindPanelForm(form, key, {
-    title: g?.title, due_date: g?.due_date, owner: g?.owner, detail: g?.detail,
+    title: g?.title, owner: g?.owner, detail: g?.detail,
     start_date: g ? g.start_date : fmtDate(draft ? draft.start : today),
     end_date: g ? g.end_date : fmtDate(draft ? draft.end : ggAddMonths(today, GG_ADD_MONTHS)),
   }, cancel);
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const v = (n) => form.elements.namedItem(n).value;
-    const body = { start_date: v("start_date"), end_date: v("end_date"), title: v("title").trim(), due_date: v("due_date") || null, owner: v("owner").trim(), detail: v("detail") };
+    const body = { start_date: v("start_date"), end_date: v("end_date"), title: v("title").trim(), owner: v("owner").trim(), detail: v("detail") };
     if (!body.title) { err.textContent = "タイトルを入力してください"; return; }
     if (!body.start_date || !body.end_date) { err.textContent = "開始日と終了日を入力してください"; return; }
     if (body.end_date < body.start_date) { err.textContent = "終了日は開始日と同じか、それより後にしてください"; return; }
@@ -1065,6 +1071,13 @@ function renderGantt(box, p, goal, editing) {
   add.addEventListener("click", () => setPanelEdit({ kind: "gantt", id: null }));
   ah.append(add);
   box.append(ah);
+  const legend = el("div", "gg-legend");
+  for (const k of ["active", "soon", "over", "future"]) {
+    const x = el("span", `st-${k}`);
+    x.append(el("i"), GG_STATUS_TEXT[k]);
+    legend.append(x);
+  }
+  box.append(legend);
   if (editing("gantt", null)) box.append(ganttForm(p, goal, null));
 
   const grid = el("div", "gg");
@@ -1104,21 +1117,16 @@ function renderGantt(box, p, goal, editing) {
     const row = el("div", "gg-row");
     row.dataset.id = g.id;
     const track = el("div", "gg-track");
-    const bar = el("div", `gg-bar${state.openGantt === g.id ? " open" : ""}`);
+    const st = ggStatus(g, today);
+    const bar = el("div", `gg-bar st-${st}${state.openGantt === g.id ? " open" : ""}`);
     const i = geo.seg(ggMs(g.start_date)), j = geo.seg(ggMs(g.end_date));
     bar.style.left = `${i * w + 1}px`;
     bar.style.width = `${(j - i + 1) * w - 2}px`;
-    bar.title = `${g.title}\n${ggRangeText(g)}${g.due_date ? `\n期限 ${slashDate(g.due_date)}` : ""}${g.owner ? `\n担当 ${g.owner.split(" ").join("・")}` : ""}\n（ドラッグで移動・両端で期間を変更。クリックで詳細）`;
+    bar.title = `${g.title}\n${ggRangeText(g)}（${GG_STATUS_TEXT[st]}。期限 = 終了日）${g.owner ? `\n担当 ${g.owner.split(" ").join("・")}` : ""}\n（ドラッグで移動・両端で期間を変更。クリックで詳細）`;
     bar.append(el("span", "handle l"), el("span", "handle r"));
     bar.append(el("span", "gg-label", `${g.title}${g.owner ? ` / ${g.owner.split(" ").join("・")}` : ""}`));
     bar.addEventListener("pointerdown", (ev) => startGanttDrag(ev, bar, g, geo));
     track.append(bar);
-    if (g.due_date) {
-      const d = el("span", `gg-due${g.due_date < fmtDate(today) ? " over" : ""}`, "◆");
-      d.style.left = `${geo.xAt(ggMs(g.due_date)) - 6}px`;
-      d.title = `期限 ${slashDate(g.due_date)}`;
-      track.append(d);
-    }
     row.append(track);
     body.append(row);
     // 詳細（クリックで開く）/ 編集
@@ -1127,12 +1135,12 @@ function renderGantt(box, p, goal, editing) {
       f.append(ganttForm(p, goal, g));
       body.append(f);
     } else if (state.openGantt === g.id) {
-      const d = el("div", "gg-detail");
+      const d = el("div", `gg-detail st-${st}`);
       d.append(el("h4", "", g.title));
       const dl = el("dl", "gpn-facts");
       const fact = (k, v, cls = "") => { if (v) dl.append(el("dt", "", k), el("dd", cls, v)); };
       fact("期間", ggRangeText(g));
-      fact("期限", g.due_date ? slashDate(g.due_date) : "", g.due_date && g.due_date < fmtDate(today) ? "overdue" : "");
+      fact("期限（終了日）", `${slashDate(g.end_date)}（${GG_STATUS_TEXT[st]}）`, st === "over" ? "overdue" : "");
       fact("担当者", g.owner ? g.owner.split(" ").join("・") : "");
       d.append(dl);
       if (g.detail) {

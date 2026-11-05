@@ -732,15 +732,25 @@ a.back-group:hover { filter: brightness(1.1); color: #fff; }
   background-size: calc(var(--sw) * 4) 100%, var(--sw) 100%;
 }
 .gg-bar { position: absolute; top: 3px; height: 20px; border-radius: 4px; background: #cfe3ff; border: 1px solid #8fb4e8; cursor: grab; touch-action: none; user-select: none; }
-.gg-bar:hover { background: #bfd8ff; }
+/* バーの色: 実施中 = 青、期限まで 1 か月以内 = オレンジ、期限（終了日）超過 = 赤、将来の予定 = グレー */
+.gg-bar.st-active { background: #cfe3ff; border-color: #8fb4e8; }
+.gg-bar.st-soon { background: #ffe2b3; border-color: #f0b050; }
+.gg-bar.st-over { background: #ffd4d4; border-color: #e57373; }
+.gg-bar.st-future { background: #e8eaee; border-color: #b8bec9; }
+.gg-bar:hover { filter: brightness(.95); }
+.gg-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 6px; font-size: 11.5px; color: var(--muted); }
+.gg-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.gg-legend i { width: 12px; height: 10px; border-radius: 3px; display: inline-block; border: 1px solid; }
+.gg-legend .st-active i { background: #cfe3ff; border-color: #8fb4e8; }
+.gg-legend .st-soon i { background: #ffe2b3; border-color: #f0b050; }
+.gg-legend .st-over i { background: #ffd4d4; border-color: #e57373; }
+.gg-legend .st-future i { background: #e8eaee; border-color: #b8bec9; }
 .gg-bar.open { outline: 2px solid var(--accent); outline-offset: 0; }
 .gg-bar.dragging { cursor: grabbing; opacity: .85; }
 .gg-bar .handle { position: absolute; top: 0; bottom: 0; width: 5px; cursor: ew-resize; }
 .gg-bar .handle.l { left: 0; }
 .gg-bar .handle.r { right: 0; }
 .gg-label { position: absolute; left: 5px; top: 0; line-height: 18px; white-space: nowrap; color: var(--text); font-size: 11px; pointer-events: none; } /* バーの左端から右へ（長いときは枠の外へ続く） */
-.gg-due { position: absolute; top: 5px; width: 12px; text-align: center; font-size: 12px; line-height: 14px; color: #d97706; pointer-events: none; }
-.gg-due.over { color: var(--today); }
 .gg-today { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--today); opacity: .6; z-index: 2; pointer-events: none; }
 .gg-new .gg-track { cursor: crosshair; background-color: #fafbfc; }
 .gg-hint { position: absolute; left: 6px; line-height: 25px; color: var(--muted); font-size: 11px; pointer-events: none; white-space: nowrap; }

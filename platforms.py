@@ -102,7 +102,7 @@ def init_db() -> None:
                    start_date TEXT NOT NULL DEFAULT '',   -- 開始日（週表示。画面では週の月曜にそろえる）
                    end_date   TEXT NOT NULL DEFAULT '',   -- 終了日（画面では週の日曜にそろえる）
                    title      TEXT NOT NULL,          -- タイトル
-                   due_date   TEXT,                   -- 期限（任意）
+                   due_date   TEXT,                   -- （未使用・旧: v1.17.0 で外した。期限は終了日）
                    owner      TEXT NOT NULL DEFAULT '',    -- 担当者（半角スペース区切り）
                    detail     TEXT NOT NULL DEFAULT '',    -- 詳細（Markdown）
                    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
@@ -322,9 +322,8 @@ def _legacy_slots(start: date, end: date) -> tuple[int, int, int]:
 class GoalGanttIn(BaseModel):
     """項目のガントの 1 行（週表示・年をまたいで表示できる）。期間 = 開始日〜終了日（画面では週の単位でそろえる）"""
     start_date: date
-    end_date: date
+    end_date: date                 # 終了日 = 期限（別に期限は決めない）
     title: str = Field(min_length=1)
-    due_date: date | None = None   # 期限（任意）
     owner: str = ""                # 担当者（半角スペース区切り）
     detail: str = ""               # 詳細（Markdown）
 
@@ -951,8 +950,7 @@ async def delete_goal_task(name: str, task_id: int, body: ConfirmIn) -> Response
 
 def _gantt_values(g: GoalGanttIn) -> tuple:
     year, s, e = _legacy_slots(g.start_date, g.end_date)
-    return (year, s, e, g.start_date.isoformat(), g.end_date.isoformat(), g.title,
-            g.due_date.isoformat() if g.due_date else None, g.owner, g.detail.strip())
+    return (year, s, e, g.start_date.isoformat(), g.end_date.isoformat(), g.title, g.owner, g.detail.strip())
 
 
 @router.get("/{name}/goal-gantt")
@@ -970,14 +968,14 @@ def add_goal_gantt(name: str, goal_id: int, g: GoalGanttIn) -> dict:
         if not db.execute("SELECT 1 FROM platform_goals WHERE id=? AND platform=?", (goal_id, name)).fetchone():
             raise HTTPException(404, "項目が見つかりません")
         cur = db.execute("INSERT INTO platform_goal_gantt(platform, goal_id, year, start_slot, end_slot, start_date, end_date,"
-                         " title, due_date, owner, detail) VALUES (?,?,?,?,?,?,?,?,?,?,?)", (name, goal_id, *_gantt_values(g)))
+                         " title, owner, detail) VALUES (?,?,?,?,?,?,?,?,?,?)", (name, goal_id, *_gantt_values(g)))
         return dict(db.execute("SELECT * FROM platform_goal_gantt WHERE id = ?", (cur.lastrowid,)).fetchone())
 
 
 @router.put("/{name}/goal-gantt/{gantt_id}")
 def update_goal_gantt(name: str, gantt_id: int, g: GoalGanttIn) -> dict:
     with get_db() as db:
-        cur = db.execute("UPDATE platform_goal_gantt SET year=?, start_slot=?, end_slot=?, start_date=?, end_date=?, title=?, due_date=?,"
+        cur = db.execute("UPDATE platform_goal_gantt SET year=?, start_slot=?, end_slot=?, start_date=?, end_date=?, title=?,"
                          " owner=?, detail=?,"
                          " updated_at=datetime('now','localtime') WHERE id=? AND platform=?", (*_gantt_values(g), gantt_id, name))
         if cur.rowcount == 0:
