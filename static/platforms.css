@@ -633,7 +633,7 @@ a.back-group:hover { filter: brightness(1.1); color: #fff; }
 
 /* 項目の一覧: 1 項目 1 行（グループと同じ構造） */
 .pf-goal-rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid #d3d8e0; }
-.pf-goal-rows li { display: grid; grid-template-columns: auto auto minmax(0, 1fr) 130px auto; gap: 12px; align-items: center; padding: 7px 10px; border-bottom: 1px solid #d3d8e0; cursor: pointer; }
+.pf-goal-rows li { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 7px 10px; border-bottom: 1px solid #d3d8e0; cursor: pointer; }
 .pf-goal-rows li:nth-child(even) { background: #fafbfd; }
 .pf-goal-rows li:hover, .pf-goal-rows li:focus { background: #f3f7ff; outline: none; }
 .pf-goal-rows li.overdue { background: #fde8e8; box-shadow: inset 4px 0 0 var(--today); }
@@ -646,6 +646,14 @@ a.back-group:hover { filter: brightness(1.1); color: #fff; }
 .pf-goal-rows .g-due { font-size: 12.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pf-goal-rows .g-due.overdue { color: var(--today); font-weight: 700; }
 .pf-goal-rows .g-due.soon { color: #b56d00; font-weight: 700; }
+.pf-goal-rows .t-sum { display: flex; align-items: center; gap: 4px; }
+.pf-goal-rows .gs { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; border: 1px solid; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pf-goal-rows .gs.zero { opacity: .35; font-weight: 500; }
+.pf-goal-rows .gs.st-active { background: #cfe3ff; border-color: #8fb4e8; color: #1d4fb8; }
+.pf-goal-rows .gs.st-over { background: #ffd4d4; border-color: #e57373; color: #a3161b; }
+.pf-goal-rows .gs.st-soon { background: #ffe2b3; border-color: #f0b050; color: #8a5100; }
+.pf-goal-rows .gs.st-future { background: #e8eaee; border-color: #b8bec9; color: #4b5563; }
+.pf-goal-rows .gs-none { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
 .pf-goal-rows .t-sum .lbl { font-size: 11.5px; font-weight: 700; color: #1d6b43; white-space: nowrap; margin-bottom: 3px; }
 .g-link { font-size: 11px; font-weight: 600; padding: 0 7px; border-radius: 6px; background: var(--accent); color: #fff; text-decoration: none; }
 .goal-panel .count-badge { font-size: 11.5px; font-weight: 700; color: #1d6b43; background: #d9f2e4; border-radius: 999px; padding: 1px 8px; }

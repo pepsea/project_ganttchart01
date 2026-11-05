@@ -766,9 +766,17 @@ function renderGoals(p) {
     main.append(el("span", "g-title", g.title));
     if (safeUrl(g.url)) main.append(linkButton("リンク", g.url, "項目のリンク"));
     if (g.note) main.append(el("span", "g-note", g.note.replace(/\s*\n\s*/g, "　").trim()));
+    // ガントの行を状態で数えて、実施中・期限超過・期限まで 1 か月・予定（まだ始まっていない）の件数を出す
     const rows = ganttOf(g.id);
+    const cnt = { active: 0, over: 0, soon: 0, future: 0 };
+    for (const r of rows) cnt[ggStatus(r, todayMs())]++;
     const sum = el("div", "t-sum");
-    sum.append(el("div", "lbl", rows.length ? `ガント ${rows.length} 件` : "ガントなし"));
+    if (!rows.length) sum.append(el("span", "gs-none", "ガントなし"));
+    for (const [k, label] of [["active", "実施中"], ["over", "期限超過"], ["soon", "期限1か月"], ["future", "予定"]]) {
+      const c = el("span", `gs st-${k}${cnt[k] ? "" : " zero"}`, `${label} ${cnt[k]}`);
+      c.title = `${GG_STATUS_TEXT[k]}: ${cnt[k]} 件（ガント全 ${rows.length} 件）`;
+      if (rows.length) sum.append(c);
+    }
     const d = el("span", `g-due ${due}`, g.due_date ? `期限 ${slashDate(g.due_date)}` : "");
     if (due) d.title = due === "overdue" ? `期限超過（${-daysLeft(g.due_date)} 日経過）` : `期限まであと ${daysLeft(g.due_date)} 日`;
     // 並び替え: 行の左のつまみ（⠿）をドラッグして好きな位置へ
