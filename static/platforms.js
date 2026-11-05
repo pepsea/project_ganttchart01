@@ -860,7 +860,7 @@ function goalForm(p, g) {
 // 月・年の区切りを見出しに出し、左右にスクロールして年をまたいで見られる（ガントチャートと同じ）。
 // 行は タイトル・担当者・詳細（Markdown）と期間を持つ。期限は決めず、期間の終了日が期限。バーの色: 実施中 = 青、期限まで 1 か月 = オレンジ、期限超過 = 赤、将来の予定 = グレー。追加の期間のデフォルトは 3 か月。
 // バーはドラッグで移動（週の単位）、両端のドラッグで期間を変更、クリックで詳細と編集。
-const GG_COLS_SHOWN = 24; // 窓の幅に、およそ半年分（6 か月 × 4 週）が見えるように 1 区画の幅を決める
+const GG_COLS_SHOWN = 48; // 窓の幅に、およそ 1 年分（12 か月 × 4 週）が見えるように 1 区画の幅を決める（月の表示を狭くして、横軸に 2 倍の期間を出す）
 const GG_ADD_MONTHS = 3;  // 追加するときの期間のデフォルト（か月）
 const GG_WEEK_DAYS = ["1〜7日", "8〜14日", "15〜21日", "22日〜末"];
 const ggMs = (str) => parseDate(str);
@@ -1044,7 +1044,7 @@ function renderGantt(box, p, goal, editing) {
   const today = todayMs();
 
   // 横軸の範囲: 今日の 1 か月前（行がもっと前にあればそこから）〜 1 年半先（行がもっと先にあればそこまで）
-  const w = Math.max(10, Math.min(30, Math.floor((box.clientWidth - 4) / GG_COLS_SHOWN)));
+  const w = Math.max(6, Math.min(30, Math.floor((box.clientWidth - 4) / GG_COLS_SHOWN)));
   let first = ggMonthNo(today) - 1;
   let last = ggMonthNo(today) + 18;
   for (const g of rows) {
@@ -1083,11 +1083,13 @@ function renderGantt(box, p, goal, editing) {
   const grid = el("div", "gg");
   grid.style.width = `${w * 4 * months}px`;
   grid.style.setProperty("--sw", `${w}px`);
+  grid.classList.toggle("narrow", w < 12); // 1 区画が狭いときは、週の数字を小さくする
   // 見出し 2 段: 上 = 月（年つき）、下 = 週（1〜4）
   const head = el("div", "gg-head");
   for (let k = 0; k < months; k++) {
     const m = first + k, y = Math.floor(m / 12), mo = m % 12;
-    const c = el("div", `gg-month${mo === 0 ? " yr" : ""}`, w * 4 >= 56 || mo === 0 || k === 0 ? `${y}年${mo + 1}月` : `${mo + 1}月`);
+    const wide = w * 4 >= 56; // 1 か月の幅に「2026年11月」が入るか
+    const c = el("div", `gg-month${mo === 0 ? " yr" : ""}`, wide ? `${y}年${mo + 1}月` : mo === 0 ? String(y) : `${mo + 1}月`); // 狭いときは、1 月のところに年だけ出す
     c.style.left = `${k * 4 * w}px`;
     c.style.width = `${4 * w}px`;
     c.title = `${y}年${mo + 1}月（4 つの週: ${GG_WEEK_DAYS.join("・")}）`;
