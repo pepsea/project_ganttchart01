@@ -1278,6 +1278,13 @@ function renderGoalPanel() {
 // 窓の幅: 左端をドラッグして変えられる
 enablePanelResize($("#goal-panel"), $("#goal-panel-resize"), "platforms.panelWidth", () => { if (!state.panelEdit) renderDetail(); }); // 幅が変わったらガントの区画の幅も合わせる
 
+// Esc で項目の詳細の窓を閉じる（入力欄の中の Esc は、先にその入力を取り消すだけ。確認のダイアログが開いているときは何もしない）
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || e.isComposing || e.defaultPrevented) return;
+  if ($("#goal-panel").hidden || document.querySelector("dialog[open]")) return;
+  openGoalPanel(null); // 書きかけがあれば、破棄してよいか確認する
+});
+
 
 // 目標・月報の削除: パスワードを入力して確認（サーバー側でも検証）
 let pwDelete = null; // { url, label, kind }
