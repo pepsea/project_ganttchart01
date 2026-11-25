@@ -11,7 +11,7 @@ from typing import Literal
 from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -151,6 +151,9 @@ def init_db() -> None:
                 db.execute(f"ALTER TABLE tasks ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
         if "completed_at" not in cols:  # 完了にした日時（空 = 未完了）。完了から 1 週間たつと自動で削除する
             db.execute("ALTER TABLE tasks ADD COLUMN completed_at TEXT NOT NULL DEFAULT ''")
+        for col in ("modified_at", "modified_by"):  # 最終修正の日時と、修正した端末の IP（v1.19.0 から自動で記録。空 = 記録なし）
+            if col not in cols:
+                db.execute(f"ALTER TABLE tasks ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
         # タスクの履歴: 完了・削除したタスクの写しを永続保管する（完了から 1 週間の自動削除のあとも残る）
         db.execute("""CREATE TABLE IF NOT EXISTS task_history (
                           id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -493,6 +496,12 @@ def list_tasks() -> list[dict]:
         return [dict(r) for r in db.execute(f"SELECT t.* FROM tasks t {TASK_ORDER}")]
 
 
+def stamp(db: sqlite3.Connection, task_id: int, request: Request | None) -> None:
+    """タスクの最終修正の日時と、修正した端末の IP（ログと同じ。X-Forwarded-For があればその先頭）を自動で記録する"""
+    db.execute("UPDATE tasks SET modified_at = ?, modified_by = ? WHERE id = ?",
+               (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), applog._client_ip(request) if request else "", task_id))
+
+
 def get_task(db: sqlite3.Connection, task_id: int) -> dict:
     return dict(db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone())
 
@@ -502,20 +511,22 @@ UPDATE_SQL = f"UPDATE tasks SET {', '.join(c + '=?' for c in TASK_COLS)} WHERE i
 
 
 @app.post("/api/tasks", status_code=201)
-def create_task(task: TaskIn) -> dict:
+def create_task(task: TaskIn, request: Request) -> dict:
     with get_db() as db:
         save_masters(db, task)
         cur = db.execute(INSERT_SQL, task.values())
+        stamp(db, cur.lastrowid, request)
         return get_task(db, cur.lastrowid)
 
 
 @app.put("/api/tasks/{task_id}")
-def update_task(task_id: int, task: TaskIn) -> dict:
+def update_task(task_id: int, task: TaskIn, request: Request) -> dict:
     with get_db() as db:
         save_masters(db, task)
         cur = db.execute(UPDATE_SQL, (*task.values(), task_id))
         if cur.rowcount == 0:
             raise HTTPException(404, "タスクが見つかりません")
+        stamp(db, task_id, request)
         keep_task_history(db, "id = ?", (task_id,))
         return get_task(db, task_id)
 
@@ -525,13 +536,14 @@ class DoneIn(BaseModel):
 
 
 @app.post("/api/tasks/{task_id}/done")
-def set_task_done(task_id: int, body: DoneIn) -> dict:
+def set_task_done(task_id: int, body: DoneIn, request: Request) -> dict:
     """完了にする / 完了を取り消す。完了にした日時を記録し、1 週間たつと自動で削除される"""
     with get_db() as db:
         cur = db.execute("UPDATE tasks SET completed_at = ? WHERE id = ?",
                          ("" if not body.done else datetime.now().strftime("%Y-%m-%d %H:%M:%S"), task_id))
         if cur.rowcount == 0:
             raise HTTPException(404, "タスクが見つかりません")
+        stamp(db, task_id, request)
         keep_task_history(db, "id = ?", (task_id,))  # 完了したタスクは履歴に写しを残す
         return get_task(db, task_id)
 
@@ -592,6 +604,7 @@ def export_history_csv() -> Response:
 
 @app.post("/api/import")
 async def import_csv(
+    request: Request,
     file: UploadFile = File(...),
     mode: Literal["append", "replace"] = "append",
     confirm: str = "",
@@ -657,11 +670,13 @@ async def import_csv(
                 if db.execute(UPDATE_SQL, (*t.values(), task_id)).rowcount:
                     if has_done:
                         db.execute("UPDATE tasks SET completed_at = ? WHERE id = ?", (done, task_id))
+                    stamp(db, task_id, request)
                     updated += 1
                     continue
             new_id = db.execute(INSERT_SQL, t.values()).lastrowid
             if has_done and done:
                 db.execute("UPDATE tasks SET completed_at = ? WHERE id = ?", (done, new_id))
+            stamp(db, new_id, request)
             added += 1
         keep_task_history(db, "1")
     return {"added": added, "updated": updated, "mode": mode}

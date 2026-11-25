@@ -481,6 +481,8 @@ async function toggleDone(task) {
   try {
     const saved = await api(`/api/tasks/${task.id}/done`, { method: "POST", body: JSON.stringify({ done }) });
     task.completed_at = saved.completed_at;
+    task.modified_at = saved.modified_at;
+    task.modified_by = saved.modified_by;
     toast(done ? "完了にしました（一番下に移ります。1 週間後に自動で削除されます。ガントチャート履歴には残ります）" : "完了を取り消しました");
     rerenderKeepScroll();
   } catch (err) {
@@ -911,6 +913,10 @@ function openTaskDialog(task = null) {
     const s = el("span", st ? `st-${st}` : "",
       days < 0 ? `期限超過（${Math.max(1, -wd)} 営業日経過）` : days === 0 ? "本日が期限" : `期限まであと ${wd} 営業日`);
     meta.append(s);
+    // 最終修正の日時と修正者（修正した端末の IP）。サーバーが保存のたびに自動で記録する（記録が無いタスクは「記録なし」）
+    meta.append(el("br"), el("span", "task-modified", task.modified_at
+      ? `最終修正: ${task.modified_at.slice(0, 16).replaceAll("-", "/")}　修正者（IP）: ${task.modified_by || "不明"}`
+      : "最終修正: 記録なし（記録を始める前のタスク。次に保存したときから記録されます）"));
     meta.hidden = false;
   } else {
     $("#task-copy").hidden = true;
