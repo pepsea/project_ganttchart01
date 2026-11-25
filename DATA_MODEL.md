@@ -25,6 +25,7 @@
 | | start_date / end_date | 開始日 / 終了日 |
 | | detail | 詳細 |
 | | completed_at | 完了にした日時（空 = 未完了）。完了したタスクはグレーアウトして一番下に表示し、完了から 1 週間（7 日）たつと自動で削除する（起動時・一覧の取得時）。削除しても `task_history` に写しが残る |
+| | modified_at / modified_by | 最終修正の日時（`YYYY-MM-DD HH:MM:SS`）/ 修正した端末の IP（v1.19.0 で追加。タスクの追加・保存（バーのドラッグを含む）・完了の切り替え・CSV インポートのたびに自動で記録。IP は `X-Forwarded-For` があればその先頭、無ければ接続元。空 = 記録なし＝記録を始める前のタスク）。画面: タスク詳細の「最終修正 … 修正者（IP）…」 |
 | `task_history` | id, task_id (一意) | ガントチャートの履歴。完了したタスク・削除したタスク（完了から 1 週間の自動削除、CSV の「置き換え」を含む）の写しを永続保管する。task_id = 元の `tasks.id`（削除後も残す） |
 | | area / project / task / assignee / priority / start_date / end_date / detail | 写した時点のタスクの内容（`tasks` と同じ意味） |
 | | completed_at / deleted_at / saved_at | 完了日時 / 削除日時（空 = まだガントチャートにある）/ 写しを保存・更新した日時。完了したタスクを編集すると写しも更新。起動時・復元後に、完了済みのタスクを毎回写す |
